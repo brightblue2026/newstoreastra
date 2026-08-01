@@ -1,0 +1,1162 @@
+{
+  "_meta": {
+    "source": [
+      "https://brightblue.in",
+      "https://brightblue.vercel.app"
+    ],
+    "scrapedOn": "2026-08-01",
+    "note": "Prices in paise. Fragrance SKUs had no price on the source site (WooCommerce 'Read more' state, price 0.00) - pricePaise is null and MUST be supplied by BBTC before launch. Hex values are proposed, not sourced - confirm against actual bottle artwork."
+  },
+  "company": {
+    "legalName": "Bright Blue Trading Corporation",
+    "shortName": "BBTC",
+    "founded": 2019,
+    "founder": {
+      "name": "V.K. Faisal",
+      "title": "Chairman & Managing Director"
+    },
+    "tollFree": "18001230621",
+    "email": "info@brightblue.in",
+    "gstinFound": "32AAICB5392H1ZN",
+    "gstinWarning": "Same GSTIN listed on brightblue.in for BOTH Bright Blue Manufacturing Pvt Ltd AND Bright Blue Chemicals LLP. Two entities cannot share one GSTIN. Must be resolved before invoicing is built.",
+    "courier": "DTDC",
+    "otherDomains": [
+      "brightbluefmcg.com"
+    ],
+    "social": {
+      "instagram": "https://www.instagram.com/brightbluecorp",
+      "facebook": "https://www.facebook.com/share/19Ho9VwnNe/"
+    }
+  },
+  "locations": [
+    {
+      "name": "Head Office",
+      "address": "66/927 Pappurath Building, Krishnaswami Road, Pullepady",
+      "city": "Ernakulam",
+      "state": "Kerala",
+      "pincode": "682035",
+      "type": "office"
+    },
+    {
+      "name": "Branch Office & Stock Room — Palakkad",
+      "address": "15/66 KVSN Compound, Chengaram",
+      "city": "Palakkad",
+      "state": "Kerala",
+      "pincode": "678681",
+      "type": "stock"
+    },
+    {
+      "name": "Branch Office & Stock Room — Malappuram",
+      "address": "4/410G Korad, Ozhur PO",
+      "city": "Malappuram",
+      "state": "Kerala",
+      "pincode": "676307",
+      "type": "stock"
+    }
+  ],
+  "entities": [
+    {
+      "name": "Bright Blue Manufacturing Pvt Ltd",
+      "abbr": "BBM",
+      "address": "15/67 KVSN Compound, Chengaram, Palakkad, Kerala 678681",
+      "gstin": "32AAICB5392H1ZN",
+      "note": "Manufacturing & packing unit. BBTC (2019) evolved into BBM by 2023."
+    },
+    {
+      "name": "Bright Blue Chemicals LLP",
+      "abbr": "BBC",
+      "address": "7/757 PH Building, Kozhinjamparambu, Kuzhalmannam, Palakkad, Kerala 678702",
+      "gstin": "32AAICB5392H1ZN",
+      "note": "Listed on brightblue.in only. Duplicate GSTIN — see warning."
+    },
+    {
+      "name": "Bright Blue Marketing Associates LLP",
+      "abbr": "BBMA",
+      "address": "28/8 Kadavath, Thalangara PO, Kasaragod, Kerala 671122",
+      "gstin": null,
+      "note": "Listed on brightblue.vercel.app only."
+    }
+  ],
+  "partners": [
+    {
+      "name": "Hanna Productions",
+      "address": "21/600 Mettingal, Muttikulangara PO, Palakkad 678594"
+    },
+    {
+      "name": "Ilfa Productions",
+      "address": "15/65 KVSN Compound, Chengaram, Palakkad, Kerala 678681"
+    },
+    {
+      "name": "AGP Enterprises",
+      "address": "Tuvvapara, Kadampuzha, Malappuram, Kerala 676553"
+    },
+    {
+      "name": "Hannasagar Productions",
+      "address": "Near KA Designer, Neerolike, Kodlamugaru Post & Village, Daigoli, Manjeshwar, Kasaragod 671323"
+    },
+    {
+      "name": "Shine Links Productions",
+      "address": "Near KA Designer, Neerolike, Kodlamugaru Post & Village, Daigoli, Manjeshwar, Kasaragod 671323"
+    }
+  ],
+  "brands": [
+    {
+      "name": "MX-3",
+      "slug": "mx-3",
+      "categorySlug": "dish-care",
+      "accentHex": "#F2C14E",
+      "isFood": false,
+      "tagline": "Clean beyond shine",
+      "logo": "assets/logos/brand-mx3.png"
+    },
+    {
+      "name": "Landfloor",
+      "slug": "landfloor",
+      "categorySlug": "home-care",
+      "accentHex": "#C77B9E",
+      "isFood": false,
+      "tagline": "7X better, long lasting",
+      "logo": "assets/logos/brand-landfloro.png"
+    },
+    {
+      "name": "ANSAF",
+      "slug": "ansaf",
+      "categorySlug": "car-care",
+      "accentHex": "#3E8FB0",
+      "isFood": false,
+      "tagline": "Sparkle & shine",
+      "logo": "assets/logos/brand-ansaf.png"
+    },
+    {
+      "name": "Rafasi",
+      "slug": "rafasi",
+      "categorySlug": "fabric-care",
+      "accentHex": "#8E7CC3",
+      "isFood": false,
+      "tagline": "Colours brighter for longer",
+      "logo": null,
+      "note": "Appears in the vercel product grid but NOT in the brand marquee or footer. Confirm brand vs sub-line."
+    },
+    {
+      "name": "Ilfa Valley",
+      "slug": "ilfa-valley",
+      "categorySlug": "beverages",
+      "accentHex": "#6E8B4A",
+      "isFood": true,
+      "tagline": "100% natural",
+      "logo": "assets/logos/brand-tilfavalley.png"
+    },
+    {
+      "name": "Kenzaniya",
+      "slug": "kenzaniya",
+      "categorySlug": "grocery",
+      "accentHex": "#C2703D",
+      "isFood": true,
+      "tagline": "Natural goodness",
+      "logo": "assets/logos/brand-kenzaniya.png"
+    }
+  ],
+  "categories": [
+    {
+      "name": "Dish Care",
+      "slug": "dish-care",
+      "sortOrder": 1
+    },
+    {
+      "name": "Home Care",
+      "slug": "home-care",
+      "sortOrder": 2
+    },
+    {
+      "name": "Car Care",
+      "slug": "car-care",
+      "sortOrder": 3
+    },
+    {
+      "name": "Fabric Care",
+      "slug": "fabric-care",
+      "sortOrder": 4
+    },
+    {
+      "name": "Beverages",
+      "slug": "beverages",
+      "sortOrder": 5,
+      "isFood": true
+    },
+    {
+      "name": "Grocery",
+      "slug": "grocery",
+      "sortOrder": 6,
+      "isFood": true
+    }
+  ],
+  "products": [
+    {
+      "name": "MX 3 – 1 Litre (Semi-Gel)",
+      "slug": "mx-3-1-litre-semi-gel",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3088,
+      "status": "priced",
+      "variants": [
+        {
+          "sku": "MX3-SEM-1L",
+          "size": "1 L",
+          "format": "Semi-Gel",
+          "pricePaise": 32000,
+          "mrpPaise": null,
+          "weightGrams": 1050,
+          "fragrance": null,
+          "fragranceHex": null
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2025/06/1-litre-smei-gel-1.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid – 1 Litre",
+      "slug": "mx-3-dish-wash-liquid-1-litre",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3101,
+      "status": "priced",
+      "variants": [
+        {
+          "sku": "MX3-LIQ-1L",
+          "size": "1 L",
+          "format": "Liquid",
+          "pricePaise": 24000,
+          "mrpPaise": null,
+          "weightGrams": 1050,
+          "fragrance": null,
+          "fragranceHex": null
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2025/06/WhatsApp-Image-2025-06-29-at-11.40.17-AM.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid – 500ml (Semi Gel)",
+      "slug": "mx-3-dish-wash-liquid-500ml-semi-gel",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3091,
+      "status": "priced",
+      "variants": [
+        {
+          "sku": "MX3-SEM-500ml",
+          "size": "500 ml",
+          "format": "Semi-Gel",
+          "pricePaise": 16000,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": null,
+          "fragranceHex": null
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2025/06/semi-gel-500-ml-1.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid – 500ml",
+      "slug": "mx-3-dish-wash-liquid-500ml",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3104,
+      "status": "priced",
+      "variants": [
+        {
+          "sku": "MX3-LIQ-500ml",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": 11800,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": null,
+          "fragranceHex": null
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2025/06/liquid-500ml-1.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid – 250ml (Semi Gel)",
+      "slug": "mx-3-dish-wash-liquid-250ml-semi-gel",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3094,
+      "status": "priced",
+      "variants": [
+        {
+          "sku": "MX3-SEM-250ml",
+          "size": "250 ml",
+          "format": "Semi-Gel",
+          "pricePaise": 7000,
+          "mrpPaise": null,
+          "weightGrams": 285,
+          "fragrance": null,
+          "fragranceHex": null
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2025/06/semi-gel-250ml-1.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Apple",
+      "slug": "mx3-dishwash-apple-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3373,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-APP-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Apple",
+          "fragranceHex": "#C0392B"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/apple-frnt.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Avocado",
+      "slug": "mx3-dishwash-avocado-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3318,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-AVO-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Avocado",
+          "fragranceHex": "#6B8E3D"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/avocadooo.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Blueberry",
+      "slug": "mx3-dishwash-blueberry-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3376,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-BLU-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Blueberry",
+          "fragranceHex": "#6B6BC4"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/blue-berry.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Butterfly Pea",
+      "slug": "mx3-dishwash-butterfly-pea-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3345,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-BUT-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Butterfly Pea",
+          "fragranceHex": "#5B5BA8"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/b-pea.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Cucumber",
+      "slug": "mx3-dishwash-cucumber-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3330,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-CUC-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Cucumber",
+          "fragranceHex": "#8FBF6A"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/cucumber-frnt.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Grapes",
+      "slug": "mx3-dishwash-grapes-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3371,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-GRA-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Grapes",
+          "fragranceHex": "#9B6BA8"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/grapess.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Green Apple",
+      "slug": "mx3-dishwash-green-apple-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3349,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-GRE-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Green Apple",
+          "fragranceHex": "#8CB84A"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/green-apple.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Green Lemon",
+      "slug": "mx3-dishwash-green-lemon-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3333,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-GRE-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Green Lemon",
+          "fragranceHex": "#B8CC4A"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/green-lemonn.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Green Mango",
+      "slug": "mx3-dishwash-green-mango-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3368,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-GRE-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Green Mango",
+          "fragranceHex": "#A8BF4A"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/green-mngo-fnrt.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Guava",
+      "slug": "mx3-dishwash-guava-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3352,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-GUA-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Guava",
+          "fragranceHex": "#E8A0A8"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/guava.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Kiwi",
+      "slug": "mx3-dishwash-kiwi-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3336,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-KIW-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Kiwi",
+          "fragranceHex": "#7DA83D"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/kiwi.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Lemon",
+      "slug": "mx3-dishwash-lemon-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3415,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-LEM-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Lemon",
+          "fragranceHex": "#F2C14E"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/lemonnnn-1.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Lychee",
+      "slug": "mx3-dishwash-lychee-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3311,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-LYC-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Lychee",
+          "fragranceHex": "#E88B8B"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/litchi.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Mango",
+      "slug": "mx3-dishwash-mango-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3327,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-MAN-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Mango",
+          "fragranceHex": "#F0A736"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/mango-frnt.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Mixed Fruits",
+      "slug": "mx3-dishwash-mixed-fruits-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3314,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-MIX-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Mixed Fruits",
+          "fragranceHex": "#E07B4F"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/mixed-fruitsssssssss.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Olive",
+      "slug": "mx3-dishwash-olive-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3367,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-OLI-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Olive",
+          "fragranceHex": "#7A8B4A"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/olivee.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Orange",
+      "slug": "mx3-dishwash-orange-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3339,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-ORA-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Orange",
+          "fragranceHex": "#EE8B3C"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/orange.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Papaya",
+      "slug": "mx3-dishwash-papaya-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3342,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-PAP-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Papaya",
+          "fragranceHex": "#E9A05C"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/green-papaya.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Passion Fruit",
+      "slug": "mx3-dishwash-passion-fruit-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3364,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-PAS-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Passion Fruit",
+          "fragranceHex": "#C4703D"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/passion-fruit.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Peach",
+      "slug": "mx3-dishwash-peach-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3377,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-PEA-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Peach",
+          "fragranceHex": "#F09A76"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/peach.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Pineapple",
+      "slug": "mx3-dishwash-pineapple-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3294,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-PIN-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Pineapple",
+          "fragranceHex": "#EFC152"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/pneapple.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Pista",
+      "slug": "mx3-dishwash-pista-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3366,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-PIS-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Pista",
+          "fragranceHex": "#A9BF7A"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/pistaaa.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Pomegranate",
+      "slug": "mx3-dishwash-pomegranate-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3358,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-POM-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Pomegranate",
+          "fragranceHex": "#B5384E"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/pomegranate-fnrt.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "MX-3 Dish Wash Liquid — Strawberry",
+      "slug": "mx3-dishwash-strawberry-fragrance",
+      "brandSlug": "mx-3",
+      "categorySlug": "dish-care",
+      "wooId": 3355,
+      "status": "NEEDS_PRICE",
+      "variants": [
+        {
+          "sku": "MX3-STR-500",
+          "size": "500 ml",
+          "format": "Liquid",
+          "pricePaise": null,
+          "mrpPaise": null,
+          "weightGrams": 540,
+          "fragrance": "Strawberry",
+          "fragranceHex": "#D94F63"
+        }
+      ],
+      "images": [
+        "https://brightblue.in/wp-content/uploads/2026/05/strawberryy.png"
+      ],
+      "hsnCode": null,
+      "gstRate": 1800
+    },
+    {
+      "name": "Landfloor Floor Cleaner",
+      "slug": "landfloor-floor-cleaner",
+      "brandSlug": "landfloor",
+      "categorySlug": "home-care",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": [
+        "Rose Frees",
+        "Morning Dew"
+      ],
+      "knownSizes": [
+        "1 L"
+      ],
+      "claims": [
+        "7X Better",
+        "Long Lasting"
+      ],
+      "isFoodProduct": false,
+      "hsnCode": null,
+      "gstRate": 1800,
+      "gstNote": null,
+      "images": [
+        "https://brightblue.vercel.app/assets/landfloro-duo-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "ANSAF Sparkle & Shine Car Wash",
+      "slug": "ansaf-car-wash",
+      "brandSlug": "ansaf",
+      "categorySlug": "car-care",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": null,
+      "knownSizes": [
+        "1 L",
+        "500 ml"
+      ],
+      "claims": [
+        "Bio-Enzyme Formula",
+        "Safe For All Paints"
+      ],
+      "isFoodProduct": false,
+      "hsnCode": null,
+      "gstRate": 1800,
+      "gstNote": null,
+      "images": [
+        "https://brightblue.vercel.app/assets/ansaf-carwash-photo-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Rafasi Cloth Wash Liquid",
+      "slug": "rafasi-cloth-wash",
+      "brandSlug": "rafasi",
+      "categorySlug": "fabric-care",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": [
+        "Rose & Jasmine"
+      ],
+      "knownSizes": null,
+      "claims": [
+        "Top Load",
+        "Gentle On Fabrics"
+      ],
+      "isFoodProduct": false,
+      "hsnCode": null,
+      "gstRate": 1800,
+      "gstNote": null,
+      "images": [
+        "https://brightblue.vercel.app/assets/rafasi-clothwash-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Ilfa Valley Premium Loose Tea",
+      "slug": "ilfa-valley-loose-tea",
+      "brandSlug": "ilfa-valley",
+      "categorySlug": "beverages",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": null,
+      "knownSizes": [
+        "1 kg jar"
+      ],
+      "claims": [
+        "100% Natural"
+      ],
+      "isFoodProduct": true,
+      "hsnCode": null,
+      "gstRate": null,
+      "gstNote": "Food — rate differs per item, accountant must confirm",
+      "images": [
+        "https://brightblue.vercel.app/assets/tilfavalley-tea-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Ilfa Valley Herbal Tea Bags",
+      "slug": "ilfa-valley-herbal-tea",
+      "brandSlug": "ilfa-valley",
+      "categorySlug": "beverages",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": null,
+      "knownSizes": [
+        "25 tea bags"
+      ],
+      "claims": [
+        "Caffeine Free",
+        "Aids Digestion"
+      ],
+      "isFoodProduct": true,
+      "hsnCode": null,
+      "gstRate": null,
+      "gstNote": "Food — rate differs per item, accountant must confirm",
+      "images": [
+        "https://brightblue.vercel.app/assets/tilfavalley-herbaltea-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Kenzaniya Himalayan Pink Salt",
+      "slug": "kenzaniya-pink-salt",
+      "brandSlug": "kenzaniya",
+      "categorySlug": "grocery",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": null,
+      "knownSizes": [
+        "1 kg jar"
+      ],
+      "claims": [
+        "100% Natural",
+        "No Additives"
+      ],
+      "isFoodProduct": true,
+      "hsnCode": null,
+      "gstRate": null,
+      "gstNote": "Food — rate differs per item, accountant must confirm",
+      "images": [
+        "https://brightblue.vercel.app/assets/kenzaniya-pinksalt-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Kenzaniya Multi Sweet Seed Mix",
+      "slug": "kenzaniya-seed-mix",
+      "brandSlug": "kenzaniya",
+      "categorySlug": "grocery",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": null,
+      "knownSizes": null,
+      "claims": [
+        "Rich In Protein",
+        "High In Fibre",
+        "No Preservatives"
+      ],
+      "isFoodProduct": true,
+      "hsnCode": null,
+      "gstRate": null,
+      "gstNote": "Food — rate differs per item, accountant must confirm",
+      "images": [
+        "https://brightblue.vercel.app/assets/kenzaniya-seedmix-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Kenzaniya Jowar & Ragi Flour",
+      "slug": "kenzaniya-flours",
+      "brandSlug": "kenzaniya",
+      "categorySlug": "grocery",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": [
+        "Jowar",
+        "Ragi"
+      ],
+      "knownSizes": [
+        "1 kg"
+      ],
+      "claims": [
+        "100% Whole Grain"
+      ],
+      "isFoodProduct": true,
+      "hsnCode": null,
+      "gstRate": null,
+      "gstNote": "Food — rate differs per item, accountant must confirm",
+      "images": [
+        "https://brightblue.vercel.app/assets/kenzaniya-flours-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Kenzaniya Marayoor Sharkara",
+      "slug": "kenzaniya-sharkara",
+      "brandSlug": "kenzaniya",
+      "categorySlug": "grocery",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": null,
+      "knownSizes": null,
+      "claims": [
+        "Natural Goodness",
+        "Rich In Minerals",
+        "Traditional Taste"
+      ],
+      "isFoodProduct": true,
+      "hsnCode": null,
+      "gstRate": null,
+      "gstNote": "Food — rate differs per item, accountant must confirm",
+      "images": [
+        "https://brightblue.vercel.app/assets/kenzaniya-sharkara-cutout.png"
+      ],
+      "variants": []
+    },
+    {
+      "name": "Kenzaniya Pure Ghee",
+      "slug": "kenzaniya-ghee",
+      "brandSlug": "kenzaniya",
+      "categorySlug": "grocery",
+      "wooId": null,
+      "status": "NEEDS_PRICE_AND_SKU",
+      "knownVariants": null,
+      "knownSizes": null,
+      "claims": [
+        "Traditional",
+        "Rich Aroma",
+        "100% Pure"
+      ],
+      "isFoodProduct": true,
+      "hsnCode": null,
+      "gstRate": null,
+      "gstNote": "Food — rate differs per item, accountant must confirm",
+      "images": [
+        "https://brightblue.vercel.app/assets/kenzaniya-ghee-cutout.png"
+      ],
+      "variants": []
+    }
+  ]
+}

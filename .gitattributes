@@ -1,0 +1,10 @@
+# Normalise line endings so Windows and Vercel's Linux builders agree.
+* text=auto eol=lf
+
+# Binary assets — never touched.
+*.pdf   binary
+*.jpeg  binary
+*.jpg   binary
+*.png   binary
+*.ico   binary
+*.woff2 binary
