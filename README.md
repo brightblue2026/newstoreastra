@@ -7,6 +7,7 @@ One Next.js application, one Postgres database, one Vercel deployment.
 
 - `BBTC-STORE-MASTER-BRIEF.md` — the single source of truth: requirements, schema, design
   system, compliance, build phases. Read it before writing code.
+- `PROGRESS.md` — **what has been built so far, and what blocks the next phase.** Start here.
 - `CLAUDE.md` — project memory, loaded every session.
 - `DECISIONS.md` — judgement calls not covered by the brief, one line each.
 - `catalogue.json` — scraped product data from brightblue.in and the brand site.
