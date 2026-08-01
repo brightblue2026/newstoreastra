@@ -1,26 +1,188 @@
 @import "tailwindcss";
 
+/*
+  Bright Blue design tokens — master brief §9.
+
+  The page is chromatically neutral: navy ink on warm off-white paper. A brand
+  accent enters only through `--bb-accent`, which a brand or product page sets
+  on a wrapper element from `Brand.accentHex` or `ProductVariant.variantHex`.
+
+  Exactly one accent is live on screen at a time. It belongs in the product
+  image field and the selected swatch, never on body text and never on the CTA
+  — the CTA is always `--bb-signal`.
+*/
+
+@theme {
+  /* ---------- Colour ---------- */
+  --color-ink: #0b1f3a;
+  --color-ink-soft: #3c4f6b;
+  --color-paper: #faf7f2;
+  --color-line: #e3e0d8;
+  --color-signal: #0f9cd6;
+  --color-success: #2e7d5b;
+  --color-warning: #b4501c;
+
+  /* ---------- Type ---------- */
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+
+  /* Tailwind's sans default is the body face, so unstyled text is Satoshi. */
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+
+  /*
+    ---------- Spacing ----------
+    Base unit 4px. The permitted scale is 4, 8, 12, 16, 24, 32, 48, 64, 96 —
+    reachable as steps 1, 2, 3, 4, 6, 8, 12, 16, 24. Nothing between: do not
+    write p-5, gap-7 or mt-9.
+  */
+  --spacing: 4px;
+
+  /* ---------- Radius ---------- */
+  --radius-control: 4px; /* inputs, buttons */
+  --radius-card: 16px; /* cards, panels, image fields */
+  /* Swatches use rounded-full. There is no fourth radius. */
+
+  /* ---------- Elevation ---------- */
+  /* One shadow in the whole system. Depth otherwise comes from hairlines. */
+  --shadow-bb: 0 1px 3px rgb(11 31 58 / 0.08);
+
+  /* ---------- Layout ---------- */
+  --container-page: 1280px;
+}
+
+/*
+  Motion budget — §9. Three durations, nothing else. Everything not listed
+  here is instant.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bb-duration-accent: 240ms; /* brand rail + fragrance grid background shift */
+  --bb-duration-drawer: 200ms; /* cart drawer slide */
+  --bb-duration-lift: 120ms; /* card hover lift, 2px */
+  --bb-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /*
+    The live brand accent. Neutral until a brand page or product image field
+    overrides it inline from the database. Never referenced by body text or a
+    CTA.
+  */
+  --bb-accent: var(--color-line);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  html {
+    /* Focus is always visible — WCAG 2.1 AA, §13. */
+    accent-color: var(--color-signal);
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+  }
+
+  /* Prices must not change width when a different variant is selected. */
+  [data-price] {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ---------- Typographic scale — §9 ---------- */
+
+@utility type-display-lg {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+@utility type-display-sm {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+@utility type-heading {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
+
+@utility type-subhead {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+@utility type-body-lg {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+@utility type-body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+@utility type-caption {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* SKUs, order numbers, admin tabular figures. */
+@utility type-mono {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Motion ---------- */
+
+@utility motion-accent {
+  transition-property: background-color, color;
+  transition-duration: var(--bb-duration-accent);
+  transition-timing-function: var(--bb-ease-out);
+}
+
+@utility motion-drawer {
+  transition-property: transform, opacity;
+  transition-duration: var(--bb-duration-drawer);
+  transition-timing-function: var(--bb-ease-out);
+}
+
+@utility motion-lift {
+  transition-property: transform, box-shadow;
+  transition-duration: var(--bb-duration-lift);
+  transition-timing-function: var(--bb-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

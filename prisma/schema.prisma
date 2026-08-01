@@ -1,0 +1,430 @@
+// Bright Blue store — data model.
+// This is the contract from master brief §7. Schema rules:
+//   - Every *Paise field is Int. No Decimal, no Float.
+//   - Every *Bps field is basis points. 18% is 1800.
+//   - pricePaise is nullable on purpose — null renders "Price on request",
+//     never ₹0.00. Do not seed placeholder prices.
+//   - OrderItem and Order.shippingAddress are snapshots, never relations.
+//   - Soft-delete via isActive. Never hard-delete a variant that could appear
+//     in an order.
+//   - Cascade only parent→child within the catalogue. Never cascade into Order.
+//
+// NOTE: no migration has been run against this file yet. Six open questions in
+// brief §14 block the first one — see DECISIONS.md.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7 takes the connection URL from prisma.config.ts for CLI commands,
+// and from the driver adapter in src/lib/db.ts at runtime.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Brand & catalogue ----------
+
+model Brand {
+  id              String    @id @default(cuid())
+  name            String // "MX-3", "Kenzaniya"
+  slug            String    @unique
+  tagline         String?
+  story           String?   @db.Text
+  logoUrl         String?
+  accentHex       String // drives the brand accent layer
+  segment         Segment
+  fssaiLicence    String? // required when segment = FOOD
+  cosmeticLicence String? // required when segment = PERSONAL_CARE
+  sortOrder       Int       @default(0)
+  isActive        Boolean   @default(true)
+  products        Product[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum Segment {
+  HOME_CARE
+  DISH_CARE
+  FABRIC_CARE
+  CAR_CARE
+  PERSONAL_CARE
+  FOOD
+  BEVERAGE
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String // "Kerala Spices"
+  slug        String     @unique
+  parentId    String? // supports Kenzaniya's sub-ranges
+  parent      Category?  @relation("CatTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CatTree")
+  description String?
+  imageUrl    String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  products    Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id])
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  shortDesc   String
+  description String   @db.Text
+  hsnCode     String? // null until the accountant confirms
+  gstRate     Int? // basis points; 1800 = 18%
+  claims      Json // [{ icon, label }] — the badge row
+  ingredients String?  @db.Text
+  usageSteps  Json?
+
+  // Regulatory
+  isFoodProduct Boolean @default(false)
+  isCosmetic    Boolean @default(false)
+  // netQty, batch, mfgDate, bestBefore, vegMark, nutrition, allergens
+  // — required when isFoodProduct
+  foodLabel     Json?
+
+  isActive   Boolean          @default(true)
+  isFeatured Boolean          @default(false)
+  sortOrder  Int              @default(0)
+  variants   ProductVariant[]
+  images     ProductImage[]
+  reviews    Review[]
+  metaTitle  String?
+  metaDesc   String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([brandId, isActive])
+  @@index([categoryId, isActive])
+}
+
+// The buyable unit. MX-3 is fragrance × size × format; Kenzaniya spices are
+// just size.
+model ProductVariant {
+  id             String         @id @default(cuid())
+  productId      String
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku            String         @unique
+  variantName    String? // "Lemon", "Jasmin", "Cardamom"
+  variantHex     String? // fragrance/flavour accent
+  size           String // "900 ml", "250 g", "5 L"
+  format         String? // "Liquid", "Semi-Gel", "Front Load"
+  mrpPaise       Int?
+  pricePaise     Int? // null = "Price on request"
+  wholesalePaise Int? // B2B tier, hidden at launch
+  weightGrams    Int?
+  barcode        String?
+  isActive       Boolean        @default(true)
+  inventory      Inventory[]
+  images         ProductImage[]
+  comboItems     ComboItem[]
+
+  @@index([productId, isActive])
+}
+
+model ProductImage {
+  id        String          @id @default(cuid())
+  productId String?
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  url       String
+  publicId  String
+  alt       String
+  sortOrder Int             @default(0)
+}
+
+// ---------- Combos ----------
+// A sellable package at a package price. NOT a discount rule.
+
+model Combo {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  shortDesc   String
+  description String      @db.Text
+  imageUrl    String?
+  pricePaise  Int
+  isActive    Boolean     @default(true)
+  isFeatured  Boolean     @default(false)
+  items       ComboItem[]
+}
+
+model ComboItem {
+  id        String         @id @default(cuid())
+  comboId   String
+  combo     Combo          @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  quantity  Int            @default(1)
+  isChoice  Boolean        @default(false) // customer picks the fragrance for this slot
+  choiceOf  String[] // restrict options; empty = any in product
+}
+
+// ---------- Inventory ----------
+
+model Location {
+  id        String      @id @default(cuid())
+  name      String
+  address   String
+  pincode   String
+  handles   Segment[] // food packing centre vs machineries etc.
+  isActive  Boolean     @default(true)
+  inventory Inventory[]
+}
+
+model Inventory {
+  id         String         @id @default(cuid())
+  variantId  String
+  variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location       @relation(fields: [locationId], references: [id])
+  quantity   Int            @default(0)
+  reserved   Int            @default(0)
+  lowStockAt Int            @default(10)
+
+  @@unique([variantId, locationId])
+}
+
+// ---------- Offers ----------
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  BUY_X_GET_Y
+  FREE_SHIPPING
+  TIERED_QUANTITY
+}
+
+enum DiscountScope {
+  ORDER
+  BRAND
+  CATEGORY
+  PRODUCT
+  COMBO
+}
+
+model Discount {
+  id               String        @id @default(cuid())
+  name             String // internal
+  publicLabel      String? // shown on the cart line
+  code             String?       @unique // null = automatic
+  type             DiscountType
+  scope            DiscountScope
+  valuePaise       Int?
+  valueBps         Int?
+  tiers            Json? // [{minQty, valueBps}]
+  buyQty           Int?
+  getQty           Int?
+  minOrderPaise    Int?
+  maxDiscountPaise Int?
+  targetIds        String[]
+  usageLimit       Int?
+  usageCount       Int           @default(0)
+  perCustomerLimit Int?
+  stackable        Boolean       @default(false)
+  priority         Int           @default(0)
+  startsAt         DateTime
+  endsAt           DateTime?
+  isActive         Boolean       @default(true)
+
+  @@index([isActive, startsAt, endsAt])
+}
+
+// ---------- Customers & orders ----------
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+  MANAGER
+  ADMIN
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String?
+  email        String?   @unique
+  phone        String?   @unique
+  passwordHash String? // staff only
+  role         UserRole  @default(CUSTOMER)
+  isActive     Boolean   @default(true)
+  addresses    Address[]
+  orders       Order[]
+  reviews      Review[]
+  createdAt    DateTime  @default(now())
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName  String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  pincode   String
+  isDefault Boolean @default(false)
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique // "BB-2627-00001" (financial year)
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+  guestEmail  String?
+  guestPhone  String?
+  items       OrderItem[]
+
+  subtotalPaise Int
+  discountPaise Int @default(0)
+  shippingPaise Int @default(0)
+  codFeePaise   Int @default(0)
+  cgstPaise     Int @default(0)
+  sgstPaise     Int @default(0)
+  igstPaise     Int @default(0)
+  totalPaise    Int
+  // [{hsn, rate, taxable, cgst, sgst, igst}] — mixed-rate carts
+  taxByHsn      Json
+
+  appliedDiscounts Json
+  shippingAddress  Json // snapshot, never a relation
+  billingAddress   Json
+
+  status            OrderStatus   @default(PENDING_PAYMENT)
+  paymentMethod     PaymentMethod
+  paymentStatus     PaymentStatus @default(PENDING)
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+
+  shiprocketOrderId String?
+  awbNumber         String?
+  courierName       String?
+  trackingUrl       String?
+
+  sellerEntityId String // which BBTC entity sold this — see §11
+  invoiceNumber  String? @unique
+  invoiceUrl     String?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Snapshots — a product edit must never alter a historical order
+  variantId      String?
+  comboId        String?
+  nameSnapshot   String
+  skuSnapshot    String
+  imageSnapshot  String?
+  choiceSnapshot Json? // fragrances picked for combo choice slots
+  quantity       Int
+  unitPricePaise Int
+  totalPaise     Int
+  hsnCode        String
+  gstRate        Int
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  authorName String
+  rating     Int
+  title      String?
+  body       String   @db.Text
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([productId, isApproved])
+}
+
+// ---------- Company & content ----------
+
+model Entity {
+  id        String  @id @default(cuid())
+  legalName String
+  abbr      String?
+  role      String // "Head Office", "Food Packing Centre"
+  address   String
+  city      String?
+  state     String?
+  country   String  @default("India")
+  pincode   String?
+  gstin     String?
+  isSeller  Boolean @default(false) // can appear on an invoice
+  isActive  Boolean @default(true)
+}
+
+model ContentBlock {
+  id        String   @id @default(cuid())
+  key       String   @unique // "home_hero", "announcement_bar", "world_record"
+  data      Json // Zod-validated per key
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model Retailer {
+  id       String  @id @default(cuid())
+  name     String
+  address  String
+  city     String
+  district String
+  pincode  String
+  phone    String?
+  isActive Boolean @default(true)
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}

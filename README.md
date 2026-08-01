@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# bbtc-store
 
-## Getting Started
+Storefront and admin panel for **Bright Blue Trading Corporation** — an FMCG manufacturer
+in Ernakulam, Kerala. Seven brands, 100+ SKUs, spanning cleaning, personal care and food.
 
-First, run the development server:
+One Next.js application, one Postgres database, one Vercel deployment.
+
+- `BBTC-STORE-MASTER-BRIEF.md` — the single source of truth: requirements, schema, design
+  system, compliance, build phases. Read it before writing code.
+- `CLAUDE.md` — project memory, loaded every session.
+- `DECISIONS.md` — judgement calls not covered by the brief, one line each.
+- `catalogue.json` — scraped product data from brightblue.in and the brand site.
+- `docs/` — the company brochure and the earlier PRD corrections.
+- `assets/source-photos/` — unprocessed product photography.
+
+## Getting started
+
+Requires Node 22+ and pnpm 10+.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env        # then fill in DATABASE_URL and AUTH_SECRET
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Generate an auth secret with `npx auth secret`. Phase 0 needs only `DATABASE_URL` and
+`AUTH_SECRET`; every other variable is documented in `.env.example` ahead of the phase
+that needs it.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Does |
+| --- | --- |
+| `pnpm dev` | Development server |
+| `pnpm build` | Production build (regenerates the Prisma client first) |
+| `pnpm test` | Unit tests |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm lint` | ESLint |
+| `pnpm db:migrate` | Create and apply a migration |
+| `pnpm db:seed` | Seed the database |
+| `pnpm db:studio` | Prisma Studio |
 
-## Learn More
+## Layout
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/app/(storefront)/   server components, ISR 60s
+src/app/admin/          role-gated in middleware, layout and every server action
+src/app/api/            webhooks, cart routes
+src/lib/                money, gst, roles, session, db, integrations
+src/server/actions/     server actions, all Zod-validated
+prisma/                 schema, migrations, seed
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Non-negotiables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+These come from the brief and are not up for rediscovery:
 
-## Deploy on Vercel
+- **Money is `Int` in paise.** ₹149.00 is `14900`. Never a float. One `formatINR()`, in
+  `src/lib/money.ts`.
+- **GST is per product, never global.** 18% detergents, 12% ghee, 5% spices, nil-rated
+  jaggery. Invoices need a per-HSN summary table.
+- **A null price renders "Price on request", never ₹0.00.** Do not seed placeholders.
+- **Food products require FSSAI fields at publish.** Fairoze needs a cosmetics licence.
+- **Every mutation checks the role server-side.** Hiding a button is not access control.
+- **Order status changes only from a verified Razorpay webhook**, never the client.
+- **`OrderItem` stores snapshots.** A product edit must never alter a past order.
+- **One accent colour live at a time**, never on body text, never on the CTA.
+- No emoji, no lorem ipsum, no stock photography, no placeholder images. Not Inter.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Status
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Phase 0 — Foundation: complete.** Scaffold, design tokens, self-hosted fonts, Prisma
+schema, Auth.js with five roles, `/admin` gated in three layers, Cloudinary and Sentry
+config, `money.ts` and `gst.ts` with 95 passing tests.
+
+**No migration has been run.** Six open questions in brief §14 block the first one — see
+the end of `DECISIONS.md`.
+
+Phases 1 to 8 are listed in brief §12. Verify a phase's acceptance criteria before
+starting the next.
