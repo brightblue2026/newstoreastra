@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requireAdminAccess } from '@/lib/session';
 import { canAdminister, canManageCatalogue } from '@/lib/roles';
 
@@ -20,7 +21,27 @@ export default async function AdminHomePage() {
         <div>
           <dt className="type-caption text-ink-soft">Products and pricing</dt>
           <dd className="mt-2 type-body">
-            {canManageCatalogue(user.role) ? 'Available to you' : 'Manager and above'}
+            {canManageCatalogue(user.role) ? (
+              <span className="flex gap-4">
+                <Link href="/admin/brands" className="text-signal">
+                  Brands
+                </Link>
+                <Link href="/admin/categories" className="text-signal">
+                  Categories
+                </Link>
+                <Link href="/admin/products" className="text-signal">
+                  Products
+                </Link>
+                <Link href="/admin/discounts" className="text-signal">
+                  Discounts
+                </Link>
+                <Link href="/admin/combos" className="text-signal">
+                  Combos
+                </Link>
+              </span>
+            ) : (
+              'Manager and above'
+            )}
           </dd>
         </div>
         <div>

@@ -99,6 +99,81 @@ the §7 schema has no `Account` or `Session` model.
 
 ---
 
+## Phase 1 — Catalogue and admin CRUD · **in progress** · 2 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (112 tests), `pnpm build` all pass. First
+migration applied against a dedicated Neon project (`bbtc-store`, Singapore region) and
+seeded with unblocked data only — see below.
+
+### What was built
+
+**Database** — first migration (`prisma/migrations/20260802101811_phase1_init`) applied.
+`prisma/seed.ts` seeds only what §14's open questions don't block: 11 locations, 3 legal
+entities (`gstin`/`isSeller` left unset — open question 6), 7 top-level categories (one per
+`Segment`, no brands or fragrances under them), and 3 dev-only staff accounts
+(`{role}@dev.bbtc.local`, password in `SEED_STAFF_PASSWORD` or a printed default — **rotate
+before any handover, never reuse in production**). Seed command switched from
+`node --experimental-strip-types` to `tsx`: the former can't resolve this project's
+bundler-style path aliases or Prisma's own generated-client imports, and failed inside
+Prisma's own output on first run.
+
+**Admin CRUD** — Brand, Category (nested tree, cycle-guarded on re-parenting), Product
+(claims, ingredients, usage steps, FSSAI food-label fields), ProductVariant (SKU, size,
+MRP/price/wholesale via `lib/money.ts` — a blank price field is `null`, never `0`, so
+"Price on request" keeps working), Discount (all five `DiscountType`s, form adapts per
+type, coupon codes restricted to `[A-Z0-9-]`), Combo + ComboItem (component picker, choice
+slots restricted to the same product's variants, live component-sum/package-price/saving
+panel). Every mutation runs through `requireCatalogueAccess` (MANAGER+) and writes an
+`AuditLog` row with the full before/after state.
+
+**Publish guards** — Product cannot go live without ≥1 variant, ≥1 image, an HSN code, and
+a complete food label if `isFoodProduct`. Combo cannot go live with zero components.
+Products and combos are created as drafts (`isActive: false`) for this reason.
+
+**Pricing engine** (`src/lib/pricing.ts`) — `calculateCart` per §8, pure and fully unit
+tested against all 17 required cases: percentage/fixed/BOGO/tiered/free-shipping discounts,
+non-stackable priority conflicts (tie-broken by larger customer saving), `maxDiscountPaise`
+capping, zero-drift proportional line distribution, Kerala CGST+SGST vs. out-of-state IGST,
+a three-HSN mixed-rate cart, expired/future/exhausted discounts ignored. Not yet wired to
+any route — no cart or checkout exists yet to call it.
+
+### Not done, deliberately
+
+- **No Cloudinary upload.** Every image field is a plain URL text input. Blocks Product and
+  Combo from ever legitimately publishing until real credentials are provided and the
+  upload widget is built.
+- **"No price" is not enforced by the publish guard.** §12 Phase 1 lists it as a blocker,
+  but §7 makes `pricePaise: null` a deliberate feature ("Price on request"). Those two
+  requirements conflict as written; resolving it needs a decision, not a guess, so the
+  guard currently checks variant/image/HSN/food-label only.
+- **Discount preview against a sample cart** (§12 Phase 4, marked mandatory) is not built.
+  It needs the pricing engine, which now exists — this is the natural next step, not a
+  fresh blocker.
+- No storefront, cart UI, checkout, payments, orders, invoicing, or shipping. Nothing here
+  is live on the internet — everything ran against a local dev server.
+
+### Known gaps found during review
+
+- **No rate limiting on staff login.** Auth.js's constant-time dummy-hash check already
+  stops account enumeration, but brute-force throttling needs a shared store (Upstash
+  Redis or similar) — an in-memory limiter would be fake protection once this deploys to
+  Vercel's serverless model, where each request can land on a fresh, memory-isolated
+  instance.
+- **Two high-severity CVEs are pinned inside `next@15.5.22` itself** (`postcss@8.4.31`,
+  `sharp<0.35.0` — `pnpm audit`), not in anything this project chose directly, and 15.5.22
+  is already the newest patch on the locked major. Low practical exploitability today
+  (postcss only ever processes our own developer-authored CSS; sharp only runs through
+  `next/image`, which `next.config.ts` already restricts to `res.cloudinary.com`) but worth
+  tracking for the next Next.js patch.
+- **Neon connects as `neondb_owner`**, an owner-level role. Fine for development; needs a
+  least-privilege application role (no DDL) before production traffic touches it.
+- `AuditLog.action` is a free-form string in the schema but the app-level TypeScript type
+  in `lib/audit.ts` only allows `create | update | deactivate | reactivate`. `ComboItem` has
+  no soft-delete field, so removing one is logged as `deactivate` with `after: null` —
+  workable, but a dedicated `delete` action would read more honestly.
+
+---
+
 ## Blocking Phase 1
 
 Per §14 and the working agreement, these are asked before the first migration, not
@@ -128,8 +203,11 @@ Questions 7–16 are wanted before Phase 2 and are listed in the brief.
 ```bash
 pnpm install
 cp .env.example .env     # AUTH_SECRET via `npx auth secret`; DATABASE_URL from Neon
+pnpm prisma migrate deploy
+pnpm prisma db seed
 pnpm dev
 ```
 
-Phase 0 needs only `AUTH_SECRET` to boot. `DATABASE_URL` can stay empty until the first
-migration — nothing in Phase 0 queries Postgres, and the Prisma client is lazy.
+`DATABASE_URL` is now required — the first migration exists and `/admin` screens beyond
+the home page query Postgres directly. Sign in with any seeded `{role}@dev.bbtc.local`
+account.

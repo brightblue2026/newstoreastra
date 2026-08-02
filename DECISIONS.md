@@ -55,10 +55,72 @@ question number is named.
 - **JetBrains Mono comes from `next/font/google`**, which self-hosts at build time. Only Clash Display and Satoshi needed manual Fontshare downloads. Only the weights §9 names are shipped.
 - Sentry's `beforeSend` strips cookies, auth headers and the user object — §13 forbids PII in logs.
 
-## Open questions blocking the first migration
+## Phase 1 — Catalogue and admin CRUD
 
-Per §14, these must be answered before `prisma migrate` is run. The schema is written and
-validates, but nothing has been applied to a database.
+### Database
+
+- **The first migration has been applied** (`20260802101811_phase1_init`), against a fresh
+  Neon project dedicated to this app rather than reusing an ambient `POSTGRES_URL` found in
+  the shell environment, which turned out to belong to an unrelated project — worth
+  double-checking any pre-set `DATABASE_URL`-shaped variable before trusting it. The six
+  §14 questions below are still open; the migration only applies the *schema*, and the seed
+  deliberately stops short of any data they'd determine. See the seed note under Phase 1 in
+  `PROGRESS.md`.
+- Seed's `tsx` swap: `prisma.config.ts` originally named `node --experimental-strip-types`
+  as the seed runner. That flag only strips types, it does not resolve path aliases or
+  bundler-style imports — it failed inside Prisma's own generated client on first run, not
+  just in `seed.ts`. `tsx` replaces it; `esbuild`'s postinstall script needed an explicit
+  `allowBuilds: true` in `pnpm-workspace.yaml` for pnpm's supply-chain gate to let it run.
+
+### Admin CRUD
+
+- **Product and Combo are created as drafts** (`isActive: false`), not §7's schema default
+  of `true`. Neither can mean anything without a variant/component yet, and the real
+  publish guard (variant + image + HSN + food-label, or ≥1 component for a combo) only runs
+  when the admin explicitly flips the toggle — so the moment of publishing is always a
+  deliberate, guarded action rather than a side effect of hitting "save" on the first draft.
+- **The "no price" publish guard is not implemented.** §12 Phase 1 lists it as blocking, but
+  §7 makes a null `pricePaise` an intentional "Price on request" state. Implementing the
+  guard as literally written would break that feature. Left unenforced pending a decision
+  on which one is actually meant.
+- **`ComboItem.choiceOf` is validated server-side to be variants of the same product** as
+  the slot's own `variantId` — §7 says "restrict options; empty = any in product," which
+  only means something if the restriction can't point outside the product.
+- Discount `code` is normalised to uppercase and restricted to `[A-Z0-9-]` — it is
+  customer-facing and will end up in URLs and support conversations; keeping the charset
+  boring avoids encoding surprises later.
+- Every admin list/edit screen for Brand, Category, Product, Combo reuses the same
+  create/update/toggle-active/audit-log shape. `src/lib/category-tree.ts` and
+  `src/app/admin/(panel)/products/format.ts` hold the one-off pure helpers (tree flattening,
+  claims/steps/food-label JSON ↔ form-field conversion) that a `'use server'` actions file
+  cannot itself export, since every export from such a file must be an async function.
+
+### Pricing engine
+
+- `src/lib/pricing.ts` interprets a few things §8 leaves implicit, each covered by a test in
+  `pricing.test.ts`:
+  - Non-stackable conflicts are resolved **before** any discount is applied: partition
+    candidates into stackable and non-stackable, keep all of the former, keep only the
+    single best of the latter (by priority, then by the larger of the two hypothetical
+    discount amounts).
+  - `minOrderPaise` is checked once, against the subtotal of the lines the discount's scope
+    actually matches — not re-evaluated as other discounts change the remaining amount.
+  - `BUY_X_GET_Y` flattens matching lines into one price per unit, sorts ascending, and
+    frees the cheapest `getQty` units in every full `buyQty + getQty` group.
+  - `TIERED_QUANTITY` picks the tier with the largest `minQty` at or below the matching
+    quantity — the best tier the cart qualifies for, not the first one that matches.
+  - Cart line `quantity` is bounded at 999 as a defensive upper limit — nothing currently
+    feeds it untrusted input, but a checkout route eventually will.
+- **Not wired to any route yet.** No cart or checkout exists to call it from. The function
+  is deliberately pure (no DB access) so it can be tested in isolation and re-run safely on
+  every future cart read — the security property that matters (a client-tampered price
+  cannot change a total) depends entirely on whoever calls this always re-fetching
+  `pricePaise` from the database, never trusting a value a request body supplies.
+
+## Open questions blocking real catalogue data
+
+Per §14. The schema is migrated and the admin CRUD works against it, but these still block
+entering the actual brand/product catalogue and building invoicing.
 
 1. **MX-3 sizes** — brochure says 900/450/225 ml, brightblue.in sells 250/500 ml/1 L with real prices. Determines the entire variant matrix.
 2. **MX-3 fragrance list** — the two sources name different sets. The record claim makes the canonical 24 legally significant.
