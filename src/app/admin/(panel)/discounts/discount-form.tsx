@@ -1,10 +1,16 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import type { DiscountFormState } from './actions';
+import type { DiscountFormState, DiscountPreviewResult } from './actions';
+import { formatINR } from '@/lib/money';
 
 export interface SelectOption {
+  id: string;
+  label: string;
+}
+
+export interface VariantOption {
   id: string;
   label: string;
 }
@@ -73,25 +79,68 @@ const sectionClass = 'mt-10 border-t border-line pt-8';
 
 export function DiscountForm({
   action,
+  previewAction,
   initialValues,
   brandOptions,
   categoryOptions,
   productOptions,
   comboOptions,
+  variantOptions,
   submitLabel,
 }: {
   action: (state: DiscountFormState, formData: FormData) => Promise<DiscountFormState>;
+  previewAction: (
+    formData: FormData,
+    sampleLines: Array<{ variantId: string; quantity: number }>,
+    settings: { shippingState?: string; paymentMethod: 'RAZORPAY' | 'COD' },
+  ) => Promise<DiscountPreviewResult>;
   initialValues?: DiscountFormValues;
   brandOptions: SelectOption[];
   categoryOptions: SelectOption[];
   productOptions: SelectOption[];
   comboOptions: SelectOption[];
+  variantOptions: VariantOption[];
   submitLabel: string;
 }) {
   const [state, formAction] = useActionState(action, {} as DiscountFormState);
   const values = initialValues ?? EMPTY_VALUES;
   const [type, setType] = useState(values.type);
   const [scope, setScope] = useState(values.scope);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const [sampleLines, setSampleLines] = useState<Array<{ variantId: string; quantity: number }>>(
+    [],
+  );
+  const [pickVariant, setPickVariant] = useState('');
+  const [pickQuantity, setPickQuantity] = useState(1);
+  const [shippingState, setShippingState] = useState('Kerala');
+  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'COD'>('RAZORPAY');
+  const [previewResult, setPreviewResult] = useState<DiscountPreviewResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  function addSampleLine() {
+    if (!pickVariant) return;
+    setSampleLines((lines) => [...lines, { variantId: pickVariant, quantity: pickQuantity }]);
+    setPickVariant('');
+    setPickQuantity(1);
+  }
+
+  function removeSampleLine(index: number) {
+    setSampleLines((lines) => lines.filter((_, i) => i !== index));
+  }
+
+  async function runPreview() {
+    if (!formRef.current) return;
+    setPreviewLoading(true);
+    setPreviewResult(null);
+    try {
+      const formData = new FormData(formRef.current);
+      const result = await previewAction(formData, sampleLines, { shippingState, paymentMethod });
+      setPreviewResult(result);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
   const targetOptionsByScope: Record<string, SelectOption[]> = {
     BRAND: brandOptions,
@@ -102,7 +151,7 @@ export function DiscountForm({
   const targetOptions = targetOptionsByScope[scope] ?? [];
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"
@@ -405,6 +454,162 @@ export function DiscountForm({
             )}
           </div>
         </div>
+      </div>
+
+      <div className={sectionClass}>
+        <p className="type-caption text-ink-soft">
+          Sample cart preview — checks the fields above against a cart you build here,
+          without saving anything
+        </p>
+
+        {sampleLines.length > 0 && (
+          <ul className="mt-4 space-y-2">
+            {sampleLines.map((line, index) => {
+              const option = variantOptions.find((v) => v.id === line.variantId);
+              return (
+                <li
+                  key={`${line.variantId}-${index}`}
+                  className="flex items-center justify-between gap-4 type-body"
+                >
+                  <span>
+                    {option?.label ?? line.variantId} × {line.quantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeSampleLine(index)}
+                    className="type-caption normal-case text-ink-soft underline"
+                  >
+                    Remove
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[16rem]">
+            <label htmlFor="pickVariant" className={labelClass}>
+              Add a variant
+            </label>
+            <select
+              id="pickVariant"
+              value={pickVariant}
+              onChange={(event) => setPickVariant(event.target.value)}
+              className={inputClass}
+            >
+              <option value="">Choose a variant</option>
+              {variantOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-24">
+            <label htmlFor="pickQuantity" className={labelClass}>
+              Qty
+            </label>
+            <input
+              id="pickQuantity"
+              type="number"
+              min={1}
+              max={999}
+              value={pickQuantity}
+              onChange={(event) => setPickQuantity(Number(event.target.value) || 1)}
+              className={inputClass}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addSampleLine}
+            disabled={!pickVariant}
+            className="rounded-control border border-line px-4 py-3 type-body disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <div>
+            <label htmlFor="previewShippingState" className={labelClass}>
+              Delivery state
+            </label>
+            <input
+              id="previewShippingState"
+              value={shippingState}
+              onChange={(event) => setShippingState(event.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="previewPaymentMethod" className={labelClass}>
+              Payment method
+            </label>
+            <select
+              id="previewPaymentMethod"
+              value={paymentMethod}
+              onChange={(event) => setPaymentMethod(event.target.value as 'RAZORPAY' | 'COD')}
+              className={inputClass}
+            >
+              <option value="RAZORPAY">Razorpay</option>
+              <option value="COD">Cash on delivery</option>
+            </select>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={runPreview}
+          disabled={previewLoading || sampleLines.length === 0}
+          className="mt-6 rounded-control border border-signal px-6 py-3 type-body font-medium text-signal disabled:opacity-50"
+        >
+          {previewLoading ? 'Checking…' : 'Preview against this cart'}
+        </button>
+
+        {previewResult && (
+          <div className="mt-6 rounded-card border border-line p-6">
+            {previewResult.ok ? (
+              <>
+                <p className="type-body">
+                  {previewResult.result.appliedDiscounts.length > 0
+                    ? 'This discount would apply.'
+                    : 'This discount would not apply to this cart — check the dates, minimum order, and targets above.'}
+                </p>
+                <dl className="mt-4 grid gap-4 sm:grid-cols-4">
+                  <div>
+                    <dt className="type-caption text-ink-soft">Subtotal</dt>
+                    <dd className="mt-1 type-mono" data-price>
+                      {formatINR(previewResult.result.subtotalPaise)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="type-caption text-ink-soft">Discount</dt>
+                    <dd className="mt-1 type-mono" data-price>
+                      −{formatINR(previewResult.result.discountPaise)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="type-caption text-ink-soft">Shipping</dt>
+                    <dd className="mt-1 type-mono" data-price>
+                      {formatINR(previewResult.result.shippingPaise)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="type-caption text-ink-soft">Total</dt>
+                    <dd className="mt-1 type-mono" data-price>
+                      {formatINR(previewResult.result.totalPaise)}
+                    </dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <p role="alert" className="type-body text-warning">
+                {previewResult.error}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mt-8">

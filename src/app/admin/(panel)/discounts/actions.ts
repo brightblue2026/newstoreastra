@@ -8,6 +8,7 @@ import { DiscountScope, DiscountType } from '@/generated/prisma/enums';
 import { recordAudit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { MoneyError, parseRupeesToPaise } from '@/lib/money';
+import { calculateCart, type CartLine, type DiscountInput, type PriceResult } from '@/lib/pricing';
 import { requireCatalogueAccess } from '@/lib/session';
 
 export interface DiscountFormState {
@@ -359,6 +360,103 @@ export async function updateDiscountAction(
 
   revalidatePath('/admin/discounts');
   redirect('/admin/discounts');
+}
+
+export type DiscountPreviewResult =
+  | { ok: true; result: PriceResult }
+  | { ok: false; error: string };
+
+/**
+ * §12 Phase 4: "discount preview against a sample cart before save — mandatory."
+ *
+ * Runs the *unsaved* form fields through `buildDiscountData` — the exact same
+ * parsing and validation `createDiscountAction`/`updateDiscountAction` use —
+ * so what the admin previews is what would actually be saved, not an
+ * approximation of it. `startsAt`/`endsAt` are taken from the form as typed,
+ * so a discount that hasn't started yet honestly shows as not applying.
+ */
+export async function previewDiscountAction(
+  formData: FormData,
+  sampleLines: Array<{ variantId: string; quantity: number }>,
+  settings: { shippingState?: string; paymentMethod: 'RAZORPAY' | 'COD' },
+): Promise<DiscountPreviewResult> {
+  await requireCatalogueAccess();
+
+  if (sampleLines.length === 0) {
+    return { ok: false, error: 'Add at least one line to the sample cart.' };
+  }
+
+  const built = await buildDiscountData(formData);
+  if (built.state) {
+    return { ok: false, error: built.state.error ?? 'Check the discount fields.' };
+  }
+  const data = built.data!;
+
+  const variants = await db.productVariant.findMany({
+    where: { id: { in: sampleLines.map((l) => l.variantId) } },
+    include: { product: true },
+  });
+  const byId = new Map(variants.map((v) => [v.id, v]));
+
+  const lines: CartLine[] = [];
+  for (const sample of sampleLines) {
+    const variant = byId.get(sample.variantId);
+    if (!variant) return { ok: false, error: 'One of the sample lines no longer exists.' };
+    if (variant.pricePaise === null) {
+      return {
+        ok: false,
+        error: `${variant.product.name} (${variant.sku}) has no price set — cannot preview.`,
+      };
+    }
+    if (!variant.product.hsnCode) {
+      return { ok: false, error: `${variant.product.name} has no HSN code — cannot preview.` };
+    }
+    lines.push({
+      kind: 'VARIANT',
+      id: variant.id,
+      quantity: sample.quantity,
+      unitPricePaise: variant.pricePaise,
+      brandId: variant.product.brandId,
+      categoryId: variant.product.categoryId,
+      productId: variant.productId,
+      hsnCode: variant.product.hsnCode,
+      gstRate: variant.product.gstRate ?? 0,
+    });
+  }
+
+  const discountInput: DiscountInput = {
+    id: 'preview',
+    code: data.code,
+    type: data.type,
+    scope: data.scope,
+    valuePaise: data.valuePaise,
+    valueBps: data.valueBps,
+    tiers: data.tiers === Prisma.JsonNull ? null : (data.tiers as unknown as DiscountInput['tiers']),
+    buyQty: data.buyQty,
+    getQty: data.getQty,
+    minOrderPaise: data.minOrderPaise,
+    maxDiscountPaise: data.maxDiscountPaise,
+    targetIds: data.targetIds,
+    usageLimit: data.usageLimit,
+    usageCount: 0,
+    perCustomerLimit: data.perCustomerLimit,
+    stackable: data.stackable,
+    priority: data.priority,
+    startsAt: data.startsAt,
+    endsAt: data.endsAt,
+    isActive: true,
+  };
+
+  const result = calculateCart({
+    lines,
+    discounts: [discountInput],
+    discountCode: discountInput.code ?? undefined,
+    shippingState: settings.shippingState,
+    paymentMethod: settings.paymentMethod,
+    now: new Date(),
+  });
+
+  return { ok: true, result };
 }
 
 export async function setDiscountActiveAction(discountId: string, isActive: boolean): Promise<void> {

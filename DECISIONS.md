@@ -111,11 +111,32 @@ question number is named.
     quantity — the best tier the cart qualifies for, not the first one that matches.
   - Cart line `quantity` is bounded at 999 as a defensive upper limit — nothing currently
     feeds it untrusted input, but a checkout route eventually will.
-- **Not wired to any route yet.** No cart or checkout exists to call it from. The function
-  is deliberately pure (no DB access) so it can be tested in isolation and re-run safely on
-  every future cart read — the security property that matters (a client-tampered price
-  cannot change a total) depends entirely on whoever calls this always re-fetching
-  `pricePaise` from the database, never trusting a value a request body supplies.
+- Wired to the cart via `src/lib/cart-pricing.ts` — still nothing downstream (checkout,
+  orders) calls it yet. The function stays deliberately pure (no DB access) so it can be
+  tested in isolation; `cart-pricing.ts` is the layer that does the re-fetching, which is
+  what makes "a client-tampered price cannot change a total" actually true rather than just
+  a property of a function nothing calls.
+
+### Cart, order numbers, COD
+
+- **A `Combo` cart line is exploded into one pricing line per component**, the package
+  price apportioned across them by each component's own price weight
+  (`distributeProportionally`). `Combo` has no HSN or GST rate of its own — nothing in §7 or
+  §10 says how a bundle should be taxed — so this is a judgement call, not a spec: it is the
+  standard real-world treatment for a mixed bundle (apportion by value), and it means
+  `calculateCart`'s per-line HSN requirement doesn't need a schema change to accommodate
+  combos. Revisit if BBTC's accountant wants something else.
+- **Order number generation stops at formatting, not sequencing.** `formatOrderNumber` is
+  pure and tested; assigning the next number for real needs a gapless, race-safe counter
+  per financial year (a Postgres advisory lock or a counter row) inside the same
+  transaction as the `Order` insert — and no `Order` can be inserted yet regardless, since
+  `sellerEntityId` is required and open question 6 is still open.
+- **`CodSettings` (pincode allowlist, fee, min/max, toggle) has no home yet** — no
+  `Settings` model, no admin screen. `checkCodEligibility` takes it as a parameter so
+  whichever of those arrives first is a small wiring change, not a rewrite. Allowlist
+  entries are matched as pincode *prefixes* (`"67"` matches every 67xxxx pincode), matching
+  §10's "Kerala-and-adjacent allowlist" phrasing better than requiring every exact pincode
+  to be listed.
 
 ## Open questions blocking real catalogue data
 

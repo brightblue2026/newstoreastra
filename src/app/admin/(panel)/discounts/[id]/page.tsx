@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { paiseToRupeesInput } from '@/lib/money';
 import { requireCatalogueAccess } from '@/lib/session';
 import { DiscountForm, type DiscountFormValues } from '../discount-form';
-import { updateDiscountAction } from '../actions';
+import { previewDiscountAction, updateDiscountAction } from '../actions';
 import { formatTiers } from '../format';
 
 /** `<input type="datetime-local">` wants "YYYY-MM-DDTHH:mm", local time, no seconds. */
@@ -23,11 +23,15 @@ export default async function EditDiscountPage({
   const discount = await db.discount.findUnique({ where: { id } });
   if (!discount) notFound();
 
-  const [brands, categories, products, combos] = await Promise.all([
+  const [brands, categories, products, combos, variants] = await Promise.all([
     db.brand.findMany({ orderBy: { name: 'asc' } }),
     db.category.findMany({ orderBy: { name: 'asc' } }),
     db.product.findMany({ orderBy: { name: 'asc' } }),
     db.combo.findMany({ orderBy: { name: 'asc' } }),
+    db.productVariant.findMany({
+      include: { product: true },
+      orderBy: [{ product: { name: 'asc' } }, { sku: 'asc' }],
+    }),
   ]);
 
   const initialValues: DiscountFormValues = {
@@ -65,11 +69,16 @@ export default async function EditDiscountPage({
       )}
       <DiscountForm
         action={boundAction}
+        previewAction={previewDiscountAction}
         initialValues={initialValues}
         brandOptions={brands.map((b) => ({ id: b.id, label: b.name }))}
         categoryOptions={categories.map((c) => ({ id: c.id, label: c.name }))}
         productOptions={products.map((p) => ({ id: p.id, label: p.name }))}
         comboOptions={combos.map((c) => ({ id: c.id, label: c.name }))}
+        variantOptions={variants.map((v) => ({
+          id: v.id,
+          label: `${v.product.name}${v.variantName ? ` — ${v.variantName}` : ''} (${v.sku})`,
+        }))}
         submitLabel="Save changes"
       />
     </div>

@@ -146,11 +146,20 @@ any route — no cart or checkout exists yet to call it.
   but §7 makes `pricePaise: null` a deliberate feature ("Price on request"). Those two
   requirements conflict as written; resolving it needs a decision, not a guess, so the
   guard currently checks variant/image/HSN/food-label only.
-- **Discount preview against a sample cart** (§12 Phase 4, marked mandatory) is not built.
-  It needs the pricing engine, which now exists — this is the natural next step, not a
-  fresh blocker.
 - No storefront, cart UI, checkout, payments, orders, invoicing, or shipping. Nothing here
   is live on the internet — everything ran against a local dev server.
+
+### Discount preview against a sample cart · added 3 August 2026
+
+§12 Phase 4 marks this mandatory. `previewDiscountAction` (`discounts/actions.ts`) runs the
+*unsaved* form fields through the same `buildDiscountData` parsing `create`/`update` use,
+builds cart lines from variants an admin picks on the form, and calls `calculateCart`
+directly — so the preview reflects exactly what would be saved, including an honest "this
+hasn't started yet" if the admin typed a future start date. Verified rendering against a
+real seeded variant; the click-through (button → server action → result panel) itself
+could not be exercised end-to-end — no browser automation tool was available this session,
+only HTTP-level checks, and this feature calls the server action directly from client code
+rather than through a plain form post, which curl cannot replicate.
 
 ### Known gaps found during review
 
@@ -171,6 +180,40 @@ any route — no cart or checkout exists yet to call it.
   in `lib/audit.ts` only allows `create | update | deactivate | reactivate`. `ComboItem` has
   no soft-delete field, so removing one is logged as `deactivate` with `after: null` —
   workable, but a dedicated `delete` action would read more honestly.
+
+### Cart, order numbers and COD rules · added 3 August 2026 · backend only
+
+Client direction for this stretch: backend and business logic first, storefront/checkout UI
+comes later as its own pass. `pnpm test` now at 130.
+
+- **`src/lib/cart-store.ts`** — the client-side cart shape: `{ kind, id, quantity }` only,
+  nothing priced. Zustand, persisted to `localStorage`. Safe to persist precisely because
+  there is nothing here worth tampering with.
+- **`src/lib/cart-pricing.ts`** — the actual security boundary §12 Phase 3 asks for: given
+  cart line refs, it re-fetches every price, HSN and GST rate from Postgres and runs them
+  through `calculateCart`. A client-tampered price cannot reach a total, because no price
+  ever comes from the client. **Combo tax apportionment is a judgement call, not a spec**:
+  `Combo` has no HSN/GST fields of its own, so a combo line is exploded into one pricing
+  line per component, the package price split across them by each component's own price
+  weight (`distributeProportionally`), each carrying its own component's HSN/GST. See
+  DECISIONS.md.
+- **`src/lib/order-number.ts`** — `Order.orderNumber` formatting (`"BB-2627-00001"`,
+  financial-year-coded) and parsing, fully unit tested. Deliberately stops at formatting:
+  the gapless, race-safe *sequence* needs a real transaction around an actual `Order`
+  insert, and no order can be inserted yet — `sellerEntityId` is required and no `Entity`
+  has `isSeller: true` (open question 6).
+- **`src/lib/cod.ts`** — cash-on-delivery eligibility exactly per §10 (pincode allowlist,
+  flat non-discountable fee, min/max order value, global toggle), unit tested. There is no
+  `Settings` model or admin screen for these values yet, so a caller supplies them; the
+  shape (`CodSettings`) is what that future screen would read and write.
+- **A storefront UI pass exists locally but is held back, not pushed.** Before "backend
+  only" was confirmed as this stretch's direction, a full pass was built — site header,
+  cart drawer, home/brand/category/product/combo/search pages, JSON-LD, sitemap. It typechecks,
+  lints, and builds, and was smoke-tested via curl against seeded data, but was never
+  exercised in a real browser. Left on disk rather than deleted; picking it back up is the
+  next UI pass whenever that starts, not a rebuild from zero.
+- **The order-creation service itself is not built** — blocked on the same seller-entity
+  question as order numbering above.
 
 ---
 
