@@ -217,6 +217,76 @@ comes later as its own pass. `pnpm test` now at 130.
 
 ---
 
+## Phase 2 — Storefront browse · **in progress** · 6 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (139 tests) and `pnpm build` all pass. Ten
+storefront routes now build. Judgement calls are in `DECISIONS.md`.
+
+### What was built
+
+**Shell** — the announcement ticker, header + cart drawer and footer moved out of the
+homepage into `src/app/(storefront)/layout.tsx`, so every browse page has them and every
+page below stays a server component.
+
+**Read models** (`src/lib/storefront.ts`) — one shared product-card projection used by
+every listing surface, plus `listProducts` (brand / category-subtree / segment / search /
+sort), `getBrandBySlug`, `getCategoryBySlug`, `getProductBySlug`, `getComboBySlug`,
+`getTopCategories`, `getStockistsByDistrict` and `getSitemapData`. Every one degrades to
+an empty result rather than throwing.
+
+**Pages** — `/shop` (brand and category filters, five sorts), `/brands/[slug]`,
+`/categories/[slug]` (lists the whole subtree, breadcrumbs, child chips),
+`/products/[slug]`, `/combos/[slug]`, `/search`, `/story`, `/stockists`. All ISR 60s.
+Filters and sort are links, not client state — `src/lib/query.ts`, unit tested.
+
+**Product page** — gallery that follows the variant, the fragrance grid with
+`variantHex` swatches, size and format axes, claims, no-JS `<details>` accordions for
+description / usage / ingredients / FSSAI panel / cosmetics licence, related products, and
+a sticky mobile add-to-cart. A null price renders "Price on request" with an enquiry link
+carrying the product name and SKU, never ₹0.00.
+
+**Cart drawer wired** — `src/server/actions/cart.ts` (`readCart`, Zod-validated) calls the
+existing `priceCart`, so every price in the drawer is re-read from Postgres. Line
+quantities, removal, named offers from `Discount.publicLabel`, free-shipping progress and
+an unavailable-items notice. This is Phase 3's "server-side recomputation on every cart
+read", brought forward because Phase 2's add-to-cart cannot be honest without it.
+
+**SEO** — `Product` + `Offer` JSON-LD on products and combos, `sitemap.ts` built from live
+rows, `robots.ts`, canonical URLs on every route via `metadataBase` + `alternates`.
+
+### Verified
+
+Against `pnpm dev` with **an empty `DATABASE_URL`**, which exercises every degrade path:
+
+```
+/ /shop /shop?sort=price-asc&brand=mx-3 /search /search?q=lemon
+/story /stockists /sitemap.xml /robots.txt          200
+/products|brands|categories|combos/does-not-exist   404
+```
+
+The only errors in the dev log were the 79 expected `DATABASE_URL is not set` throws, all
+caught by the degrade handlers. `/shop` renders the header, footer and its empty-catalogue
+sentence; `/stockists` falls back to the toll-free number; no `₹0.00` anywhere.
+
+### Not done, deliberately
+
+- **Nothing has been exercised against real catalogue data.** There is no local database
+  in this environment — `DATABASE_URL` in `.env` is empty. So the fragrance grid, the
+  variant picker, price sorting, the cart drawer's arithmetic and the JSON-LD `offers`
+  array have been typechecked and rendered against *no* rows, never against a seeded
+  catalogue or in a browser. That is the single biggest gap in this phase and the first
+  thing to do next.
+- **No Lighthouse run.** Phase 2's "done when" needs mobile ≥ 90; that needs a deployment
+  with real images.
+- **No reviews.** The `Review` model exists and is unread — Phase 7.
+- **No checkout button in the drawer.** Phase 5.
+- **Combo choice slots are shown but not selectable** — `CartLineRef` cannot hold a
+  per-slot choice. Phase 4.
+- **Still no Cloudinary upload,** so no product can legitimately publish yet. Every image
+  field remains a URL text input.
+
+---
+
 ## Blocking Phase 1
 
 Per §14 and the working agreement, these are asked before the first migration, not

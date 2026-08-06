@@ -195,6 +195,83 @@ what already existed here.
   0 → 24 on scroll from below the fold, steady 24 when already in view, and 24 immediately
   under reduced motion.
 
+## Phase 2 (cont.) — Storefront browse
+
+Completes the §12 Phase 2 checklist apart from reviews and a Lighthouse run — see
+`PROGRESS.md` for what is verified and what is not.
+
+- **Chrome moved into `(storefront)/layout.tsx`.** The ticker, header and footer were
+  built inside the homepage. Nine more pages needed them, so they were hoisted; the brand
+  list is now read once per layout rather than once per page, and the mega-menu is
+  populated on every route instead of only the homepage.
+- **One product-card projection** (`productCardSelect` + `toProductCard`), shared by the
+  homepage, /shop, brand, category and search. Four hand-written copies of "take the
+  cheapest active variant" is four chances for two surfaces to quote different prices for
+  the same product.
+- **Price sorting is not done in SQL.** A null `pricePaise` means "Price on request", not
+  zero. Postgres sorts NULLs first descending, so `?sort=price-desc` would have opened
+  with every unpriced product in the catalogue — which is currently most of it. Priced
+  products are ordered in the database and unpriced ones appended, at both ends.
+- **Filters are links, not client state.** `lib/query.ts` builds the hrefs; every listing
+  page stays a server component, a filtered listing is a shareable, indexable URL, and
+  filtering works before JavaScript arrives. Keys are emitted sorted so one result set has
+  exactly one URL, and `?sort=featured` is expressed as the absence of the parameter.
+- **A category page lists its whole subtree.** "Kerala Spices" showing nothing because
+  every product hangs off a child range would read as an empty shop. The tree is walked in
+  application code, not a recursive CTE — this catalogue is two or three levels deep — and
+  the walk is cycle-guarded so bad data cannot hang the page.
+- **The variant picker never dead-ends.** MX-3 is fragrance × size × format. Choosing a
+  fragrance that doesn't come in the current size moves to the closest real variant
+  (`pickAlong` scores candidates by how many other axes still agree, tie-broken toward a
+  priced one) rather than disabling options or landing on nothing. Every state of the
+  component corresponds to a variant that exists. An axis with one value renders nothing.
+- **JSON-LD omits `offers` entirely when nothing is priced.** Emitting `price: 0` would be
+  the structured-data version of the ₹0.00 bug this build exists to fix, and would publish
+  a free price into search results. Only variants with a real price become `Offer` nodes.
+- **"Price on request" links to a real enquiry address.** `lib/contact.ts` holds the toll
+  free number and `info@brightblue.in` from the brief; the mailto carries the product name
+  and SKU in the subject. With most of the catalogue unpriced this link is the primary
+  conversion path, not a courtesy.
+- **`/search` is `robots: noindex, follow`** and is excluded from the sitemap — listing a
+  page that tells crawlers to go away wastes crawl budget. It is a plain GET form: no
+  debounce, no fetch-as-you-type. Search also matches `variantName`, so "lemon" finds the
+  MX-3 fragrance rather than only products with "lemon" in the title.
+- **`/story` and `/stockists` were built because the header already linked to them.** Both
+  404'd. The story page reuses the same `home_story` and `world_record` content blocks as
+  the homepage rather than duplicating the copy. Stockists with no rows prints the toll
+  free number, never an invented shop list.
+
+### Cart wiring (Phase 3 surface, brought forward)
+
+§12 Phase 2 lists "sticky mobile add-to-cart" on the product page, which cannot be honest
+while the drawer renders a hardcoded empty state. So the drawer was wired up:
+
+- **`src/server/actions/cart.ts`** — `readCart` Zod-validates the line refs and calls the
+  existing `priceCart`. Every rupee in the drawer is re-read from Postgres; the client
+  sends ids and quantities only. This is Phase 3's "server-side recomputation on every
+  cart read".
+- **Priced lines are collapsed back to one row per cart line.** `priceCart` explodes a
+  combo into one line per component so each carries its own HSN and GST rate — correct for
+  tax, wrong for a drawer, where a three-component combo is one thing the customer chose.
+  Rows are grouped by `kind:id` and their money summed rather than recomputed, so the
+  drawer reconciles exactly with the total.
+- **Offer names come from `Discount.publicLabel`,** looked up in the action rather than
+  threaded through `calculateCart` — keeping that function pure and database-free is what
+  makes it testable. `Discount.name` is marked internal in the schema and is never shown.
+- **`useCartDrawer` is a second, unpersisted store.** "The drawer was open when I closed
+  the tab" is not state worth restoring, and add-to-cart fires from a product page far
+  down the tree, so open/closed could not stay in `StorefrontChrome`'s local state.
+- **The cart badge is gated behind a mount flag.** The cart lives in localStorage, which
+  the server cannot see, so rendering the real count on the first pass is a hydration
+  mismatch.
+- **No checkout button.** Checkout, payment and the order transaction are Phase 5. The
+  drawer shows a subtotal and says delivery and taxes are calculated at checkout.
+- **Combo choice slots are shown but not selectable.** `CartLineRef` is `{ kind, id,
+  quantity }` — there is nowhere to record "for slot 2 they picked Jasmin". A picker whose
+  choice was silently dropped would be worse than none, so the options are displayed and
+  the slot says the selection is confirmed before dispatch. Per-slot pickers need a cart
+  shape that can hold choices; that is Phase 4.
+
 ## Open questions blocking real catalogue data
 
 Per §14. The schema is migrated and the admin CRUD works against it, but these still block

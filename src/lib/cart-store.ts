@@ -62,3 +62,21 @@ export const useCartStore = create<CartState>()(
     { name: 'bb-cart' },
   ),
 );
+
+/**
+ * Whether the cart drawer is open.
+ *
+ * Separate from the cart itself, and deliberately not persisted: "the drawer
+ * was open when I closed the tab" is not state worth restoring. It lives in a
+ * store rather than in `StorefrontChrome`'s local state because "add to cart"
+ * fires from a product page far down the tree and has to be able to open it.
+ */
+interface CartDrawerState {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}
+
+export const useCartDrawer = create<CartDrawerState>()((set) => ({
+  open: false,
+  setOpen: (open) => set({ open }),
+}));

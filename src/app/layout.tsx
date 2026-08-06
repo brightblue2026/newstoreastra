@@ -1,9 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import { fontVariables } from './fonts';
 import SmoothScroll from '@/components/SmoothScroll';
+import { SITE_URL } from '@/lib/site';
 import './globals.css';
 
 export const metadata: Metadata = {
+  // Lets every page declare `alternates.canonical` as a path and have Next
+  // resolve it against the real origin.
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'Bright Blue',
     template: '%s · Bright Blue',
