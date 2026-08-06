@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { fontVariables } from './fonts';
+import SmoothScroll from '@/components/SmoothScroll';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -21,7 +22,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-IN" className={fontVariables}>
-      <body>{children}</body>
+      <body>
+        {/* Renders nothing; every scroll-driven animation inherits its feel
+            from this. Opts itself out under prefers-reduced-motion. */}
+        <SmoothScroll />
+        {children}
+      </body>
     </html>
   );
 }

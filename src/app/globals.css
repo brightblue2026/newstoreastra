@@ -22,6 +22,30 @@
   --color-success: #2e7d5b;
   --color-warning: #b4501c;
 
+  /*
+    Section wash. Paper is the page; sky is the alternating band that separates
+    one section from the next without introducing a second accent.
+  */
+  --color-sky: #dceafb;
+
+  /*
+    ---------- The seven houses ----------
+    One per brand, mirroring Brand.accentHex in the database. These exist so a
+    static surface (nav mega-menu, the seven-house band) can render the set
+    before products load; anything reading a real Brand row must prefer
+    `Brand.accentHex` over these.
+
+    Subject to the same rule as every accent: image fields, hairlines and
+    swatches only. Never body text, never a CTA.
+  */
+  --color-brand-mx3: #1e6fd9; /* dish          */
+  --color-brand-rafasi: #7c5cd6; /* fabric        */
+  --color-brand-landfloro: #14a38b; /* floor         */
+  --color-brand-fairoze: #e8617a; /* personal care */
+  --color-brand-ansaf: #f0a020; /* car           */
+  --color-brand-ilfa: #b4552a; /* tea           */
+  --color-brand-kenzaniya: #2f7d3a; /* food          */
+
   /* ---------- Type ---------- */
   --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-body), ui-sans-serif, system-ui, sans-serif;
@@ -59,6 +83,7 @@
   --bb-duration-accent: 240ms; /* brand rail + fragrance grid background shift */
   --bb-duration-drawer: 200ms; /* cart drawer slide */
   --bb-duration-lift: 120ms; /* card hover lift, 2px */
+  --bb-duration-reveal: 500ms; /* section scroll-in — a 24px rise, not a hover */
   --bb-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
   /*

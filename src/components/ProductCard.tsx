@@ -1,0 +1,166 @@
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { motion, useReducedMotion } from 'motion/react';
+import { dur, ease } from '@/lib/motion';
+import { formatPrice, isPurchasable } from '@/lib/money';
+
+/*
+  The catalogue card.
+
+  On the accent: it reaches the hairline border and the image field wash, and
+  stops there. The brand label is ink and the CTA is `--bb-signal`, on every
+  card, in every brand. A CTA that changes colour per brand stops reading as
+  "the button" and starts reading as decoration — and the one-accent rule exists
+  so a grid of seven houses doesn't turn into a paint chart.
+*/
+
+export type ProductCardData = {
+  slug: string;
+  name: string;
+  brandName: string;
+  /** `Brand.accentHex` — the live accent for this card. */
+  accentHex: string;
+  size?: string | null;
+  imageUrl: string | null;
+  imageAlt: string | null;
+  /** Second photo, revealed on hover. Optional — most SKUs have one shot. */
+  hoverImageUrl?: string | null;
+  /** Paise, or null for "Price on request". Never zero as a stand-in. */
+  pricePaise: number | null;
+  mrpPaise: number | null;
+};
+
+export default function ProductCard({
+  product,
+  onQuickAdd,
+}: {
+  product: ProductCardData;
+  onQuickAdd?: (slug: string) => void;
+}) {
+  const [hover, setHover] = useState(false);
+  const reduced = useReducedMotion();
+
+  const {
+    slug,
+    name,
+    brandName,
+    accentHex,
+    size,
+    imageUrl,
+    imageAlt,
+    hoverImageUrl,
+    pricePaise,
+    mrpPaise,
+  } = product;
+
+  const purchasable = isPurchasable(pricePaise);
+  const showMrp =
+    purchasable && mrpPaise !== null && mrpPaise > (pricePaise as number);
+
+  // A 12% wash rather than the raw hex: the accent belongs behind the product,
+  // not competing with it.
+  const field = `color-mix(in oklab, ${accentHex} 12%, var(--color-paper))`;
+
+  return (
+    <motion.article
+      onHoverStart={() => setHover(true)}
+      onHoverEnd={() => setHover(false)}
+      whileHover={reduced ? undefined : { y: -2 }}
+      transition={{ duration: dur.lift, ease }}
+      className="group relative flex flex-col rounded-card border bg-paper p-4"
+      style={{ borderColor: hover ? accentHex : 'var(--color-line)' }}
+    >
+      <div
+        className="relative aspect-square overflow-hidden rounded-card"
+        style={{ backgroundColor: field }}
+      >
+        {imageUrl ? (
+          <>
+            <motion.div
+              className="absolute inset-0"
+              animate={{ scale: hover && !reduced ? 1.06 : 1 }}
+              transition={{ duration: dur.accent, ease }}
+            >
+              <Image
+                src={imageUrl}
+                alt={imageAlt ?? name}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-contain p-6"
+              />
+            </motion.div>
+
+            {hoverImageUrl && (
+              <motion.div
+                className="absolute inset-0"
+                initial={false}
+                animate={{ opacity: hover ? 1 : 0 }}
+                transition={{ duration: dur.accent, ease }}
+                aria-hidden="true"
+              >
+                <Image
+                  src={hoverImageUrl}
+                  alt=""
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-contain p-6"
+                />
+              </motion.div>
+            )}
+          </>
+        ) : (
+          // No stock photography and no placeholder art: an image-less product
+          // gets an empty accent field, not a grey box with a camera glyph.
+          <span className="sr-only">No photograph available</span>
+        )}
+
+        {purchasable && onQuickAdd && (
+          <motion.button
+            type="button"
+            onClick={() => onQuickAdd(slug)}
+            initial={false}
+            animate={{
+              y: hover || reduced ? 0 : 56,
+              opacity: hover || reduced ? 1 : 0,
+            }}
+            transition={{ duration: dur.lift, ease }}
+            // Hidden from the tab order until it is actually visible, so
+            // keyboard users don't tab into an offscreen control.
+            tabIndex={hover ? 0 : -1}
+            aria-hidden={!hover && !reduced}
+            className="absolute inset-x-3 bottom-3 rounded-control bg-signal py-3 font-medium text-paper"
+          >
+            Quick add
+          </motion.button>
+        )}
+      </div>
+
+      {/* Ink, not accent — this is body text. */}
+      <p className="mt-4 type-caption text-ink-soft">{brandName}</p>
+
+      <h3 className="mt-1 type-subhead">
+        <Link href={`/products/${slug}`} className="after:absolute after:inset-0">
+          {name}
+        </Link>
+      </h3>
+
+      {size && <p className="mt-1 type-body text-ink-soft">{size}</p>}
+
+      <p className="mt-2 type-body" data-price>
+        {purchasable ? (
+          <>
+            <span className="font-medium">{formatPrice(pricePaise)}</span>
+            {showMrp && (
+              <s className="ml-2 text-ink-soft">{formatPrice(mrpPaise)}</s>
+            )}
+          </>
+        ) : (
+          <span className="text-ink-soft">{formatPrice(null)}</span>
+        )}
+      </p>
+    </motion.article>
+  );
+}

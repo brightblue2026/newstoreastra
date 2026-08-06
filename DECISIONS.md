@@ -138,6 +138,63 @@ question number is named.
   §10's "Kerala-and-adjacent allowlist" phrasing better than requiring every exact pincode
   to be listed.
 
+## Phase 2 (partial) — Storefront homepage and motion system
+
+Built from the Cleancult teardown brief. Section architecture and interaction patterns
+were taken from it; its tokens, timings and copy were not, where they conflicted with
+what already existed here.
+
+- **Dependencies added:** `motion`, `lenis`, `clsx` — the first two named directly in the
+  brief. `clsx` came with them and is currently unused by this work.
+- **The brief's token block was not adopted.** It proposed a parallel `--bb-navy/blue/sky/
+  paper/ink` set that near-duplicates the existing `--color-ink/paper/line/signal` with
+  different hexes. Adding it would mean two colour systems. The brief's roles were mapped
+  onto the existing tokens instead; only `--color-sky` (section wash) and the seven
+  `--color-brand-*` accents are genuinely new.
+- **The brief's motion scale was not adopted.** It specified 250/500/800ms on
+  `cubic-bezier(.22,1,.36,1)`; globals.css already declared 240/200/120ms on
+  `cubic-bezier(.16,1,.3,1)`. Kept the existing curve (visually near-identical) and added
+  one duration, `--bb-duration-reveal: 500ms`, because a section entrance and a 2px hover
+  lift are different jobs. `src/lib/motion.ts` mirrors the CSS values; the two must not drift.
+- **Accent rule held, per the owner's decision.** The brief's §07 "colour wheel" and its
+  accent-coloured "Quick add" button both conflicted with the one-accent rule. Accent
+  reaches the image field, the card hairline and the brand swatch. Brand labels stay ink
+  and every CTA stays `--bb-signal`.
+- **Body face stays Satoshi.** The brief nominated Inter, which CLAUDE.md forbids.
+- **The italic-serif "collision" word is approximated.** The teardown's signature is a
+  script/serif word colliding with grotesque caps. Only Clash Display and Satoshi ship
+  here, so the hero's emphasis word uses weight and case within the display face. A true
+  third register needs a new font file — not added without asking.
+- **`ContentBlock` is the homepage CMS.** The brief asked for a `sections` collection with
+  a type discriminator; the schema already had `ContentBlock { key, data Json }`. No
+  migration was needed. `src/lib/content.ts` owns one Zod schema per key and a code-level
+  default for each. A missing row, malformed JSON or an unreachable database all fall back
+  to the default rather than throwing — bad admin input should cost the hero, not the site.
+- **Every homepage section guards its own data and renders nothing when empty.** This is
+  what lets the page be correct before brands and products exist, with no placeholder art,
+  no lorem and no stock photography anywhere in it.
+- **No `onQuickAdd` on the homepage grid.** `ProductCard` supports it; the cart is Phase 4,
+  and a button that does nothing should not ship.
+- **The footer prints a GSTIN only when exactly one active seller entity exists.** §14 Q6
+  is open — the same GSTIN is published for two entities — so an ambiguous result prints
+  nothing rather than picking one.
+- **`PinnedSteps` hoists its per-step `useTransform` into a child component.** The brief's
+  version calls hooks inside `.map()`, which lint rejects and which breaks as soon as the
+  array length can change. It also collapses to a normal-height stack under reduced motion:
+  pinning 300vh of scroll on someone who asked for less motion inverts the request.
+- **`CountUp` renders its destination, not zero, and polls the rect on rAF.** Starting at 0
+  ships "0 fragrance variants" in the HTML and leaves it there without JS. It only winds
+  back to 0 when it starts below the fold, so a tall viewport doesn't paint the figure and
+  visibly rewind it. Viewport detection is a rAF rect poll because `useInView`,
+  `onViewportEnter` and a hand-rolled IntersectionObserver all failed to fire for that
+  element while Lenis was driving the scroll — the same observer fires with Lenis disabled.
+  The cause was not identified. Motion's `whileInView`, which drives every `Reveal`, was
+  verified to fire reliably at every scroll position, so the reveals still use it.
+- **Verified in a real browser over CDP,** not just typechecked: reveals never leave an
+  on-screen element transparent at any scroll position; the counter reads 24 in the markup,
+  0 → 24 on scroll from below the fold, steady 24 when already in view, and 24 immediately
+  under reduced motion.
+
 ## Open questions blocking real catalogue data
 
 Per §14. The schema is migrated and the admin CRUD works against it, but these still block
