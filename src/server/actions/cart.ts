@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { priceCart } from '@/lib/cart-pricing';
 import { cartLineKey, type CartLineRef } from '@/lib/cart-line';
+import { cartLinesSchema, discountCodeSchema } from '@/lib/cart-schema';
 
 /*
   Reading the cart.
@@ -20,30 +21,10 @@ import { cartLineKey, type CartLineRef } from '@/lib/cart-line';
   beyond what Next already applies to actions.
 */
 
-const cartLineSchema = z.object({
-  kind: z.enum(['VARIANT', 'COMBO']),
-  // cuid-shaped, but not asserted as one: an id that doesn't resolve is
-  // already handled as `unavailable` below, and a stricter check here would
-  // only turn a recoverable state into an error.
-  id: z.string().min(1).max(64),
-  quantity: z.number().int().min(1).max(999),
-  choices: z
-    .array(
-      z.object({
-        itemId: z.string().min(1).max(64),
-        // One id per unit of the slot; the real bound is the slot's own
-        // quantity, which only `priceCart` knows.
-        variantIds: z.array(z.string().min(1).max(64)).min(1).max(50),
-      }),
-    )
-    .max(20)
-    .optional(),
-});
-
 const readCartSchema = z.object({
   // A bound on the request, not a business rule about cart size.
-  lines: z.array(cartLineSchema).max(100),
-  discountCode: z.string().trim().max(64).optional(),
+  lines: cartLinesSchema,
+  discountCode: discountCodeSchema,
 });
 
 export type CartViewLine = {

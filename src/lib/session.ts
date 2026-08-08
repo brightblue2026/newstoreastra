@@ -4,6 +4,7 @@ import {
   UserRole,
   canAccessAdmin,
   canAdminister,
+  canHandleOrders,
   canManageCatalogue,
   canSeePricing,
   hasAtLeast,
@@ -76,6 +77,14 @@ export async function requirePricingAccess(): Promise<SessionUser> {
   const user = await currentUser();
   if (!user) redirect('/admin/login');
   if (!canSeePricing(user.role)) forbidden();
+  return user;
+}
+
+/** STAFF and above. Viewing orders and updating fulfilment — §6. */
+export async function requireOrderAccess(): Promise<SessionUser> {
+  const user = await currentUser();
+  if (!user) redirect('/admin/login');
+  if (!canHandleOrders(user.role)) forbidden();
   return user;
 }
 

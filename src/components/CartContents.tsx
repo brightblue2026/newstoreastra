@@ -328,10 +328,21 @@ export default function CartContents() {
         </p>
 
         {/*
-          No checkout button yet. Checkout, payment and the order transaction
-          are Phase 5; a button that goes nowhere is worse than none, and this
-          drawer is honest about where the build has got to.
+          Checkout is a link, not a button that posts: the cart it carries is
+          already in the store, and the checkout page re-prices everything from
+          Postgres on arrival anyway. An item that went unavailable while the
+          drawer was open blocks the way through — the alternative is a customer
+          discovering it after filling in an address.
         */}
+        <Link
+          href="/checkout"
+          aria-disabled={view.lines.length === 0}
+          className={`mt-4 block rounded-control bg-signal px-8 py-4 text-center type-body font-medium text-paper motion-lift ${
+            view.lines.length === 0 ? 'pointer-events-none opacity-50' : ''
+          }`}
+        >
+          Checkout
+        </Link>
       </div>
     </div>
   );

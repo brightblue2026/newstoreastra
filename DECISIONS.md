@@ -321,6 +321,190 @@ two customer-facing halves that were left as "needs a cart shape that can hold c
   rather than claiming it does not exist — the last case is a cart the customer can fix,
   and telling them the code is wrong would be a lie.
 
+## Phase 5 — Checkout, payments, orders
+
+Completes the §12 Phase 5 checklist apart from phone OTP and the MSG91 submission itself —
+see `PROGRESS.md` for what is verified and what is not.
+
+### Settings, and the two open questions that turned out to be data entry
+
+- **A `Setting` model was added** (`key`, `data Json`, `updatedAt`) — not in §7. §10 says
+  the COD controls live "in admin settings" and there was nowhere for them to live. Same
+  key + validated-JSON shape as `ContentBlock`, kept as a separate table because it is not
+  content: it decides what a customer is charged, and it is ADMIN-only where content is
+  MANAGER-editable. Migration `20260808120000_phase5_settings`.
+- **Migrations are now authored offline.** There is no database in this environment, so the
+  migration SQL was generated with `prisma migrate diff --from-schema <snapshot> --to-schema
+  prisma/schema.prisma --script`, which needs no shadow database. Worth knowing:
+  `--from-schema-datamodel` was removed in Prisma 7 and the replacement is `--from-schema`.
+- **Every settings default is safe rather than plausible.** §14 Q17 (COD fee, bounds,
+  pincodes, weight slabs) is unanswered, so nothing here guesses a number. COD ships
+  **disabled** — a fee nobody set and an allowlist nobody drew are worse than the option
+  being absent. The slab table ships **empty**, which charges nothing for delivery; that is
+  a real cost, so `/admin/settings` says it in as many words rather than letting free
+  delivery be a silent default. Refusing every order until someone configures a slab was
+  the alternative, and it makes the store unusable to fix a number that takes one screen.
+- **No free-shipping threshold in settings.** `FREE_SHIPPING` is already one of the five
+  `DiscountType`s and `cart-pricing.ts` already derives the drawer's progress bar from
+  whichever real discount configures it. A second threshold in settings would be a second
+  source of truth for the same number, and the two would disagree the first time one
+  changed. `/admin/settings` says so and links to the discount screen.
+- **§14 Q6 is resolved by a mechanism, not a guess.** `/admin/settings` has a
+  seller-of-record form: an ADMIN picks one active entity and enters its GSTIN, and saving
+  clears `isSeller` on every other entity in the same transaction — so
+  `resolveSellerEntity`'s "exactly one" is something the UI cannot violate rather than
+  something it hopes for. Until one is set, `placeOrder` throws `OrderConfigurationError`
+  and checkout says orders are not being accepted, because an order that can never be
+  invoiced should not be taken. The GSTIN is format-checked (15 characters) but deliberately
+  **not** checked for uniqueness across entities: the published duplicate is the open
+  question, and once only one entity is the seller, what the others carry stops mattering
+  for invoicing.
+
+### Pincode, state and tax
+
+- **`src/lib/pincode.ts` is an offline prefix → state table, and it is deliberately
+  incomplete.** The delivery state decides CGST + SGST versus IGST, so it must not depend on
+  a third party's uptime — but a wrong entry charges the wrong tax, while an unknown one
+  costs the customer a dropdown. So a prefix resolves only where the whole series belongs to
+  one state; a shared series (`24`/`26` Uttar Pradesh–Uttarakhand, `81`/`82`
+  Bihar–Jharkhand, `605`/`609` Tamil Nadu–Puducherry, `396` Gujarat–DNHDD, `16`, `19`)
+  returns `ambiguous` with the candidates named, and anything unlisted returns `unknown`.
+- **Longest prefix wins,** which is what keeps the union territories sitting inside a
+  state's series correct: Goa's `403` inside Maharashtra's `40`, Sikkim's `737` and the
+  Andamans' `744` inside West Bengal's, Lakshadweep's `68255x` and Mahé's `673310` inside
+  Kerala's own. "68 is Kerala" is not good enough for tax, and Kavaratti is the proof.
+- **A definite pincode overrules the customer's selected state.** Otherwise selecting Kerala
+  for a Bengaluru pincode turns an IGST order into a CGST + SGST one. Where the series is
+  shared the selection stands but must be one of that series' candidates. A test asserts
+  every state named in the table resolves through `gst.ts` — a typo would silently become an
+  inter-state supply, because `isIntraStateSupply` treats an unrecognised state as
+  inter-state.
+- **City is not auto-filled.** That needs a real pincode database and is Phase 6's
+  Shiprocket lookup. The state is the field that matters for money, and it is the one filled
+  in.
+
+### Shipping and inventory
+
+- **`rateShipping` is pure and is currently the only rate source.** §10 makes the flat-rate
+  slab table the fallback for when Shiprocket is down; at Phase 5 Shiprocket does not exist
+  yet, so it is also the primary. Phase 6's job is to try Shiprocket first and fall back to
+  this, not to replace it. The narrowest slab that holds the weight wins, bounds are
+  inclusive, and an out-of-order table is sorted rather than trusted.
+- **An unweighed variant counts as `defaultUnitGrams`, not as nothing.** Most of the
+  catalogue has no `weightGrams`; skipping those lines would land a heavy order in the
+  lightest slab.
+- **A variant with no `Inventory` row is not blocked.** Almost nothing is stocked in the
+  database yet and treating "no row" as "no stock" would reject every order. An untracked
+  variant reserves nothing and ships — the honest reading of an empty table is "nobody is
+  counting this".
+- **Allocation ignores `Location.handles`.** Whether food ships from Thrissur or Malappuram
+  rather than Palakkad is §14 Q19 and unanswered, so stock is drawn deepest-row-first from
+  wherever there is stock rather than guessing a routing rule.
+- **The reservation is not recorded per location.** Release and restock re-plan against
+  freshly read rows — most-reserved first, deepest first — clamped so `reserved` cannot go
+  negative. Per-location drift is possible; the global count, which is the only thing that
+  decides whether the next order can be accepted, stays right. Recording the original
+  allocation would need a field §7 does not have.
+
+### The order transaction
+
+- **Order numbers are gapless without a counter table.** A transaction-scoped advisory lock
+  per financial year (`pg_advisory_xact_lock(hashtext('bbtc:order-number:2627'))`)
+  serialises read-then-insert, and the next sequence is derived from the highest *committed*
+  number — so a rolled-back transaction leaves no gap, because it never held a number. The
+  five-digit zero padding is what makes a lexicographic `ORDER BY DESC` the same as a
+  numeric one.
+- **The §4 read-and-price steps moved inside the transaction.** `resolveCartLines` and
+  `loadDiscountCandidates` now take an optional `Prisma.TransactionClient`; reading through
+  the singleton would put "re-read prices" outside the transaction that inserts the order,
+  and a price edited in between would be a price the order silently disagrees with.
+- **`resolveComboUnits` is now generic over the variant row.** `cart-pricing.ts` needs the
+  SKU, weight and image off the *same rows* choice resolution validates, and threading the
+  row type through returns them with those fields intact instead of a cast that would
+  quietly become a lie if the query changed.
+- **A combo becomes one `OrderItem` per component, not one per package.**
+  `OrderItem.hsnCode` and `gstRate` are not nullable and a bundle has neither of its own, so
+  the alternative was inventing an HSN for a mixed package. Each component line carries its
+  own HSN and rate and the combo's id; `comboId` puts the package back together for display,
+  and keeping the components apart is what lets a mixed-rate invoice reconcile line by line.
+  `nameSnapshot` reads "Festive Trio — MX-3 Dish Wash Lemon", so an invoice line is
+  self-describing.
+- **`OrderItem.totalPaise` is net of every discount,** including that line's share of an
+  order-level one, so the items sum to exactly what was charged for goods. `unitPricePaise`
+  is `round(subtotal / quantity)` — display-only, since `totalPaise` and `Order.taxByHsn`
+  are what reconcile.
+- **A COD order is created `CONFIRMED`,** not `PENDING_PAYMENT` — there is no payment to
+  wait for — and its stock hold is committed in the same transaction.
+- **The Razorpay order is created *after* the transaction commits,** and attached in a
+  second write. A network call inside a database transaction holds locks for as long as a
+  third party takes to answer. Creating it first would be worse: a database failure would
+  leave a payable order Razorpay knows about and this database does not, which is money
+  taken against nothing. If Razorpay cannot be reached the local order is cancelled
+  automatically — releasing the stock hold and keeping the order list honest about what is
+  collectable — and the customer is told to try again.
+- **`perCustomerLimit` is enforced from the `appliedDiscounts` snapshot** on the customer's
+  past orders, via one `jsonb_array_elements` aggregate, excluding cancelled and refunded
+  orders: a coupon on an order that never happened has not been spent. No counter table,
+  because the snapshot already is the record of what was granted. Only reachable for a
+  signed-in user, which today means staff — there is no customer login yet.
+
+### Payments
+
+- **No Razorpay SDK.** §5 locks the *provider*, not a client library, and the package wraps
+  two REST calls and an HMAC. This is `fetch` plus `node:crypto`, so the dependency list
+  stays where it was. Razorpay's API unit for INR is the paise, which is this codebase's
+  unit, so nothing in `razorpay.ts` multiplies by 100 — and it says so, because that is the
+  classic bug.
+- **`createRazorpayOrder` rejects an echoed amount that differs from what was sent.** Cannot
+  happen with a correct request, and must never pass silently if it does.
+- **Signature verification fails closed.** No signature, no configured secret, a length
+  mismatch or non-hex input all return false, and the compare is `timingSafeEqual`. A test
+  asserts that the same payload re-serialised with its keys in another order fails, which is
+  why the route handler reads `req.text()` before it parses anything.
+- **`PENDING_PAYMENT → CONFIRMED` is reachable only by actor `'WEBHOOK'`** in
+  `order-status.ts`. Not by an admin button, not by the browser's success handler, not by an
+  ADMIN — §10 has no exception for seniority. The guarantee lives in the state machine, so
+  it does not depend on the webhook route being its only caller.
+- **The browser's success handler clears the cart and navigates. It marks nothing paid.**
+  The confirmation page reads the real status, so it says "confirming the payment" until the
+  webhook lands and "Confirmed" afterwards. A page that congratulated a customer on a
+  payment that later failed would be the visible form of trusting the client.
+- **Webhook idempotency is two-layered:** matched first by `razorpayPaymentId`, then by order
+  state — `transitionOrder` treats a move to the status an order is already in as a no-op, so
+  a replay cannot decrement inventory twice. A signed event for an unknown order is
+  acknowledged with 200 and logged loudly, so Razorpay stops retrying something no retry will
+  fix; a failure on our side returns 500 to ask for it again.
+- **`payment.failed` moves `paymentStatus` only, never `status`.** A failed attempt is not a
+  cancelled order — the customer can try again on the same one.
+
+### The customer-facing surfaces
+
+- **An order page is not readable by order number alone.** Numbers run in sequence, so
+  `BB-2627-00001` cannot be the credential. Access comes from an HMAC capability token
+  minted at placement and carried in the URL, or from the **full ten-digit** mobile number on
+  the order. Not the last four: there is no shared rate-limit store in this deployment, and
+  four digits against a sequential number is a few thousand guesses. The token does not
+  expire — it is a link a customer keeps, and an order they can still see next month is the
+  point.
+- **The unlock form gives one message for a wrong number and for an order that does not
+  exist.** A form that distinguishes them tells a stranger which order numbers are real.
+- **`/order` and `/order/[orderNumber]` need no client JavaScript.** Both are server
+  components with a plain form action, which is also what makes them work for a customer on
+  a bad connection opening a WhatsApp link.
+- **Checkout is three sections of one form, not three routes.** A customer can go back to a
+  field without losing the rest, and it is one submit. Every rupee shown comes from
+  `quoteCheckout` and is recomputed a third time inside the transaction; the browser sends
+  ids, quantities, an address and a payment method, and never a total.
+- **A payment method that stops being available is deselected.** COD switched off, or a
+  pincode outside its allowlist, silently reverts the choice to online payment rather than
+  letting a customer submit an order the server will refuse.
+- **The cart drawer's checkout button is a `Link`.** The cart it carries is already in the
+  store and the checkout page re-prices from Postgres on arrival, so there is nothing to
+  post.
+- **STAFF can see order totals.** §6 bars STAFF from prices, products and discounts — not
+  from what an order came to. They have to print invoices and hand parcels to couriers, and
+  neither is possible otherwise.
+
 ## Open questions blocking real catalogue data
 
 Per §14. Client supplied source documents on 9 August 2026 (trade licence, two FSSAI
@@ -406,3 +590,11 @@ fragrances use a synthesized internal SKU (`MX3-<FRAGRANCE>-<SIZE>`) rather than
 fabricated barcode, because inventing a barcode risks colliding with a real one the
 business already uses elsewhere. Swap in the real code once the full size × fragrance
 barcode sheet is available.
+### How the resolved seller reaches an order · 9 August 2026
+
+Phase 5 was built before the answer to question 6 arrived, so it does not hardcode it: an
+ADMIN marks the seller of record and enters its GSTIN in `/admin/settings`, and
+`resolveSellerEntity` refuses to take an order until exactly one entity is marked with a
+GSTIN on it. That mechanism stays. It is now satisfied by real data rather than waiting on
+it — **Bright Blue Trading Corporation, `32DCVPK7871P1ZI`** — and the same screen remains
+the place to correct it without a deploy.

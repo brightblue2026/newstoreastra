@@ -27,18 +27,27 @@ export interface ChoiceVariant {
   };
 }
 
-export interface ChoiceComboItem {
+export interface ChoiceComboItem<V extends ChoiceVariant = ChoiceVariant> {
   id: string;
   quantity: number;
   isChoice: boolean;
   /** Restricts the slot; empty means any variant of the slot's own product (§7). */
   choiceOf: string[];
-  variant: ChoiceVariant;
+  variant: V;
 }
 
-export interface ResolvedCombo {
+/*
+  Generic over the variant row, not fixed to `ChoiceVariant`.
+
+  This module only needs the fields `ChoiceVariant` names to decide whether a
+  package is one BBTC offers. Its caller needs more from the *same rows* — a
+  SKU, a weight and an image to snapshot onto an `OrderItem` — and threading
+  the row type through means it gets them back with those fields intact,
+  instead of a cast that would quietly become a lie if the query ever changed.
+*/
+export interface ResolvedCombo<V extends ChoiceVariant = ChoiceVariant> {
   /** What ships, grouped: one entry per distinct variant, with how many of it. */
-  units: { variant: ChoiceVariant; units: number }[];
+  units: { variant: V; units: number }[];
   /** What to print in the cart, per choice slot. Empty when nothing was chosen. */
   chosenLabels: { slotLabel: string; picks: string[] }[];
 }
@@ -63,11 +72,11 @@ export interface ResolvedCombo {
  * choice slots, or a cart saved before pickers existed; those fall back to the
  * slot's own variant, which is exactly what was being sold before.
  */
-export function resolveComboUnits(
-  items: ChoiceComboItem[],
+export function resolveComboUnits<V extends ChoiceVariant>(
+  items: ChoiceComboItem<V>[],
   cartLine: Pick<CartLineRef, 'choices'>,
-  variantById: ReadonlyMap<string, ChoiceVariant>,
-): ResolvedCombo | null {
+  variantById: ReadonlyMap<string, V>,
+): ResolvedCombo<V> | null {
   const choiceByItem = new Map((cartLine.choices ?? []).map((choice) => [choice.itemId, choice]));
 
   // A choice naming a slot this combo does not have is a stale or forged line.
@@ -75,7 +84,7 @@ export function resolveComboUnits(
     if (!items.some((item) => item.id === itemId)) return null;
   }
 
-  const units: { variant: ChoiceVariant; units: number }[] = [];
+  const units: { variant: V; units: number }[] = [];
   const chosenLabels: { slotLabel: string; picks: string[] }[] = [];
 
   for (const item of items) {

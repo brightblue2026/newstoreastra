@@ -1,4 +1,5 @@
 import 'server-only';
+import type { Prisma } from '@/generated/prisma/client';
 import { db } from '@/lib/db';
 import { distributeProportionally } from '@/lib/money';
 import { calculateCart, type CartLine, type DiscountInput, type PriceResult } from '@/lib/pricing';
@@ -16,6 +17,50 @@ export interface CartDisplayItem {
   choices?: { slotLabel: string; picks: string[] }[];
 }
 
+/**
+ * Everything an `OrderItem` snapshot needs, captured at the moment the cart was
+ * priced. Index-aligned with `ResolvedCart.lines`, so the priced result can be
+ * zipped straight onto it — a product edit after this point must never alter
+ * what the order says was bought.
+ *
+ * A combo contributes **one snapshot per component**, each carrying that
+ * component's own HSN and rate and the combo's id. `OrderItem.hsnCode` and
+ * `gstRate` are not nullable and a bundle has neither of its own, so the
+ * alternative would be inventing an HSN for a mixed package. Grouping by
+ * `comboId` puts the package back together for the order detail; keeping the
+ * components apart is what lets a mixed-rate invoice reconcile line by line.
+ */
+export interface OrderItemSnapshot {
+  variantId: string | null;
+  comboId: string | null;
+  nameSnapshot: string;
+  skuSnapshot: string;
+  imageSnapshot: string | null;
+  choiceSnapshot: { slotLabel: string; picks: string[] }[] | null;
+  /** Physical units of this variant in the order, not the number of packages. */
+  quantity: number;
+  hsnCode: string;
+  gstRate: number;
+  weightGrams: number | null;
+}
+
+export interface ResolvedCart {
+  /** Pricing input, in cart order. Combos are exploded into component lines. */
+  lines: CartLine[];
+  /** Index-aligned with `lines`: the `cartLineKey` each line came from. */
+  lineKeys: string[];
+  /** Index-aligned with `lines`: what to write onto an `OrderItem`. */
+  snapshots: OrderItemSnapshot[];
+  /** Lines from the client cart that no longer resolve to a real, active, priced item. */
+  unavailable: CartLineRef[];
+  /** Keyed by `cartLineKey` — `calculateCart` only knows ids, not names or images. */
+  display: Record<string, CartDisplayItem>;
+  /** Pre-discount goods total: what COD bounds and slab rating are judged on. */
+  subtotalPaise: number;
+  /** Billable weight, or null when no line in the cart has a weight recorded. */
+  weightGrams: number | null;
+}
+
 export interface CartPricingResult {
   result: PriceResult;
   /**
@@ -26,10 +71,14 @@ export interface CartPricingResult {
    * back to the cart line the customer sees.
    */
   lineKeys: string[];
+  /** Index-aligned with `result.lines`, for the order transaction. */
+  snapshots: OrderItemSnapshot[];
   /** Lines from the client cart that no longer resolve to a real, active, priced item. */
   unavailable: CartLineRef[];
   /** Keyed by `cartLineKey` — `calculateCart` only knows ids, not names or images. */
   display: Record<string, CartDisplayItem>;
+  /** Billable weight, or null when nothing in the cart has a weight recorded. */
+  weightGrams: number | null;
   /**
    * How close the cart is to the cheapest active automatic FREE_SHIPPING
    * discount's minimum order — the cart drawer's "free-shipping progress".
@@ -40,13 +89,17 @@ export interface CartPricingResult {
   freeShippingProgress: { thresholdPaise: number; remainingPaise: number } | null;
 }
 
-/** Everything pricing and labelling need from a variant, and nothing more. */
+/** Everything pricing, labelling, snapshotting and rating need from a variant. */
 const variantCoreSelect = {
   id: true,
   productId: true,
+  sku: true,
   variantName: true,
+  size: true,
+  weightGrams: true,
   isActive: true,
   pricePaise: true,
+  images: { take: 1, orderBy: { sortOrder: 'asc' }, select: { url: true } },
   product: {
     select: {
       name: true,
@@ -60,37 +113,48 @@ const variantCoreSelect = {
   },
 } as const;
 
+/** The display name for a variant: "MX-3 Dish Wash — Lemon". */
+function variantLabel(variant: {
+  variantName: string | null;
+  product: { name: string };
+}): string {
+  return variant.variantName ? `${variant.product.name} — ${variant.variantName}` : variant.product.name;
+}
+
 /**
- * Server-side recomputation on every cart read — brief §12 Phase 3's "done
- * when": a client-tampered price has no effect on totals. This function is
- * the only place that is true, because it is the only place a price is
- * looked up rather than trusted. It takes nothing from the client but IDs,
- * quantities and choices — and a choice is re-checked against the slot's own
- * `choiceOf` restriction before it can affect what is sold.
+ * Turn the client's cart into priceable lines, using nothing from the client
+ * but ids, quantities and choices.
+ *
+ * This is the security boundary — brief §12 Phase 3's "done when": a
+ * client-tampered price has no effect on totals, because no price ever comes
+ * from the client. A tampered *choice* is re-checked against the combo's own
+ * slot restrictions in `resolveComboUnits` and rejected there.
  *
  * Combos have no HSN/GST fields of their own (open in the schema — see
- * DECISIONS.md). A combo line is exploded into one pricing line per
- * component, each carrying its own component's HSN/GST rate, with the
- * combo's package price apportioned across components by their own price
- * weight — the standard way to tax a mixed bundle. `kind: 'COMBO'` and the
- * combo's own id are kept on every exploded line so `DiscountScope.COMBO`
- * still matches correctly.
+ * DECISIONS.md). A combo line is exploded into one pricing line per component,
+ * each carrying its own component's HSN/GST rate, with the combo's package
+ * price apportioned across components by their own price weight — the standard
+ * way to tax a mixed bundle. `kind: 'COMBO'` and the combo's own id are kept on
+ * every exploded line so `DiscountScope.COMBO` still matches correctly.
+ *
+ * Separate from `priceCart` because the order transaction needs the resolved
+ * lines *before* it can price them: shipping is rated on their weight and COD
+ * eligibility on their subtotal, and both feed back into `calculateCart`.
+ *
+ * `client` exists so the order transaction can re-read every price through its
+ * own transaction rather than outside it. §4 puts "re-read prices → re-run
+ * pricing" *inside* the one `$transaction`, and reading through the singleton
+ * would put it outside — a price edited between the read and the insert would
+ * then be a price the order silently disagrees with.
  */
-export async function priceCart(
+export async function resolveCartLines(
   cartLines: CartLineRef[],
-  options: {
-    discountCode?: string;
-    shippingState?: string;
-    shippingPaise?: number;
-    codFeePaise?: number;
-    paymentMethod: 'RAZORPAY' | 'COD';
-    customerId?: string;
-    customerUsage?: Record<string, number>;
-  },
-): Promise<CartPricingResult> {
+  client: Prisma.TransactionClient = db,
+): Promise<ResolvedCart> {
   const unavailable: CartLineRef[] = [];
   const lines: CartLine[] = [];
   const lineKeys: string[] = [];
+  const snapshots: OrderItemSnapshot[] = [];
 
   const variantIds = cartLines.filter((l) => l.kind === 'VARIANT').map((l) => l.id);
   const comboIds = cartLines.filter((l) => l.kind === 'COMBO').map((l) => l.id);
@@ -105,17 +169,13 @@ export async function priceCart(
 
   const [variants, combos] = await Promise.all([
     lookupIds.length > 0
-      ? db.productVariant.findMany({
+      ? client.productVariant.findMany({
           where: { id: { in: lookupIds } },
-          select: {
-            ...variantCoreSelect,
-            sku: true,
-            images: { take: 1, orderBy: { sortOrder: 'asc' }, select: { url: true } },
-          },
+          select: variantCoreSelect,
         })
       : Promise.resolve([]),
     comboIds.length > 0
-      ? db.combo.findMany({
+      ? client.combo.findMany({
           where: { id: { in: comboIds } },
           select: {
             id: true,
@@ -145,6 +205,12 @@ export async function priceCart(
   const comboById = new Map(combos.map((c) => [c.id, c]));
 
   const display: Record<string, CartDisplayItem> = {};
+  let weightGrams: number | null = null;
+
+  const addWeight = (grams: number | null, quantity: number) => {
+    if (grams === null) return;
+    weightGrams = (weightGrams ?? 0) + grams * quantity;
+  };
 
   for (const cartLine of cartLines) {
     const key = cartLineKey(cartLine);
@@ -162,9 +228,7 @@ export async function priceCart(
         continue;
       }
       display[key] = {
-        name: variant.variantName
-          ? `${variant.product.name} — ${variant.variantName}`
-          : variant.product.name,
+        name: variantLabel(variant),
         slug: variant.product.slug,
         sku: variant.sku,
         imageUrl: variant.images[0]?.url ?? null,
@@ -181,6 +245,19 @@ export async function priceCart(
         gstRate: variant.product.gstRate ?? 0,
       });
       lineKeys.push(key);
+      snapshots.push({
+        variantId: variant.id,
+        comboId: null,
+        nameSnapshot: variantLabel(variant),
+        skuSnapshot: variant.sku,
+        imageSnapshot: variant.images[0]?.url ?? null,
+        choiceSnapshot: null,
+        quantity: cartLine.quantity,
+        hsnCode: variant.product.hsnCode,
+        gstRate: variant.product.gstRate ?? 0,
+        weightGrams: variant.weightGrams,
+      });
+      addWeight(variant.weightGrams, cartLine.quantity);
       continue;
     }
 
@@ -207,11 +284,13 @@ export async function priceCart(
       continue;
     }
 
+    const choiceSnapshot = resolved.chosenLabels.length > 0 ? resolved.chosenLabels : null;
+
     display[key] = {
       name: combo.name,
       slug: combo.slug,
       imageUrl: combo.imageUrl,
-      ...(resolved.chosenLabels.length > 0 ? { choices: resolved.chosenLabels } : {}),
+      ...(choiceSnapshot ? { choices: choiceSnapshot } : {}),
     };
 
     const packageTotal = combo.pricePaise * cartLine.quantity;
@@ -221,36 +300,71 @@ export async function priceCart(
     taxable.forEach((unit, index) => {
       const share = shares[index];
       if (share <= 0) return;
+      const variant = unit.variant;
+      // Physical units shipped: this component's slot size times the number of
+      // packages ordered.
+      const physical = unit.units * cartLine.quantity;
+
       lines.push({
         kind: 'COMBO',
         id: combo.id,
         quantity: 1,
         unitPricePaise: share,
-        brandId: unit.variant.product.brandId,
-        categoryId: unit.variant.product.categoryId,
-        productId: unit.variant.productId,
-        hsnCode: unit.variant.product.hsnCode!,
-        gstRate: unit.variant.product.gstRate ?? 0,
+        brandId: variant.product.brandId,
+        categoryId: variant.product.categoryId,
+        productId: variant.productId,
+        hsnCode: variant.product.hsnCode!,
+        gstRate: variant.product.gstRate ?? 0,
       });
       lineKeys.push(key);
+      snapshots.push({
+        variantId: variant.id,
+        comboId: combo.id,
+        nameSnapshot: `${combo.name} — ${variantLabel(variant)}`,
+        skuSnapshot: variant.sku,
+        imageSnapshot: variant.images[0]?.url ?? combo.imageUrl,
+        choiceSnapshot,
+        quantity: physical,
+        hsnCode: variant.product.hsnCode!,
+        gstRate: variant.product.gstRate ?? 0,
+        weightGrams: variant.weightGrams,
+      });
+      addWeight(variant.weightGrams, physical);
     });
   }
 
+  const subtotalPaise = lines.reduce((sum, line) => sum + line.unitPricePaise * line.quantity, 0);
+
+  return { lines, lineKeys, snapshots, unavailable, display, subtotalPaise, weightGrams };
+}
+
+/**
+ * Every discount worth considering for a cart: the automatic ones, plus the
+ * coupon the customer typed if it names a real row. Which of them actually
+ * apply is `calculateCart`'s decision, not this function's.
+ */
+export async function loadDiscountCandidates(
+  discountCode?: string,
+  client: Prisma.TransactionClient = db,
+): Promise<{
+  discounts: DiscountInput[];
+  /** The automatic rows, for the free-shipping progress bar. */
+  automatic: DiscountInput[];
+}> {
   const now = new Date();
-  const automatic = await db.discount.findMany({
+  const automaticRows = await client.discount.findMany({
     where: { isActive: true, code: null, startsAt: { lte: now } },
   });
-  const coupon = options.discountCode
-    ? await db.discount.findFirst({
+  const couponRow = discountCode
+    ? await client.discount.findFirst({
         where: {
           isActive: true,
-          code: { equals: options.discountCode.trim().toUpperCase(), mode: 'insensitive' },
+          code: { equals: discountCode.trim().toUpperCase(), mode: 'insensitive' },
         },
       })
     : null;
 
-  const candidateRows = coupon ? [...automatic, coupon] : automatic;
-  const discounts: DiscountInput[] = candidateRows.map((d) => ({
+  const toInput = (d: (typeof automaticRows)[number]): DiscountInput => ({
     id: d.id,
     code: d.code,
     type: d.type,
@@ -271,10 +385,48 @@ export async function priceCart(
     startsAt: d.startsAt,
     endsAt: d.endsAt,
     isActive: d.isActive,
-  }));
+  });
+
+  const automatic = automaticRows.map(toInput);
+  const discounts = couponRow ? [...automatic, toInput(couponRow)] : automatic;
+  return { discounts, automatic };
+}
+
+/** The cheapest automatic order-wide FREE_SHIPPING threshold, and how far the cart is from it. */
+export function freeShippingProgressFrom(
+  automatic: DiscountInput[],
+  subtotalPaise: number,
+): { thresholdPaise: number; remainingPaise: number } | null {
+  const thresholds = automatic
+    .filter((d) => d.type === 'FREE_SHIPPING' && d.scope === 'ORDER' && d.minOrderPaise !== null)
+    .map((d) => d.minOrderPaise!);
+  if (thresholds.length === 0) return null;
+  const thresholdPaise = Math.min(...thresholds);
+  return { thresholdPaise, remainingPaise: Math.max(0, thresholdPaise - subtotalPaise) };
+}
+
+/**
+ * Server-side recomputation on every cart read: resolve the cart, then price
+ * it. The two halves are separate functions because the order transaction has
+ * to rate shipping and check COD in between.
+ */
+export async function priceCart(
+  cartLines: CartLineRef[],
+  options: {
+    discountCode?: string;
+    shippingState?: string;
+    shippingPaise?: number;
+    codFeePaise?: number;
+    paymentMethod: 'RAZORPAY' | 'COD';
+    customerId?: string;
+    customerUsage?: Record<string, number>;
+  },
+): Promise<CartPricingResult> {
+  const resolved = await resolveCartLines(cartLines);
+  const { discounts, automatic } = await loadDiscountCandidates(options.discountCode);
 
   const result = calculateCart({
-    lines,
+    lines: resolved.lines,
     discounts,
     discountCode: options.discountCode,
     shippingState: options.shippingState,
@@ -283,21 +435,16 @@ export async function priceCart(
     paymentMethod: options.paymentMethod,
     customerId: options.customerId,
     customerUsage: options.customerUsage,
-    now,
+    now: new Date(),
   });
 
-  const freeShippingThresholds = automatic
-    .filter((d) => d.type === 'FREE_SHIPPING' && d.scope === 'ORDER' && d.minOrderPaise !== null)
-    .map((d) => d.minOrderPaise!);
-  const nearestThreshold =
-    freeShippingThresholds.length > 0 ? Math.min(...freeShippingThresholds) : null;
-  const freeShippingProgress =
-    nearestThreshold === null
-      ? null
-      : {
-          thresholdPaise: nearestThreshold,
-          remainingPaise: Math.max(0, nearestThreshold - result.subtotalPaise),
-        };
-
-  return { result, lineKeys, unavailable, freeShippingProgress, display };
+  return {
+    result,
+    lineKeys: resolved.lineKeys,
+    snapshots: resolved.snapshots,
+    unavailable: resolved.unavailable,
+    display: resolved.display,
+    weightGrams: resolved.weightGrams,
+    freeShippingProgress: freeShippingProgressFrom(automatic, result.subtotalPaise),
+  };
 }
