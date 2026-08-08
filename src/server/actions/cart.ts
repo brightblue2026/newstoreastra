@@ -3,15 +3,17 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { priceCart } from '@/lib/cart-pricing';
-import type { CartLineRef } from '@/lib/cart-store';
+import { cartLineKey, type CartLineRef } from '@/lib/cart-line';
 
 /*
   Reading the cart.
 
-  The client holds ids and quantities; this returns what they cost. Every
-  price, HSN code and GST rate is re-fetched from Postgres inside `priceCart` —
-  nothing priced crosses the boundary inward, so a tampered localStorage cart
-  changes what is *asked for*, never what it costs.
+  The client holds ids, quantities and combo choices; this returns what they
+  cost. Every price, HSN code and GST rate is re-fetched from Postgres inside
+  `priceCart` — nothing priced crosses the boundary inward, so a tampered
+  localStorage cart changes what is *asked for*, never what it costs. A
+  tampered choice is re-checked against the combo's own slot restrictions and
+  rejected there.
 
   It is a server action rather than a route handler because it is a read the UI
   performs, not a webhook. It writes nothing, so it needs no CSRF ceremony
@@ -25,6 +27,17 @@ const cartLineSchema = z.object({
   // only turn a recoverable state into an error.
   id: z.string().min(1).max(64),
   quantity: z.number().int().min(1).max(999),
+  choices: z
+    .array(
+      z.object({
+        itemId: z.string().min(1).max(64),
+        // One id per unit of the slot; the real bound is the slot's own
+        // quantity, which only `priceCart` knows.
+        variantIds: z.array(z.string().min(1).max(64)).min(1).max(50),
+      }),
+    )
+    .max(20)
+    .optional(),
 });
 
 const readCartSchema = z.object({
@@ -34,6 +47,8 @@ const readCartSchema = z.object({
 });
 
 export type CartViewLine = {
+  /** `cartLineKey` — how the client addresses this line for quantity and removal. */
+  key: string;
   kind: 'VARIANT' | 'COMBO';
   id: string;
   quantity: number;
@@ -41,6 +56,8 @@ export type CartViewLine = {
   slug: string;
   sku?: string;
   imageUrl: string | null;
+  /** What the customer picked for each choice slot, when there are any. */
+  choices?: { slotLabel: string; picks: string[] }[];
   unitPricePaise: number;
   subtotalPaise: number;
   discountPaise: number;
@@ -59,27 +76,29 @@ export type CartView = {
   freeShippingProgress: { thresholdPaise: number; remainingPaise: number } | null;
 };
 
+const emptyView: CartView = {
+  lines: [],
+  unavailable: [],
+  subtotalPaise: 0,
+  discountPaise: 0,
+  totalPaise: 0,
+  appliedDiscounts: [],
+  invalidDiscountCode: false,
+  freeShippingProgress: null,
+};
+
 export async function readCart(input: unknown): Promise<CartView> {
   const parsed = readCartSchema.safeParse(input);
 
   if (!parsed.success) {
     // A malformed cart is an empty cart. There is no user-correctable mistake
     // to report here — nobody types this payload.
-    return {
-      lines: [],
-      unavailable: [],
-      subtotalPaise: 0,
-      discountPaise: 0,
-      totalPaise: 0,
-      appliedDiscounts: [],
-      invalidDiscountCode: false,
-      freeShippingProgress: null,
-    };
+    return emptyView;
   }
 
   const { lines, discountCode } = parsed.data;
 
-  const { result, unavailable, display, freeShippingProgress } = await priceCart(lines, {
+  const { result, lineKeys, unavailable, display, freeShippingProgress } = await priceCart(lines, {
     discountCode,
     // Pre-checkout: no address yet, so no shipping and no COD fee. The drawer
     // shows a subtotal, never a final payable — that is settled at checkout,
@@ -115,20 +134,22 @@ export async function readCart(input: unknown): Promise<CartView> {
     `priceCart` explodes a combo into one pricing line per component so each
     carries its own component's HSN and GST rate — correct for tax, wrong for a
     drawer, where a three-component combo is one thing the customer chose.
-    Rows are grouped by `kind:id` and their money summed; the quantity comes
-    from the client's own cart line, because every exploded component line
-    carries quantity 1 regardless of how many combos were added.
+    Rows are grouped by `cartLineKey`, which `priceCart` returns index-aligned
+    with the priced lines; grouping by combo id alone would merge two lines of
+    the same combo bought with different fragrances. The quantity comes from
+    the client's own cart line, because every exploded component line carries
+    quantity 1 regardless of how many combos were added.
 
     Summing rather than recomputing is what keeps the drawer reconciled with
     the total: `distributeProportionally` guarantees the component shares add
     back up to the package price exactly, so `subtotal / quantity` is the combo
     price to the paise, with no rounding reintroduced here.
   */
-  const requested = new Map(lines.map((line) => [`${line.kind}:${line.id}`, line.quantity]));
+  const requested = new Map(lines.map((line) => [cartLineKey(line), line.quantity]));
   const grouped = new Map<string, CartViewLine>();
 
-  for (const line of result.lines) {
-    const key = `${line.kind}:${line.id}`;
+  result.lines.forEach((line, index) => {
+    const key = lineKeys[index];
     const existing = grouped.get(key);
 
     if (existing) {
@@ -136,13 +157,14 @@ export async function readCart(input: unknown): Promise<CartView> {
       existing.discountPaise += line.discountPaise;
       existing.netPaise += line.netPaise;
       existing.unitPricePaise = Math.round(existing.subtotalPaise / existing.quantity);
-      continue;
+      return;
     }
 
     const shown = display[key];
     const quantity = requested.get(key) ?? line.quantity;
 
     grouped.set(key, {
+      key,
       kind: line.kind,
       id: line.id,
       quantity,
@@ -150,12 +172,13 @@ export async function readCart(input: unknown): Promise<CartView> {
       slug: shown?.slug ?? '',
       sku: shown?.sku,
       imageUrl: shown?.imageUrl ?? null,
+      ...(shown?.choices ? { choices: shown.choices } : {}),
       unitPricePaise: Math.round(line.subtotalPaise / quantity),
       subtotalPaise: line.subtotalPaise,
       discountPaise: line.discountPaise,
       netPaise: line.netPaise,
     });
-  }
+  });
 
   return {
     lines: [...grouped.values()],

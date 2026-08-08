@@ -146,7 +146,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
 
   function handleAdd() {
     if (!selected || !purchasable) return;
-    addLine('VARIANT', selected.id, quantity);
+    addLine({ kind: 'VARIANT', id: selected.id, quantity });
     setAdded(true);
     openCart(true);
   }

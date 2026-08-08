@@ -5,9 +5,10 @@ import { useCartDrawer, useCartStore } from '@/lib/cart-store';
 
 /**
  * Quantity stepper plus add-to-cart, for anything whose selection is already
- * settled by the time it renders — a combo, where the buyable thing is the
- * package itself. Products go through `ProductDetail`, which has variant axes
- * to resolve first.
+ * settled by the time it renders — a combo with no choice slots, where the
+ * buyable thing is the package itself. Products go through `ProductDetail`,
+ * which has variant axes to resolve first; a combo with choice slots goes
+ * through `ComboChoices`, which has fragrances to pick.
  *
  * The CTA is `--bb-signal` here as everywhere; a combo page carries no accent
  * of its own because its components come from several houses at once.
@@ -51,7 +52,7 @@ export default function AddToCartButton({
       <button
         type="button"
         onClick={() => {
-          addLine(kind, id, quantity);
+          addLine({ kind, id, quantity });
           setAdded(true);
           openCart(true);
         }}

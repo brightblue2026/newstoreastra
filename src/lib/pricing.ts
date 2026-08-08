@@ -102,6 +102,13 @@ export interface AppliedDiscount {
 }
 
 export interface PriceResult {
+  /**
+   * One result per input line, in the same order. `cart-pricing.ts` relies on
+   * that alignment to map a priced line back to the cart line it came from —
+   * a combo is handed in as several component lines that all carry the
+   * combo's own id, so id alone cannot identify one. Asserted in
+   * `pricing.test.ts`.
+   */
   lines: CartLineResult[];
   subtotalPaise: Paise;
   discountPaise: Paise;

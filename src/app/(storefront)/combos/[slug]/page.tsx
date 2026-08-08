@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import AddToCartButton from '@/components/AddToCartButton';
+import ComboChoices, { type ChoiceSlot } from '@/components/ComboChoices';
 import { getComboBySlug } from '@/lib/storefront';
 import { formatINR } from '@/lib/money';
 import { absoluteUrl } from '@/lib/site';
@@ -33,13 +34,11 @@ export async function generateMetadata({
   it gets a real `Offer` at its own price rather than being described as a
   markdown on something else.
 
-  Choice slots are shown, with their options named, but they are not yet
-  selectable. `CartLineRef` carries a kind, an id and a quantity — there is
-  nowhere to put "and for slot 2 they picked Jasmin". Making that work needs a
-  cart shape that can hold per-slot choices, which is Phase 4. Displaying the
-  options without a picker is the honest half: a customer can see what the
-  package contains before buying, and nothing on screen pretends to record a
-  choice that would be silently dropped. Logged in DECISIONS.md.
+  Choice slots are picked here, per slot and per unit ("any 3 MX-3
+  fragrances" asks three times). The picks ride on the cart line as ids and are
+  re-validated server-side against the slot's own `choiceOf` restriction before
+  they can affect what is sold. A combo with no choice slots keeps the plain
+  add-to-cart button — there is nothing to decide.
 */
 
 export default async function ComboPage({
@@ -51,6 +50,15 @@ export default async function ComboPage({
 
   const combo = await getComboBySlug(slug);
   if (!combo) notFound();
+
+  const choiceSlots: ChoiceSlot[] = combo.items
+    .filter((item) => item.isChoice)
+    .map((item) => ({
+      itemId: item.id,
+      quantity: item.quantity,
+      productName: item.productName,
+      options: item.options,
+    }));
 
   const saving =
     combo.componentSumPaise !== null && combo.componentSumPaise > combo.pricePaise
@@ -137,7 +145,15 @@ export default async function ComboPage({
             </div>
 
             <div className="mt-12">
-              <AddToCartButton kind="COMBO" id={combo.id} label="Add combo to cart" />
+              {choiceSlots.length > 0 ? (
+                <ComboChoices
+                  comboId={combo.id}
+                  slots={choiceSlots}
+                  label="Add combo to cart"
+                />
+              ) : (
+                <AddToCartButton kind="COMBO" id={combo.id} label="Add combo to cart" />
+              )}
             </div>
 
             {combo.description && (
@@ -226,7 +242,9 @@ export default async function ComboPage({
                         </p>
                       )}
                       <p className="mt-3 type-caption text-ink-soft">
-                        We&rsquo;ll confirm your selection before dispatch.
+                        {item.quantity > 1
+                          ? `Pick ${item.quantity} above — repeats allowed.`
+                          : 'Pick yours above.'}
                       </p>
                     </div>
                   ) : (

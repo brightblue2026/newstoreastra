@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { AnimatePresence } from 'motion/react';
 import { CartLine } from '@/components/CartDrawer';
+import { cartLineKey } from '@/lib/cart-line';
 import { useCartStore } from '@/lib/cart-store';
 import { formatINR } from '@/lib/money';
 import { readCart, type CartView } from '@/server/actions/cart';
@@ -12,10 +13,10 @@ import { readCart, type CartView } from '@/server/actions/cart';
 /*
   The cart drawer's contents.
 
-  The store holds ids and quantities; every rupee on this screen comes back
-  from `readCart`, which re-reads each price from Postgres. That is the whole
-  point — nothing here is priced client-side, so nothing here can be tampered
-  into a cheaper order.
+  The store holds ids, quantities and combo choices; every rupee on this screen
+  comes back from `readCart`, which re-reads each price from Postgres. That is
+  the whole point — nothing here is priced client-side, so nothing here can be
+  tampered into a cheaper order.
 
   Quantity edits are optimistic in the store and settle when the recomputation
   returns. The previous totals stay on screen while that happens rather than
@@ -23,11 +24,14 @@ import { readCart, type CartView } from '@/server/actions/cart';
 */
 export default function CartContents() {
   const lines = useCartStore((state) => state.lines);
+  const discountCode = useCartStore((state) => state.discountCode);
   const setQuantity = useCartStore((state) => state.setQuantity);
   const removeLine = useCartStore((state) => state.removeLine);
+  const setDiscountCode = useCartStore((state) => state.setDiscountCode);
 
   const [view, setView] = useState<CartView | null>(null);
   const [failed, setFailed] = useState(false);
+  const [codeDraft, setCodeDraft] = useState('');
 
   useEffect(() => {
     if (lines.length === 0) {
@@ -38,7 +42,7 @@ export default function CartContents() {
 
     let cancelled = false;
 
-    readCart({ lines })
+    readCart({ lines, ...(discountCode ? { discountCode } : {}) })
       .then((next) => {
         if (cancelled) return;
         setView(next);
@@ -55,7 +59,7 @@ export default function CartContents() {
     return () => {
       cancelled = true;
     };
-  }, [lines]);
+  }, [lines, discountCode]);
 
   if (lines.length === 0) {
     return (
@@ -92,7 +96,7 @@ export default function CartContents() {
       <div className="flex-1">
         <AnimatePresence initial={false}>
           {view.lines.map((line) => (
-            <CartLine key={`${line.kind}:${line.id}`}>
+            <CartLine key={line.key}>
               <div className="flex gap-4">
                 <div className="relative size-16 shrink-0 overflow-hidden rounded-control bg-sky">
                   {line.imageUrl && (
@@ -126,11 +130,20 @@ export default function CartContents() {
 
                   {line.sku && <p className="mt-1 type-mono text-ink-soft">{line.sku}</p>}
 
+                  {/* What they picked for each choice slot. Two lines of the
+                      same combo with different fragrances are two rows, so
+                      this is the only thing telling them apart. */}
+                  {line.choices?.map((choice) => (
+                    <p key={choice.slotLabel} className="mt-1 type-caption text-ink-soft">
+                      {choice.slotLabel}: {choice.picks.join(', ')}
+                    </p>
+                  ))}
+
                   <div className="mt-3 flex items-center gap-3">
                     <div className="flex items-center rounded-control border border-line">
                       <button
                         type="button"
-                        onClick={() => setQuantity(line.kind, line.id, line.quantity - 1)}
+                        onClick={() => setQuantity(line.key, line.quantity - 1)}
                         aria-label={`Decrease quantity of ${line.name}`}
                         className="px-3 py-1 type-body text-ink-soft hover:text-ink"
                       >
@@ -141,7 +154,7 @@ export default function CartContents() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setQuantity(line.kind, line.id, line.quantity + 1)}
+                        onClick={() => setQuantity(line.key, line.quantity + 1)}
                         aria-label={`Increase quantity of ${line.name}`}
                         className="px-3 py-1 type-body text-ink-soft hover:text-ink"
                       >
@@ -151,7 +164,7 @@ export default function CartContents() {
 
                     <button
                       type="button"
-                      onClick={() => removeLine(line.kind, line.id)}
+                      onClick={() => removeLine(line.key)}
                       className="type-caption text-ink-soft hover:text-ink"
                     >
                       Remove
@@ -175,7 +188,8 @@ export default function CartContents() {
         </AnimatePresence>
 
         {/* An item that went out of stock or unpublished while it sat in the
-            cart. Named, not silently dropped. */}
+            cart — or a combo whose chosen fragrance is no longer offered.
+            Named, not silently dropped and not silently substituted. */}
         {view.unavailable.length > 0 && (
           <CartLine>
             <p className="type-body text-warning">
@@ -186,7 +200,7 @@ export default function CartContents() {
             <button
               type="button"
               onClick={() => {
-                for (const line of view.unavailable) removeLine(line.kind, line.id);
+                for (const line of view.unavailable) removeLine(cartLineKey(line));
               }}
               className="mt-2 type-caption underline"
             >
@@ -225,6 +239,72 @@ export default function CartContents() {
         {view.freeShippingProgress && view.freeShippingProgress.remainingPaise === 0 && (
           <p className="mb-4 type-caption text-success">Free delivery unlocked.</p>
         )}
+
+        {/*
+          Coupon entry.
+
+          The code is held in the cart store, not in this component, so it
+          survives navigation and a reload the same way the lines do — and it
+          is only ever a string the customer typed. Whether it means anything
+          is decided by `calculateCart`, which reports `invalidDiscountCode`
+          when a code was supplied and no usable discount answered to it. That
+          covers a code that doesn't exist, one that has expired, one that has
+          not started, one that is out of uses, and one whose minimum order the
+          cart doesn't meet — all of which look the same from here, so the
+          message says the code isn't valid *for this cart* rather than
+          claiming it doesn't exist.
+        */}
+        <div className="mb-4 border-b border-line pb-4">
+          {discountCode ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="type-caption text-ink-soft">
+                Code <span className="type-mono text-ink">{discountCode}</span>
+                {view.invalidDiscountCode && ' — not valid for this cart'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setDiscountCode(null);
+                  setCodeDraft('');
+                }}
+                className="type-caption underline"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                const code = codeDraft.trim().toUpperCase();
+                if (code) setDiscountCode(code);
+              }}
+              className="flex gap-2"
+            >
+              <label htmlFor="cart-coupon" className="sr-only">
+                Discount code
+              </label>
+              <input
+                id="cart-coupon"
+                name="coupon"
+                value={codeDraft}
+                onChange={(event) => setCodeDraft(event.target.value)}
+                placeholder="Discount code"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 type-caption uppercase placeholder:normal-case placeholder:text-ink-soft"
+              />
+              <button
+                type="submit"
+                disabled={codeDraft.trim().length === 0}
+                className="rounded-control border border-ink px-4 py-2 type-caption disabled:opacity-40"
+              >
+                Apply
+              </button>
+            </form>
+          )}
+        </div>
 
         {/* Named offers — `Discount.publicLabel`, never the internal name. */}
         {view.appliedDiscounts.map((discount) => (

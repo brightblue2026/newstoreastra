@@ -372,4 +372,30 @@ describe('calculateCart', () => {
       expect(Number.isInteger(n)).toBe(true);
     }
   });
+
+  /*
+    `cart-pricing.ts` returns a `lineKeys` array index-aligned with these
+    results, so that the cart drawer can regroup a combo's exploded component
+    lines back into the one row the customer chose. Two lines of the same combo
+    with different fragrances share an id and differ only in position, so if
+    this alignment ever broke, the drawer would merge them and show the wrong
+    quantity against the wrong fragrances.
+  */
+  it('returns one result per input line, in the same order', () => {
+    const lines = [
+      makeLine({ kind: 'COMBO', id: 'combo-1', unitPricePaise: 30_000, hsnCode: '3401' }),
+      makeLine({ kind: 'VARIANT', id: 'variant-9', unitPricePaise: 12_000, hsnCode: '1517' }),
+      makeLine({ kind: 'COMBO', id: 'combo-1', unitPricePaise: 20_000, hsnCode: '0904' }),
+    ];
+
+    const result = calculateCart({ lines, discounts: [], paymentMethod: PAYMENT, now: NOW });
+
+    expect(result.lines).toHaveLength(lines.length);
+    result.lines.forEach((priced, index) => {
+      expect(priced.id).toBe(lines[index].id);
+      expect(priced.kind).toBe(lines[index].kind);
+      expect(priced.hsnCode).toBe(lines[index].hsnCode);
+      expect(priced.unitPricePaise).toBe(lines[index].unitPricePaise);
+    });
+  });
 });

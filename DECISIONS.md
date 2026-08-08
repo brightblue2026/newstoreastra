@@ -272,6 +272,55 @@ while the drawer renders a hardcoded empty state. So the drawer was wired up:
   the slot says the selection is confirmed before dispatch. Per-slot pickers need a cart
   shape that can hold choices; that is Phase 4.
 
+## Phase 4 — Combo choice slots and coupon entry
+
+Completes the §12 Phase 4 checklist. The combo builder, the live saving panel, the
+discount admin and the mandatory discount preview were built in Phase 1; these are the
+two customer-facing halves that were left as "needs a cart shape that can hold choices".
+
+- **A cart line is now identified by `cartLineKey`, not by `kind:id`.** Two lines of the
+  same combo with different fragrances are two different things to buy, so id alone can no
+  longer address a line — the quantity stepper, the remove button and the server's
+  regrouping of exploded component lines all key off it. `src/lib/cart-line.ts` holds the
+  shape and the key function, outside `cart-store.ts` because both the client store and the
+  server pricing path need them and `cart-store.ts` is `'use client'`.
+- **Choices are normalised before keying.** Slots sorted by id, picks sorted within a slot:
+  two Lemon and one Rose is the same package however the customer clicked, so it merges
+  with an existing line rather than opening a second one. A combo with no choice slots
+  still keys as plain `COMBO:<id>`, which is exactly what carts saved before pickers
+  existed already are — so nobody's cart breaks.
+- **A choice slot with `quantity: 3` asks three times, and repeats are allowed.** "Any 3
+  MX-3 fragrances" is one `ComboItem` with `quantity: 3`, so `ComboChoice.variantIds`
+  carries one id per unit rather than a set. Three bottles of Lemon is a real order.
+- **Every pick is re-validated server-side** in `src/lib/combo-choice.ts` — active variant,
+  active product, inside `choiceOf` when the admin restricted the slot and otherwise a
+  variant of the slot's own product, and exactly as many picks as the slot has units. A
+  combo's price is its package price either way, so a forged choice buys nothing cheaper;
+  what it could do is put a fragrance BBTC never offered onto a picking list. The
+  resolution is a pure function in its own module precisely so it can be tested without a
+  database, which is the only kind of test this environment can run.
+- **An unresolvable choice makes the line unavailable rather than substituting the slot
+  default.** A fragrance deactivated, a slot resized since the line was added and a tampered
+  payload all arrive the same way and all have the same honest fix: pick again. Silently
+  shipping a different fragrance from the one on screen is worse than saying so.
+- **The pricing engine's line ordering is now a documented, tested contract.**
+  `PriceResult.lines` was always 1:1 with the input in order; `cart-pricing.ts` now depends
+  on it, returning a `lineKeys` array index-aligned with the priced lines so a combo's
+  exploded components regroup into the row the customer chose. Grouping by combo id alone
+  would merge two lines of the same combo bought with different fragrances. Asserted in
+  `pricing.test.ts` rather than left as folklore.
+- **`ComboItem` has no sort field**, so both `getComboBySlug` and `priceCart` now order
+  items by id. Without it the choice slots could swap places between requests, and the
+  drawer's slot labels would stop matching the pickers that produced them.
+- **The coupon code lives in the cart store**, persisted alongside the lines, so it survives
+  navigation and a reload the way the cart does. It is only ever a string the customer
+  typed; whether it means anything is `calculateCart`'s decision.
+- **One message for every kind of invalid coupon.** A code that does not exist, has expired,
+  has not started, is out of uses, or whose minimum order this cart does not meet all
+  surface as `invalidDiscountCode`. The drawer says the code is not valid *for this cart*
+  rather than claiming it does not exist — the last case is a cart the customer can fix,
+  and telling them the code is wrong would be a lie.
+
 ## Open questions blocking real catalogue data
 
 Per §14. The schema is migrated and the admin CRUD works against it, but these still block

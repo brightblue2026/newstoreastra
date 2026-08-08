@@ -287,6 +287,81 @@ sentence; `/stockists` falls back to the toll-free number; no `₹0.00` anywhere
 
 ---
 
+## Phase 4 — Combos and discounts · **checklist complete, unverified against data** · 8 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (167 tests) and `pnpm build` all pass. This
+closes the §12 Phase 4 list: the combo builder, the live saving panel, the discount admin
+and the mandatory discount preview landed in Phase 1; the two customer-facing halves that
+were deferred for needing a cart shape that can hold choices are now built.
+
+### What was built
+
+**Cart lines carry choices** (`src/lib/cart-line.ts`, new) — `CartLineRef` gains
+`choices: { itemId, variantIds }[]`, and a line is now identified by `cartLineKey` rather
+than `kind:id`, because two lines of the same combo with different fragrances are two
+different things to buy. Choices are normalised (slots sorted, picks sorted within a slot)
+so the same package keys the same however the customer clicked. A combo with no choice
+slots still keys as plain `COMBO:<id>` — carts saved before this change keep working, and
+the persisted store gained a v2 migration that sanitises anything malformed.
+
+**Per-slot pickers** (`src/components/ComboChoices.tsx`, new) — one radio group per unit of
+each choice slot, so a `quantity: 3` slot ("any 3 MX-3 fragrances") asks three times and
+allows repeats. Every slot starts on its first option, so the package is always one that
+exists and the button is never blocked on a decision nobody wants to make. A combo with no
+choice slots keeps the plain `AddToCartButton`. A slot whose product has no active variants
+left hides the button rather than offering an order the server would reject.
+
+**Server-side choice validation** (`src/lib/combo-choice.ts`, new, pure) — every pick is
+re-checked against the slot: active variant, active product, inside `choiceOf` when the
+admin restricted the slot and otherwise a variant of the slot's own product, and exactly as
+many picks as the slot has units. Unresolvable → the line is named as unavailable, never
+silently swapped for the slot default. The chosen variant is what gets exploded into
+pricing lines, so the combo's package price is apportioned across what actually ships and
+each component still carries its own HSN and GST rate.
+
+**Coupon entry** (`src/components/CartContents.tsx`) — code held in the cart store and
+persisted with the lines, applied through the existing `readCart` → `calculateCart` path.
+One message covers every way a code can fail, and it says the code is not valid *for this
+cart* rather than claiming it does not exist, because "your cart is below the minimum" is a
+fixable case that would otherwise read as a lie.
+
+**`PriceResult.lines` ordering is now a contract** — always 1:1 with the input in order,
+now documented and asserted in `pricing.test.ts`, because `priceCart` returns a `lineKeys`
+array aligned to it. Grouping by combo id alone would merge two lines of the same combo
+bought with different fragrances into one row with the wrong quantity.
+
+### Verified
+
+167 tests pass, up from 139. The 28 new ones cover the two things this phase can prove
+without a database: `cartLineKey`/`normaliseChoices` (12), and choice resolution including
+every rejection path — a pick outside `choiceOf`, a pick from another product when
+`choiceOf` is empty, a nonexistent variant, a deactivated variant, a variant of an
+unpublished product, too many picks, too few, a choice sent for a fixed slot, and a choice
+naming a slot the combo does not have (15). Plus the line-ordering assertion (1).
+
+Against `pnpm dev` with an empty `DATABASE_URL`, every route still degrades rather than
+throwing: `/ /shop /search /story` 200, `/combos/…` and `/products/…` 404 for unknown
+slugs, and the only errors in the log are the expected `DATABASE_URL is not set` throws.
+
+### Not done, deliberately
+
+- **Still nothing exercised against real catalogue data, and this phase needed it most.**
+  There is no database in this environment — `DATABASE_URL` in `.env` is empty and Docker's
+  daemon is not running. So the picker UI, the drawer's per-slot labels, the coupon round
+  trip and the combo apportionment across *chosen* components have been typechecked, unit
+  tested and built, but never rendered against a real combo or clicked in a browser. The
+  validation logic is tested directly because it is the part that must not be taken on
+  trust; the wiring around it is not. **Paste the Neon connection string into `.env` and
+  this can be seeded with a real "any 3 MX-3 fragrances" combo and driven end to end** —
+  that is the first thing to do next.
+- **No per-slot choice reaches an order yet.** `OrderItem` has no field for it. Orders are
+  Phase 5 and blocked on the seller-entity question regardless; when they are built, the
+  chosen variants need to land on the order snapshot, not just the cart.
+- Coupon usage counting is still not incremented anywhere — `Discount.usageCount` only
+  moves when an order is placed, which cannot happen yet.
+
+---
+
 ## Blocking Phase 1
 
 Per §14 and the working agreement, these are asked before the first migration, not

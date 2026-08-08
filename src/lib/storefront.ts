@@ -695,6 +695,10 @@ export async function getComboBySlug(slug: string): Promise<ComboPage | null> {
         imageUrl: true,
         pricePaise: true,
         items: {
+          // `ComboItem` has no sort field, and an unordered fetch would let
+          // the choice slots swap places between requests — so "Choose your
+          // MX-3" could move under a different picker on a reload.
+          orderBy: { id: 'asc' },
           select: {
             id: true,
             quantity: true,
