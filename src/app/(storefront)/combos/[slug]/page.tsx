@@ -7,6 +7,7 @@ import ComboChoices, { type ChoiceSlot } from '@/components/ComboChoices';
 import { getComboBySlug } from '@/lib/storefront';
 import { formatINR } from '@/lib/money';
 import { absoluteUrl } from '@/lib/site';
+import { jsonLdString } from '@/lib/json-ld';
 
 export const revalidate = 60;
 
@@ -89,7 +90,10 @@ export default async function ComboPage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // Escaped via jsonLdString: combo name/description are admin-entered
+        // text, and a stray "</script>" in either would otherwise break out of
+        // this tag into live HTML.
+        dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
       />
 
       <div className="mx-auto max-w-(--container-page) px-6 py-16">

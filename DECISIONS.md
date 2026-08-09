@@ -323,12 +323,86 @@ two customer-facing halves that were left as "needs a cart shape that can hold c
 
 ## Open questions blocking real catalogue data
 
-Per §14. The schema is migrated and the admin CRUD works against it, but these still block
-entering the actual brand/product catalogue and building invoicing.
+Per §14. Client supplied source documents on 9 August 2026 (trade licence, two FSSAI
+registrations, GST registration, and 28 product-label photographs) that answer four of
+the original six directly from primary evidence rather than reconciling two secondary
+sources. Kept for the record; resolutions below cite the document each answer came from.
 
-1. **MX-3 sizes** — brochure says 900/450/225 ml, brightblue.in sells 250/500 ml/1 L with real prices. Determines the entire variant matrix.
-2. **MX-3 fragrance list** — the two sources name different sets. The record claim makes the canonical 24 legally significant.
-3. **Is MX-3 Liquid vs Semi-Gel a format axis or a separate line?**
-4. **FSSAI licence number and scope** — does it cover online sale of Kenzaniya and Ilfa Valley?
-5. **Cosmetics licence for Fairoze.**
-6. **Seller of record and the GSTIN** — brightblue.in publishes the same GSTIN for two entities.
+1. **MX-3 sizes — resolved.** 225 ml, 450 ml, 900 ml. Confirmed by three price-tag photos
+   dated 9 August 2026 (batch 10075, MFG 18/7/2026): ₹52 / ₹104 / ₹207, a constant ₹0.23
+   per ml across all three — the brochure was right, brightblue.in's 250 ml/500 ml/1 L was
+   stale.
+2. **MX-3 fragrance list — resolved.** Exactly 24, confirmed by one label photo per
+   fragrance (28 photos covered 24 distinct fragrances, several at more than one size):
+   Strawberry, Grapes, Green Apple, Orange, Green Lemon, Guava, Pineapple, Blue Berry,
+   Litchi, Lemon, Green Mango, Pista, Green Papaya, Mango, Avocado, Mixed Fruits, Kiwi,
+   Peach, Apple, Pomegranate, Cucumber, Butterfly Pea, Olive, Passion Fruit. Barcodes
+   7860001–7860016 cover 16 of them; the other 8 (Kiwi, Peach, Apple, Pomegranate,
+   Cucumber, Butterfly Pea, Olive, Passion Fruit) carry `BBTC-01xx` codes instead — two
+   different coding generations in concurrent use, not an error.
+3. **Liquid vs Semi-Gel — still open.** Every one of the 28 labels reads "LIQUID"; none
+   photographed is Semi-Gel. Liquid is confirmed real. Whether Semi-Gel is a real second
+   line is not evidenced either way yet — not claiming it doesn't exist, just no photo of
+   it.
+4. **FSSAI licence number and scope — partially resolved.** Two **Basic Registrations**
+   exist (not a State or Central *Licence* — that distinction matters, see below):
+   - `21325201000650`, "BBTC Foods and Beverages", valid 29-12-2025 to 28-12-2030, scoped
+     to exactly two categories: **Biscuit, Tea**.
+   - `21326201000001`, "BBTC Foods Products", valid 01-01-2026 to 31-12-2030, scoped to
+     Ghee, Pickles (fruit/vegetable/mixed/fish), Pickled eggs, Cured/pickled meat, Rice,
+     Wheat, Millets, Chia seeds, Arrowroot, maize flour, mixed millet flour, multigrain
+     atta, ragi flour, barley flour, bread.
+
+   Neither document names "Kenzaniya" or "Ilfa Valley" — FSSAI registers food categories
+   and an FBO, not brand names, so that was never going to be answered directly. What
+   **is** new and load-bearing: **a Basic Registration caps annual turnover at ₹12 lakh,
+   per-registration, stated on the certificate itself.** An online store that grows past
+   ₹12 lakh/year in food sales under either registration needs a State or Central FSSAI
+   *Licence* before that happens, not just before launch. This is a real business
+   ceiling, not a paperwork formality — worth surfacing to the client directly, not just
+   filing away in this doc.
+5. **Cosmetics licence for Fairoze — still open.** No cosmetics licence document was
+   supplied. Unresolved.
+6. **Seller of record and the GSTIN — resolved, and simpler than feared.** GSTIN
+   `32DCVPK7871P1ZI`, legal name **Faisal Vathyedath Kunjimuhammed**, trade name
+   **Bright Blue Trading Corporation**, constitution **Proprietorship** (not a Pvt Ltd or
+   LLP), principal place 66/927 Pappurath, Krishnaswamy Road, Pullepady, Kochi, Kerala
+   682035, with **four additional places of business under the same single GSTIN**
+   (Chengaram/Palakkad, Ozhur/Malappuram, Kasaragod, Kaloor/Ernakulam). There was never a
+   duplicate-GSTIN conflict — brightblue.in's brochure data was simply wrong. §11's
+   separately-named "Bright Blue Manufacturing Pvt Ltd" *does* appear independently, but
+   as the **manufacturer** on product labels (its own licence number,
+   `BFIF04-G091202-00119-2025`, not a GSTIN) — a normal manufacturer/seller split, not a
+   second seller entity. For invoicing: `Entity.isSeller = true` belongs on **Bright Blue
+   Trading Corporation** alone, with `gstin = 32DCVPK7871P1ZI`. See the entity backfill
+   below.
+
+### Entity data backfill · 9 August 2026
+
+The three entities seeded in Phase 1 (`Bright Blue Manufacturing Pvt Ltd`, `Bright Blue
+Marketing Associates LLP`, `Bright Blue Chemicals LLP`) were seeded with `gstin` and
+`isSeller` deliberately unset, per open question 6 being unresolved at the time. Now that
+it's resolved: a fourth entity, **Bright Blue Trading Corporation**, was added with the
+real GSTIN and `isSeller: true`. The other three are left as they were — real names that
+appear on real documents (Manufacturing Pvt Ltd is the licensed manufacturer on every
+label), just not the invoicing party, so `isSeller` stays `false` on them rather than
+being guessed either way.
+
+### Real MX-3 catalogue seeded · 9 August 2026
+
+`Brand` (MX-3), `Product` (MX Three Dish Wash Liquid) and 72 `ProductVariant` rows (24
+fragrances × 3 sizes) were added from the resolved data above — real names, real prices
+(₹52/₹104/₹207 inclusive of tax, from the photographed price tags), real ingredient list
+(off the label's INGREDIENTS line). Left as **drafts** (`isActive: false`) and **without
+an HSN code or GST rate** — no label or document supplied one, and §7 is explicit that
+`hsnCode` stays null until the accountant confirms it rather than being guessed at. This
+is also why the publish guard still blocks these from going live: it requires an HSN
+code, which is correctly absent.
+
+SKUs for the 8 fragrances where only one size was photographed (Kiwi, Peach, Apple,
+Pomegranate, Cucumber, Butterfly Pea, Olive, Passion Fruit — all carry `BBTC-01xx` codes)
+were only confirmed at the sizes actually shown in a photo; the other sizes for those
+fragrances use a synthesized internal SKU (`MX3-<FRAGRANCE>-<SIZE>`) rather than a
+fabricated barcode, because inventing a barcode risks colliding with a real one the
+business already uses elsewhere. Swap in the real code once the full size × fragrance
+barcode sheet is available.

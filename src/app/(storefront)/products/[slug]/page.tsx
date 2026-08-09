@@ -8,6 +8,7 @@ import { getProductBySlug, listProducts, type ProductPage } from '@/lib/storefro
 import { isPurchasable } from '@/lib/money';
 import { absoluteUrl } from '@/lib/site';
 import { CONTACT } from '@/lib/contact';
+import { jsonLdString } from '@/lib/json-ld';
 
 export const revalidate = 60;
 
@@ -141,9 +142,10 @@ export default async function ProductDetailPage({
       */}
       <script
         type="application/ld+json"
-        // The payload is our own database content serialised by JSON.stringify,
-        // not user-authored markup.
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product)) }}
+        // Escaped via jsonLdString: product name/description are admin-entered
+        // text, and a stray "</script>" in either would otherwise break out of
+        // this tag into live HTML.
+        dangerouslySetInnerHTML={{ __html: jsonLdString(productJsonLd(product)) }}
       />
 
       <div className="mx-auto max-w-(--container-page) px-6 py-16">

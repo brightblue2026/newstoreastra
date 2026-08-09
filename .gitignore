@@ -47,3 +47,10 @@ next-env.d.ts
 # prisma — generated client, never committed
 /src/generated/prisma
 
+# client-supplied compliance documents and product photos — contain personal
+# ID/address data (trade licence, FSSAI/GST certs) and are dropped directly in
+# the repo root. Local reference only, never git history. (docs/*.pdf is a
+# separate, intentionally-tracked folder and is unaffected by this.)
+/*.pdf
+/WhatsApp Image*.jpeg
+

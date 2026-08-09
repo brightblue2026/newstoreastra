@@ -362,27 +362,38 @@ slugs, and the only errors in the log are the expected `DATABASE_URL is not set`
 
 ---
 
-## Blocking Phase 1
+## Blocking Phase 1 · 4 of 6 resolved 9 August 2026
 
-Per §14 and the working agreement, these are asked before the first migration, not
-guessed at. The first three reshape the variant matrix; the last three decide whether
-parts of the catalogue can be listed online at all.
+Per §14. Real source documents (trade licence, two FSSAI Basic Registrations, GST
+registration, 28 product-label photographs) were supplied on 9 August 2026 and answer
+four of these from primary evidence. Full detail and citations in `DECISIONS.md` under
+"Open questions blocking real catalogue data" — summary here:
 
-1. **MX-3 sizes.** The brochure says 900 / 450 / 225 ml. brightblue.in sells 250 / 500 ml
-   / 1 L with real prices (₹70 / ₹118–160 / ₹240–320). Different product lines, a repack,
-   or one source is stale?
-2. **The canonical 24 fragrances.** The two sources name different sets. The record claim
-   makes the exact list of 24 legally and commercially significant — needed in writing.
-3. **Liquid vs Semi-Gel.** A format axis across all fragrances, or a separate line? The
-   site sells both at a consistent ~33% premium.
-4. **FSSAI licence number and scope.** Does it cover online sale of the full Kenzaniya and
-   Ilfa Valley ranges? If not, most of the catalogue cannot list.
-5. **Cosmetics licence for Fairoze.** Manufacturing licence number and label declarations.
-6. **Seller of record and the GSTIN.** brightblue.in publishes the same GSTIN,
-   `32AAICB5392H1ZN`, for two different entities at different Palakkad addresses. Two
-   entities cannot share a GSTIN. Invoicing cannot be built until this is settled.
+1. **MX-3 sizes — resolved.** 225 / 450 / 900 ml, ₹52 / ₹104 / ₹207. The brochure was
+   right; brightblue.in's 250 ml/500 ml/1 L was stale.
+2. **The canonical 24 fragrances — resolved.** Exact list of 24, off real label photos:
+   Strawberry, Grapes, Green Apple, Orange, Green Lemon, Guava, Pineapple, Blue Berry,
+   Litchi, Lemon, Green Mango, Pista, Green Papaya, Mango, Avocado, Mixed Fruits, Kiwi,
+   Peach, Apple, Pomegranate, Cucumber, Butterfly Pea, Olive, Passion Fruit.
+3. **Liquid vs Semi-Gel — still open.** Every photographed label says Liquid; no Semi-Gel
+   label was among them. Not evidence it doesn't exist, just no evidence yet either way.
+4. **FSSAI licence number and scope — partially resolved.** Two **Basic Registrations**
+   exist (not a State/Central Licence): `21325201000650` (Biscuit, Tea only) and
+   `21326201000001` (Ghee, pickles, rice, wheat, millets, flours, bread). Neither names
+   Kenzaniya or Ilfa Valley — FSSAI doesn't register brand names. **New and important: a
+   Basic Registration caps annual turnover at ₹12 lakh, per registration** — a real
+   ceiling on how big the food side of this store can get before a Licence upgrade is
+   required, not just a paperwork detail.
+5. **Cosmetics licence for Fairoze — still open.** No document supplied.
+6. **Seller of record and the GSTIN — resolved.** One GSTIN, `32DCVPK7871P1ZI`, one
+   proprietorship ("Bright Blue Trading Corporation", proprietor Faisal Vathyedath
+   Kunjimuhammed), five addresses (1 principal + 4 additional) under that single
+   registration. There was never a duplicate-GSTIN conflict — the brochure data was
+   simply wrong. `Bright Blue Manufacturing Pvt Ltd` is real too, but as the
+   *manufacturer* named on product labels, not a second seller.
 
-Questions 7–16 are wanted before Phase 2 and are listed in the brief.
+Questions 7–16 are wanted before Phase 2 and are listed in the brief; not addressed by
+this document set.
 
 ---
 

@@ -1,0 +1,26 @@
+# Bright Blue
+
+> Bright Blue Trading Corporation — home care, personal care and food products,
+> manufactured in Kerala, India since 2019. International Book of Records
+> holder for the maximum number of fragrance variants created for a
+> dishwashing liquid brand (MX-3, 24 fragrances), awarded to Mr Faisal V.K.
+
+Every page below is server-rendered — the HTML returned on first request
+already contains the real content, not a client-side shell.
+
+## Store
+
+- [Shop the full catalogue](/shop)
+- [Search](/search)
+- [Our story](/story)
+- [Where to buy](/stockists)
+- [Full product sitemap](/sitemap.xml) — every brand, category, product and
+  combo currently published, kept current on the same 60-second cadence as
+  the pages themselves.
+
+## Notes for automated readers
+
+- Prices shown are GST-inclusive, in Indian Rupees. A product with no price
+  yet reads "Price on request" — never a placeholder ₹0.00.
+- `/admin` is a staff-only management panel, not part of the public catalogue,
+  and is excluded from indexing.
