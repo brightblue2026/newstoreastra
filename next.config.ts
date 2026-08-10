@@ -5,16 +5,24 @@ import type { NextConfig } from 'next';
  * RSC payload scripts, and the `<script type="application/ld+json">` blocks
  * this app renders inline (see `src/lib/json-ld.ts`), all need
  * `'unsafe-inline'` for `script-src` — a nonce-based CSP would be tighter but
- * needs per-request nonce plumbing through middleware that hasn't been built
- * or, critically, verified in a real browser (no browser automation tool was
- * available this session — every check here was HTTP-level). This is a real
- * improvement over having no CSP at all, not the strongest possible one.
- * Tighten it once someone can click through the site and watch for
- * `Content-Security-Policy` violations in devtools before deploying.
+ * needs per-request nonce plumbing through middleware that hasn't been built.
+ * This is a real improvement over having no CSP at all, not the strongest
+ * possible one. Tighten it once someone can click through the site and watch
+ * for `Content-Security-Policy` violations in devtools before deploying.
+ *
+ * `'unsafe-eval'` is dev-only, and was a real bug the first time this shipped
+ * without it: Next's dev server (fast refresh / HMR) generates code via
+ * `eval`, so a CSP without it doesn't just look stricter in dev — it silently
+ * blocks large parts of the client bundle from ever running. The page still
+ * server-renders correctly (so `curl` sees real content), but nothing
+ * JS-driven works: no hydration, no scroll-reveal, nothing interactive. That
+ * is a much worse failure mode than the CSP being slightly looser locally,
+ * so eval is scoped to development only — the production build never eval's
+ * generated code and doesn't need it.
  */
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://res.cloudinary.com",
   "font-src 'self' data:",
