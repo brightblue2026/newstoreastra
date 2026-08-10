@@ -5,6 +5,7 @@ import CountUp from '@/components/CountUp';
 import PinnedSteps from '@/components/PinnedSteps';
 import ProductCard from '@/components/ProductCard';
 import MagneticButton from '@/components/MagneticButton';
+import HouseSpectrum from '@/components/HouseSpectrum';
 import { getContent } from '@/lib/content';
 import { getBrands, getFeaturedCombos, getFeaturedProducts } from '@/lib/storefront';
 import { formatPrice } from '@/lib/money';
@@ -90,13 +91,12 @@ export default async function HomePage() {
           <h1 className="mt-6 max-w-4xl type-display-lg">
             {hero.before}{' '}
             {/*
-              The second type register. The teardown calls for an italic serif
-              colliding with grotesque caps; this project ships Clash Display
-              and Satoshi only, so the collision is made with weight and case
-              inside the display face. A true third face needs a new font
-              file — logged in DECISIONS.md.
+              The second type register, for real: Instrument Serif italic
+              colliding with Clash Display's grotesque caps. `font-accent`
+              is a genuine third face (see src/app/fonts.ts), not weight and
+              case tricks inside the display face.
             */}
-            <em className="font-medium lowercase not-italic text-ink-soft">
+            <em className="font-accent text-[1.15em] italic text-ink-soft">
               {hero.emphasis}
             </em>
             {hero.after}
@@ -144,37 +144,9 @@ export default async function HomePage() {
             <RevealItem>
               <h2 className="type-display-sm">Seven houses, one factory</h2>
             </RevealItem>
-            <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {brands.map((brand) => (
-                <RevealItem key={brand.slug}>
-                  <Link
-                    href={`/brands/${brand.slug}`}
-                    className="group block rounded-card border border-line p-6 motion-accent hover:border-ink"
-                  >
-                    {/* Accent reaches this rule and the swatch. The name and
-                        tagline stay ink. */}
-                    <span
-                      aria-hidden="true"
-                      className="block h-1 w-10 rounded-full motion-accent group-hover:w-20"
-                      style={{ backgroundColor: brand.accentHex }}
-                    />
-                    <span className="mt-6 block type-heading">{brand.name}</span>
-                    <span className="mt-1 block type-body text-ink-soft">
-                      {brand.segmentLabel}
-                    </span>
-                    {brand.tagline && (
-                      <span className="mt-3 block type-body text-ink-soft">
-                        {brand.tagline}
-                      </span>
-                    )}
-                    <span className="mt-4 block type-caption text-ink-soft">
-                      {brand.productCount}{' '}
-                      {brand.productCount === 1 ? 'product' : 'products'}
-                    </span>
-                  </Link>
-                </RevealItem>
-              ))}
-            </div>
+            <RevealItem className="mt-16">
+              <HouseSpectrum brands={brands} />
+            </RevealItem>
           </Reveal>
         </section>
       )}

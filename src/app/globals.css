@@ -51,6 +51,12 @@
   --font-body: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, monospace;
 
+  /*
+    Accent face — the hero's "collision" word only. A real italic serif set
+    against Clash Display's grotesque caps and Satoshi's geometric sans.
+  */
+  --font-accent: var(--font-accent), ui-serif, Georgia, serif;
+
   /* Tailwind's sans default is the body face, so unstyled text is Satoshi. */
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
 

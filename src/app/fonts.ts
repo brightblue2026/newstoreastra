@@ -1,5 +1,5 @@
 import localFont from 'next/font/local';
-import { JetBrains_Mono } from 'next/font/google';
+import { Instrument_Serif, JetBrains_Mono } from 'next/font/google';
 
 /**
  * Display face. Only the two weights the design system uses are shipped —
@@ -42,9 +42,26 @@ export const jetbrainsMono = JetBrains_Mono({
   fallback: ['ui-monospace', 'monospace'],
 });
 
+/**
+ * Accent face — the true second type register for the hero's "collision"
+ * word (§9 / DECISIONS.md). A high-contrast didone italic against Clash
+ * Display's heavy grotesque and Satoshi's geometric sans, self-hosted by
+ * next/font like JetBrains Mono. Used only on the emphasis word — never
+ * body copy, never a heading.
+ */
+export const instrumentSerif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: ['400'],
+  style: ['italic'],
+  variable: '--font-accent',
+  display: 'swap',
+  fallback: ['ui-serif', 'Georgia', 'serif'],
+});
+
 /** Every font variable, for the <html> class. */
 export const fontVariables = [
   clashDisplay.variable,
   satoshi.variable,
   jetbrainsMono.variable,
+  instrumentSerif.variable,
 ].join(' ');
