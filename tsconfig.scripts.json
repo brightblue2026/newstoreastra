@@ -1,0 +1,15 @@
+{
+  // For `tsx`-run scripts in `scripts/` that render JSX — currently the sample
+  // invoice generator.
+  //
+  // The base config sets `jsx: "preserve"` because Next.js does its own JSX
+  // transform downstream. `tsx` has no downstream step, so under `preserve` it
+  // falls back to the classic runtime and emits `React.createElement` calls
+  // into a module that never imports React — which fails at run time, not at
+  // build time, with "React is not defined".
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  },
+  "include": ["scripts/**/*.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

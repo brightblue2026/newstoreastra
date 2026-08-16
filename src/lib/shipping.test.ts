@@ -15,6 +15,12 @@ const SETTINGS: ShippingSettings = {
   overflowPricePaise: 25_000,
   defaultUnitGrams: 0,
   serviceablePincodePrefixes: [],
+  // Phase 6 fields. Nothing in this file uses them — `rateShipping` and
+  // `isServiceablePincode` are still the pure slab-table half, and the live
+  // Shiprocket rate that reads these is decided in `delivery.ts`.
+  originPincode: '',
+  shiprocketPickupLocation: '',
+  preferLiveRates: false,
 };
 
 describe('rateShipping', () => {

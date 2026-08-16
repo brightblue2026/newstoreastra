@@ -505,6 +505,73 @@ see `PROGRESS.md` for what is verified and what is not.
   from what an order came to. They have to print invoices and hand parcels to couriers, and
   neither is possible otherwise.
 
+## Phase 6 — fulfilment, invoices, communications
+
+- **The invoice number is taken at confirmation, not at placement.** §10 says "generated
+  inside the order transaction" and §12 says "no gaps". For a prepaid order those pull
+  apart: an order created in `PENDING_PAYMENT` that is never paid would have consumed a
+  number, and cancelling it puts a hole in a series that is legally required not to have
+  one. So it is taken in whichever transaction moves the order to `CONFIRMED` — which for a
+  COD order *is* the creation transaction, because a COD order is created confirmed. Both
+  readings hold, and an order that never became a supply never held a number.
+- **An invoice number, once raised, is never released.** A cancellation after confirmation
+  keeps its number. Under GST that is right — a raised invoice is reversed with a credit
+  note, not deleted or reused. Credit notes are out of v1 scope, so that reversal is
+  currently manual, outside this system.
+- **`BBTC/2627/00001`, not `BB/INV/2627/00001`.** CGST Rule 46(b) caps a tax invoice number
+  at sixteen characters; the more readable form is seventeen. It also must not be mistakable
+  for an order number (`BB-2627-00001`), so both the prefix and the separator differ rather
+  than just one. Asserted in a test at the maximum sequence.
+- **The invoice PDF recalculates nothing.** Every figure comes from the order's stored
+  snapshot and `taxByHsn`. A renderer doing its own arithmetic could disagree with what the
+  customer was charged, and then the invoice would be the thing that was wrong.
+- **Intra-state and inter-state invoices have different tables, not one table with empty
+  columns.** A zeroed CGST column beside a filled IGST one invites the reader to wonder
+  which is correct.
+- **Delivery, FSSAI and cosmetics licences are looked up live; everything else is
+  snapshotted.** A licence is a property of the business, not of the sale, and a regulator
+  wants the current one. The consequence — reprinting an old invoice after a renewal prints
+  the new number — is the right direction.
+- **`delivery.ts` distinguishes "nobody delivers there" from "we could not find out."**
+  `rateShipment` returns an empty courier list for the first and `null` for the second.
+  Treating an unreachable Shiprocket as unserviceable would refuse orders BBTC can fulfil
+  every time the API blinks, which is exactly what §10's "never block an order because a
+  third party is down" forbids.
+- **Live Shiprocket rating is off by default.** A live rate nobody has compared against the
+  slab table could quietly charge more or less than BBTC intends. An admin turns it on after
+  looking at both.
+- **The delivery rate is settled before the order transaction opens.** It may call
+  Shiprocket, and a network call inside a transaction holds locks for as long as the third
+  party takes to answer. The cost is pricing the cart twice — once for a weight outside, once
+  authoritatively inside.
+- **Every notification is dispatched after the transition commits, never inside it.** A paid
+  order must not roll back because Resend timed out; equally, a customer must never be told
+  about a transition that did not commit. `notifyOrderEvent` swallows its own failures so it
+  cannot turn a successful confirmation into a retry.
+- **The Shiprocket webhook acts as `'STAFF'`, not `'WEBHOOK'`.** Shiprocket authenticates
+  with a shared header token, which is weaker than Razorpay's HMAC over the body. As a STAFF
+  actor it cannot reach `CONFIRMED` however it is called, because `order-status.ts` reserves
+  that transition for `'WEBHOOK'`. A test also asserts the status map cannot even name it.
+- **A tracking scan that cannot be applied returns 200, not an error.** Shiprocket re-sends
+  scans, and a `DELIVERED` arriving after staff marked an order `RETURNED` is expected
+  traffic. A non-2xx would make it retry something that can never succeed.
+- **An AWB can be entered by hand.** BBTC already ships DTDC directly, and §10's rule about
+  third parties applies to dispatch as much as to checkout. The manual path moves the order
+  and notifies exactly as the automatic one does.
+- **The invoice is rendered on demand, never stored.** `Order.invoiceUrl` exists in the
+  schema, but the document derives entirely from immutable snapshots, so re-rendering is
+  deterministic. Storing a copy would add a bucket to keep in sync with no reader asking
+  for it.
+- **Pure logic lives outside the `server-only` modules.** `shiprocket-tracking.ts` and
+  `phone.ts` were split out of `shiprocket.ts` and `msg91.ts` so they can be unit tested —
+  `server-only` throws on import under Vitest. Same pattern as `combo-choice.ts` and
+  `cart-pricing.ts`.
+- **The CSP had to be widened for Razorpay, and that was a live bug, not a precaution.**
+  The CSP and the checkout screen were built on separate branches; `default-src 'self'`
+  blocked `checkout.razorpay.com` and the payment iframe outright. Nothing surfaced until
+  the Pay button. Five directives widened with the reason for each recorded in
+  `next.config.ts`.
+
 ## Open questions blocking real catalogue data
 
 Per §14. Client supplied source documents on 9 August 2026 (trade licence, two FSSAI

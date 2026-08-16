@@ -484,6 +484,107 @@ log traces to the single expected `DATABASE_URL is not set` throw.
 
 ---
 
+## Phase 6 — Fulfilment, invoices, communications · **built, unexercised against a database** · 10 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (276 tests, up from 233) and `pnpm build` all
+pass. Every §12 Phase 6 checkbox is addressed. The one thing the phase's "done when" asks
+for — an accountant's approval of a generated mixed-rate invoice — now has an artefact to
+review, which is the point of `pnpm invoice:sample`.
+
+### Merge reconciliation, first
+
+This session began three commits behind `origin/main`, which carried the resolved open
+questions, the real MX-3 catalogue seed and a new CSP. Rebased Phase 5 on top. Two things
+came out of it worth recording:
+
+- **The CSP silently killed the entire payment flow.** `default-src 'self'` blocks
+  `checkout.razorpay.com`, and the Razorpay modal is a cross-origin iframe no directive
+  permitted. Nothing surfaces until a customer clicks Pay. Five directives widened, each
+  documented in `next.config.ts` with the reason.
+- **`razorpay-webhook.ts` was superseded.** Written as prep before Phase 5 existed; Phase 5
+  built the real thing in `razorpay.ts`. Two exported `verifyWebhookSignature` functions
+  with different signatures, only a test importing the dead one. Removed.
+
+### What was built
+
+**Invoice numbering** (`src/lib/invoice-number.ts`, `assignInvoiceNumber` in `invoice.ts`)
+— `BBTC/2627/00001`, gapless per financial year under a per-FY advisory lock, derived from
+the highest committed number rather than a counter. Fifteen characters: **CGST Rule 46(b)
+caps an invoice number at sixteen**, and the obvious `BB/INV/2627/00001` is seventeen. A
+test asserts the length at the maximum sequence, because otherwise an auditor finds it.
+
+**When the number is taken is a judgement call** — §10 says "inside the order transaction",
+§12 says "no gaps", and for a prepaid order those pull apart. Resolved by taking it in the
+transaction that moves an order to CONFIRMED, which for COD *is* the creation transaction.
+Both readings hold. In `DECISIONS.md`.
+
+**The GST invoice PDF** (`invoice-pdf.tsx`, `@react-pdf/renderer` per §5) — per-HSN tax
+summary table with intra-state and inter-state layouts that differ rather than zeroing
+columns, per-line HSN and rate, amount in words in the Indian numbering system
+(`amountInWords` in `money.ts` — lakh and crore, not thousands), FSSAI and cosmetics
+licences on the orders that contain those goods. Nothing is recalculated: every figure
+comes from the order's stored snapshot.
+
+**`pnpm invoice:sample`** writes two real PDFs — one Kerala, one Tamil Nadu — from the same
+fixture the tests assert against, so the reviewed document and the tested document cannot
+drift. Verified by decompressing the content streams: four HSN rows, nil-rated jaggery
+showing 0.00 tax against a real taxable value, ₹1,491.67 + ₹161.33 = ₹1,653.00.
+
+**Shiprocket** (`shiprocket.ts` + pure `shiprocket-tracking.ts`) — token auth with a
+nine-day cache, rate shopping, order push, AWB assignment, label URL, and a tracking
+webhook at `POST /api/webhooks/shiprocket`. `delivery.ts` is the seam that decides between
+a live rate and the slab table, and it distinguishes *"nobody delivers there"* from *"we
+could not find out"* — conflating them would refuse orders BBTC can fulfil every time the
+API blinks.
+
+**Communications** — `email.ts` (Resend over REST, no SDK) sends the confirmation with the
+invoice PDF attached and a shipped notice; `msg91.ts` sends the four WhatsApp templates
+from `docs/msg91-templates.md` with an SMS fallback. `notifications.ts` is the single entry
+point, always called *after* a transition commits and never inside it.
+
+**Fulfilment actions** (`src/server/actions/fulfilment.ts`) — push to Shiprocket, assign an
+AWB and ship, fetch a label, and **record an AWB by hand**. The manual path matters: BBTC
+already ships DTDC directly, and §10's "never block an order because a third party is down"
+applies to dispatch as much as to checkout.
+
+**Invoice download** — `GET /api/invoice/[orderNumber]`, one route for both audiences:
+a customer's capability token or a staff session. Rendered on demand, never stored — the
+document is derived from immutable snapshots, so re-rendering is deterministic.
+
+### Verified
+
+276 tests pass, up from 233. The 43 new ones cover invoice numbering including the Rule
+46(b) length limit and mutual rejection against order numbers (12), `amountInWords`
+including the 2-2-3 lakh/crore grouping that is the whole reason it is hand-rolled (6),
+mixed-rate invoice arithmetic and PDF rendering (8), Shiprocket tracking-webhook parsing
+including **an assertion that no courier scan can ever map to CONFIRMED** (11), and phone
+normalisation that refuses rather than truncates (6).
+
+### Not done, deliberately
+
+- **Still nothing has touched a database.** `DATABASE_URL` is empty in this environment. The
+  invoice sequence's advisory lock, the order transaction that now raises an invoice, the
+  Shiprocket push and every notification have been typechecked, unit tested where pure, and
+  rendered — never run against Postgres. This remains the first thing to do next.
+- **No admin UI for the fulfilment actions or the new shipping settings.** The server
+  actions and the settings schema are built and guarded; the buttons and form fields on
+  `/admin/orders/[orderId]` and `/admin/settings` are not wired to them yet. That is the
+  next visible piece of work.
+- **No third party has actually been called.** Shiprocket, Resend and MSG91 all have unset
+  credentials, so every integration has been exercised only down its unconfigured path —
+  which is the path that must degrade cleanly, and does.
+- **MSG91 templates are still unapproved,** and `bbtc_order_delivered` remains blocked on
+  §14 Q18 (the return policy, which differs for food). A template with no id configured is
+  skipped with a log rather than faked.
+- **No credit notes.** Once raised, an invoice number stays on the order even if it is later
+  cancelled — which is correct under GST, where a raised invoice is reversed with a credit
+  note, never deleted. Credit notes are not built, so a post-confirmation cancellation needs
+  the accountant to raise one outside this system.
+- **No retry queue for notifications.** A failed WhatsApp or email is logged, not retried.
+  Doing it properly needs a durable job store this deployment does not have.
+
+---
+
 ## Blocking Phase 1 · 4 of 6 resolved 9 August 2026
 
 Per §14. Real source documents (trade licence, two FSSAI Basic Registrations, GST

@@ -329,13 +329,22 @@ model Order {
   razorpayPaymentId String?
 
   shiprocketOrderId String?
-  awbNumber         String?
-  courierName       String?
-  trackingUrl       String?
+  // Shiprocket keys the AWB assignment and the label off the *shipment*, not
+  // the order, so both ids have to be kept — see lib/shiprocket.ts.
+  shiprocketShipmentId String?
+  awbNumber            String?
+  courierName          String?
+  trackingUrl          String?
+  labelUrl             String?
 
   sellerEntityId String // which BBTC entity sold this — see §11
   invoiceNumber  String? @unique
   invoiceUrl     String?
+  // When the tax invoice was raised, which is when the order was confirmed —
+  // not when it was placed. A prepaid order placed at 23:50 and confirmed by
+  // webhook at 00:05 belongs in the next day's GST return, and for a March
+  // order, potentially the next financial year's.
+  invoicedAt     DateTime?
 
   notes     String?
   createdAt DateTime @default(now())

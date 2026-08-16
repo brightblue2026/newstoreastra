@@ -105,7 +105,7 @@ function readAppliedDiscounts(value: unknown): { code: string | null; amountPais
   });
 }
 
-function readChoices(value: unknown): { slotLabel: string; picks: string[] }[] | null {
+export function readChoices(value: unknown): { slotLabel: string; picks: string[] }[] | null {
   if (!Array.isArray(value)) return null;
   const choices = value.flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];

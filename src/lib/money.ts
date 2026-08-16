@@ -161,6 +161,100 @@ export function isPurchasable(pricePaise: Paise | null | undefined): pricePaise 
   return isPaise(pricePaise);
 }
 
+const ONES = [
+  '',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+  'Thirteen',
+  'Fourteen',
+  'Fifteen',
+  'Sixteen',
+  'Seventeen',
+  'Eighteen',
+  'Nineteen',
+];
+
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+/** 0–99 in words. Empty string for 0, so callers can drop the group entirely. */
+function twoDigitsToWords(value: number): string {
+  if (value < 20) return ONES[value];
+  const tens = TENS[Math.floor(value / 10)];
+  const ones = ONES[value % 10];
+  return ones ? `${tens} ${ones}` : tens;
+}
+
+/** 0–999 in words, using "Hundred" — the same in both numbering systems. */
+function threeDigitsToWords(value: number): string {
+  const hundreds = Math.floor(value / 100);
+  const rest = value % 100;
+  const parts: string[] = [];
+  if (hundreds) parts.push(`${ONES[hundreds]} Hundred`);
+  if (rest) parts.push(twoDigitsToWords(rest));
+  return parts.join(' ');
+}
+
+/**
+ * A whole number in words using the **Indian** numbering system: crore, lakh,
+ * thousand, hundred. `150000` is "One Lakh Fifty Thousand", never "One Hundred
+ * Fifty Thousand".
+ *
+ * The grouping is 2-2-3 above the hundreds, not 3-3-3, which is why this cannot
+ * be a loop over a single thousands scale.
+ */
+function integerToIndianWords(value: number): string {
+  if (value === 0) return 'Zero';
+
+  const crore = Math.floor(value / 10_000_000);
+  const lakh = Math.floor((value % 10_000_000) / 100_000);
+  const thousand = Math.floor((value % 100_000) / 1000);
+  const rest = value % 1000;
+
+  const parts: string[] = [];
+  if (crore) parts.push(`${integerToIndianWords(crore)} Crore`);
+  if (lakh) parts.push(`${twoDigitsToWords(lakh)} Lakh`);
+  if (thousand) parts.push(`${twoDigitsToWords(thousand)} Thousand`);
+  if (rest) parts.push(threeDigitsToWords(rest));
+
+  return parts.join(' ');
+}
+
+/**
+ * The amount in words, as an Indian tax invoice prints it:
+ * `149900` → "Rupees One Thousand Four Hundred Ninety Nine and Fifty Paise
+ * Only".
+ *
+ * This is not decoration. Rule 46 of the CGST Rules does not itself mandate it,
+ * but it is universal practice on Indian invoices and it is what makes an
+ * invoice hard to alter after the fact — the figure and the words have to
+ * agree, so changing one digit is visible. It is generated from the same paise
+ * integer `formatINR` renders, so the two can never disagree.
+ *
+ * "Paise" is invariant in this usage — fifty paise, one paise — so no plural is
+ * formed.
+ */
+export function amountInWords(paise: Paise): string {
+  assertPaise(paise);
+
+  const rupees = Math.trunc(paise / PAISE_PER_RUPEE);
+  const fraction = paise % PAISE_PER_RUPEE;
+
+  const parts = [`Rupees ${integerToIndianWords(rupees)}`];
+  if (fraction > 0) parts.push(`and ${integerToIndianWords(fraction)} Paise`);
+
+  return `${parts.join(' ')} Only`;
+}
+
 /** Adds amounts, asserting each one and the result. */
 export function sumPaise(...amounts: Paise[]): Paise {
   const total = amounts.reduce((acc, amount, index) => {

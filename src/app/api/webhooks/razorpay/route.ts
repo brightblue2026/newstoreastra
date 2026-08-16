@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { OrderStatus, PaymentStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
 import { transitionOrder } from '@/lib/orders';
+import { notifyOrderEvent } from '@/lib/notifications';
 import { verifyWebhookSignature } from '@/lib/razorpay';
 
 /*
@@ -145,6 +146,17 @@ export async function POST(request: Request) {
       // Our problem, not Razorpay's — ask for the event again.
       return NextResponse.json({ error: 'Could not confirm the order' }, { status: 500 });
     }
+
+    /*
+      The confirmation email and WhatsApp go out only now, after the transition
+      has committed — never inside it. A payment that Razorpay has captured
+      must not be rolled back because Resend timed out, and a customer must
+      never be told an order is confirmed by a transaction that then failed.
+
+      `notifyOrderEvent` swallows its own failures, so this cannot turn a
+      successful confirmation into a 500 that makes Razorpay retry.
+    */
+    await notifyOrderEvent({ orderId: order.id, event: 'CONFIRMED' });
 
     console.info('[razorpay] confirmed', order.orderNumber);
     return NextResponse.json({ received: true, order: order.orderNumber, status: 'confirmed' });

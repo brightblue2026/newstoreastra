@@ -55,6 +55,12 @@ export const codSettingsSchema = z.object({
   pincodeAllowlist: z.array(pincodePrefix).max(500),
 });
 
+/** A complete six-digit Indian pincode, unlike `pincodePrefix` which allows a partial. */
+const fullPincode = z
+  .string()
+  .trim()
+  .regex(/^[1-9][0-9]{5}$/, 'Enter the full six-digit pincode parcels ship from.');
+
 export const shippingSettingsSchema = z.object({
   slabs: z
     .array(z.object({ uptoGrams: z.number().int().min(1).max(100_000), pricePaise: paise }))
@@ -62,6 +68,13 @@ export const shippingSettingsSchema = z.object({
   overflowPricePaise: paise,
   defaultUnitGrams: z.number().int().min(0).max(100_000),
   serviceablePincodePrefixes: z.array(pincodePrefix).max(500),
+  // Phase 6. Optional in the schema with a safe default so a settings row
+  // written before Phase 6 still parses — otherwise every existing deployment
+  // would silently fall back to DEFAULT_SHIPPING_SETTINGS and lose its slab
+  // table, which is exactly the failure `parseOr` is meant to prevent.
+  originPincode: z.union([fullPincode, z.literal('')]).default(''),
+  shiprocketPickupLocation: z.string().trim().max(120).default(''),
+  preferLiveRates: z.boolean().default(false),
 });
 
 export const DEFAULT_COD_SETTINGS: CodSettings = {
@@ -77,6 +90,11 @@ export const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
   overflowPricePaise: 0,
   defaultUnitGrams: 0,
   serviceablePincodePrefixes: [],
+  // No origin means no live rate can be asked for, and the slab table answers
+  // every quote — the documented fallback, not a broken state.
+  originPincode: '',
+  shiprocketPickupLocation: '',
+  preferLiveRates: false,
 };
 
 export interface CheckoutSettings {

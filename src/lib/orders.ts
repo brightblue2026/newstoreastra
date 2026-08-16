@@ -14,10 +14,12 @@ import {
   type InventoryRow,
 } from '@/lib/inventory';
 import { calculateCart } from '@/lib/pricing';
+import { assignInvoiceNumber } from '@/lib/invoice';
 import { financialYearCode, formatOrderNumber, parseOrderNumber } from '@/lib/order-number';
 import { canTransition, inventoryEffect } from '@/lib/order-status';
 import { resolveDeliveryState } from '@/lib/pincode';
-import { isServiceablePincode, rateShipping, totalWeightGrams } from '@/lib/shipping';
+import { isServiceablePincode, totalWeightGrams } from '@/lib/shipping';
+import { quoteDelivery } from '@/lib/delivery';
 import { readCheckoutSettings } from '@/lib/settings';
 import {
   RAZORPAY_MIN_AMOUNT_PAISE,
@@ -34,7 +36,19 @@ import {
      back the lot."
 
   Every one of those steps is below, in that order, inside one interactive
-  transaction. Three things are deliberately *outside* it:
+  transaction. Since Phase 6 one more thing happens inside it, and three
+  deliberately do not.
+
+  Inside, added in Phase 6:
+
+    - **The tax invoice number.** §10 requires it generated transactionally and
+      gapless, so it is taken in whichever transaction confirms the order —
+      this one for COD, `transitionOrder` for a prepaid order whose webhook has
+      landed. See the note at the top of `invoice.ts` for why confirmation and
+      not placement is the moment.
+
+  Outside, all for the same reason — a third party must never be able to hold a
+  database lock or roll back a sale:
 
     - The Razorpay order. A network call inside a database transaction holds
       locks for as long as a third party takes to answer. The local order is
@@ -43,7 +57,11 @@ import {
       be worse: a database failure would then leave a payable order Razorpay
       knows about and this database does not, which is money taken against
       nothing.
-    - Anything that emails, WhatsApps or invoices. Phase 6.
+    - **The delivery rate**, which may call Shiprocket. Settled before the
+      transaction opens and passed in — see `quoteDelivery`.
+    - **Every email and WhatsApp message.** Dispatched by `notifications.ts`
+      after the transition has committed, never within it. An order that is
+      paid for must not be rolled back because Resend timed out.
     - The customer's cart. It is cleared by the client after a successful
       placement; the server has no access to localStorage.
 
@@ -238,11 +256,39 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   }
   const pincode = input.shipping.pincode.trim();
 
-  if (!isServiceablePincode(settings.shipping, pincode)) {
+  /*
+    Delivery is rated *before* the transaction opens, for the same reason the
+    Razorpay call sits outside it: `quoteDelivery` may call Shiprocket, and a
+    third-party request inside a database transaction holds locks for as long
+    as that third party takes to answer.
+
+    Pricing the cart twice is the cost — once here for a weight, once inside
+    the transaction for the authoritative prices. That is a read, and it buys
+    the guarantee that no lock is ever held across a network call.
+
+    Serviceability comes from this quote rather than from the prefix list
+    directly, because a live answer knows things the list does not. It still
+    degrades to the list whenever Shiprocket cannot be reached — see
+    `delivery.ts`.
+  */
+  const preview = await resolveCartLines(input.lines);
+  const deliveryQuote = await quoteDelivery({
+    settings: settings.shipping,
+    deliveryPincode: pincode,
+    weightGrams: totalWeightGrams(preview.snapshots, settings.shipping),
+    cod: input.paymentMethod === 'COD',
+    declaredValuePaise: preview.subtotalPaise,
+  });
+
+  if (!deliveryQuote.serviceable) {
     return {
       ok: false,
       error: 'We do not deliver to that pincode yet. Call 1800 123 0621 and we will help.',
     };
+  }
+
+  if (deliveryQuote.fallbackReason) {
+    console.warn('[orders] delivery priced from the slab table:', deliveryQuote.fallbackReason);
   }
 
   const seller = await resolveSellerEntity();
@@ -264,10 +310,10 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
         return { ok: false as const, error: 'Your cart is empty.' };
       }
 
-      const shippingQuote = rateShipping(
-        settings.shipping,
-        totalWeightGrams(resolved.snapshots, settings.shipping),
-      );
+      // The rate settled before this transaction opened. It is not re-rated
+      // here: it may have come from Shiprocket, and this is exactly where a
+      // network call must not happen.
+      const shippingQuote = deliveryQuote;
 
       let codFeePaise = 0;
       if (input.paymentMethod === 'COD') {
@@ -411,6 +457,15 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
           reserved: { decrement: quantity },
           quantity: { decrement: quantity },
         }));
+
+        /*
+          A COD order is created CONFIRMED — there is no payment to wait for —
+          so this *is* its confirmation transaction, and the tax invoice is
+          raised here for the same reason `transitionOrder` raises one on
+          PENDING_PAYMENT → CONFIRMED. A prepaid order gets nothing yet: it is
+          not a supply until Razorpay says it was paid for.
+        */
+        await assignInvoiceNumber(tx, order.id);
       }
 
       return { ok: true as const, order: { ...order, razorpayOrderId: null } };
@@ -563,16 +618,25 @@ export async function quoteOrder(input: {
   const delivery = pincode ? resolveDeliveryState(pincode, input.state) : null;
   const deliveryState = delivery && 'state' in delivery ? delivery.state : null;
 
-  const serviceabilityError =
-    pincode && !isServiceablePincode(settings.shipping, pincode)
-      ? 'We do not deliver to that pincode yet.'
-      : null;
-
   // No address yet means no rate and no tax split to quote — the drawer's
   // subtotal is honest, a total pretending to include delivery would not be.
-  const shippingQuote = deliveryState
-    ? rateShipping(settings.shipping, totalWeightGrams(resolved.snapshots, settings.shipping))
-    : null;
+  // The same `quoteDelivery` the order transaction uses, so the figure shown
+  // at checkout is arrived at the same way as the figure charged.
+  const shippingQuote =
+    deliveryState && pincode
+      ? await quoteDelivery({
+          settings: settings.shipping,
+          deliveryPincode: pincode,
+          weightGrams: totalWeightGrams(resolved.snapshots, settings.shipping),
+          cod: input.paymentMethod === 'COD',
+          declaredValuePaise: resolved.subtotalPaise,
+        })
+      : null;
+
+  const serviceabilityError =
+    pincode && (shippingQuote ? !shippingQuote.serviceable : !isServiceablePincode(settings.shipping, pincode))
+      ? 'We do not deliver to that pincode yet.'
+      : null;
 
   const codCheck = pincode
     ? checkCodEligibility(settings.cod, { subtotalPaise: resolved.subtotalPaise, pincode })
@@ -706,6 +770,21 @@ export async function transitionOrder(input: {
           ...(input.note ? { notes: input.note } : {}),
         },
       });
+
+      /*
+        The tax invoice is raised here, in the same transaction as the
+        confirmation, because §10 requires the number to be generated
+        transactionally and gapless. Taking it at *confirmation* rather than at
+        placement is what makes gapless achievable — a prepaid order that is
+        never paid never holds a number. See the note at the top of
+        `invoice.ts`.
+
+        `assignInvoiceNumber` is idempotent, so a replayed webhook cannot raise
+        a second invoice for the same supply.
+      */
+      if (input.to === OrderStatus.CONFIRMED) {
+        await assignInvoiceNumber(tx, order.id);
+      }
 
       return { ok: true as const };
     },

@@ -2,6 +2,7 @@
 
 import { placeOrderInputSchema, quoteInputSchema } from '@/lib/cart-schema';
 import { orderAccessToken } from '@/lib/order-access';
+import { notifyOrderEvent } from '@/lib/notifications';
 import { currentUser } from '@/lib/session';
 import {
   OrderConfigurationError,
@@ -123,6 +124,18 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
   }
 
   if (placed.order.paymentMethod === 'COD') {
+    /*
+      A COD order is confirmed the moment it is placed, so its confirmation
+      message goes now. A prepaid order gets nothing here — it is not confirmed
+      until Razorpay's webhook says the money arrived, and that route sends it.
+      Telling a customer their order is confirmed before the payment lands is
+      exactly the mistake §10 forbids.
+
+      `notifyOrderEvent` never throws, so a failed WhatsApp cannot turn a
+      placed order into an error the customer sees.
+    */
+    await notifyOrderEvent({ orderId: placed.order.id, event: 'CONFIRMED' });
+
     return {
       ok: true,
       orderNumber: placed.order.orderNumber,

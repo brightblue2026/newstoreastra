@@ -54,3 +54,6 @@ next-env.d.ts
 /*.pdf
 /WhatsApp Image*.jpeg
 
+
+# Generated sample invoices for review — not source.
+/tmp/

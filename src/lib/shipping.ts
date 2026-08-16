@@ -47,6 +47,37 @@ export interface ShippingSettings {
    * as the answer when Shiprocket is unreachable.
    */
   serviceablePincodePrefixes: string[];
+
+  /**
+   * Where parcels ship from. Shiprocket rates every quote against a pickup
+   * pincode, so without this there is no live rate to ask for — the slab table
+   * is used instead, which is the documented fallback rather than a failure.
+   *
+   * §11 lists eleven BBTC locations and §10 notes food may ship from a
+   * different one than detergents. This is one origin, not a per-segment map:
+   * splitting a single order across two pickup locations is a warehousing
+   * decision nobody has made yet, and guessing at it would produce shipments
+   * BBTC's operations team did not ask for.
+   */
+  originPincode: string;
+
+  /**
+   * The pickup location's *name in the Shiprocket dashboard*. Shiprocket
+   * identifies a pickup point by this string and rejects an order push that
+   * names one it does not have, so it is typed by the admin rather than
+   * derived from anything here.
+   */
+  shiprocketPickupLocation: string;
+
+  /**
+   * Ask Shiprocket for a live rate before falling back to the slab table.
+   *
+   * Off by default. A live rate that nobody has compared against the slab
+   * table yet could quietly charge customers more or less than BBTC intends,
+   * and §10 wants the slab table as the safety net either way — so live rating
+   * is something an admin turns on deliberately, after looking at both.
+   */
+  preferLiveRates: boolean;
 }
 
 export interface ShippingQuote {
