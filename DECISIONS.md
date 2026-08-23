@@ -748,3 +748,22 @@ credentials per Phase 1's "Not done, deliberately" list. A pasted-URL row with a
 `publicId` would be the same category of guess this project already refuses to make on
 SKUs and prices, so it wasn't added here. Revisit once Cloudinary credentials exist and a
 signed upload widget can supply a real `publicId`.
+
+### Merged parallel Phase 5/6 work, applied its migrations · 23 August 2026
+
+`git push` was rejected: origin/main had three commits this session never saw — full
+Phase 5 (checkout, Razorpay, order transaction, admin orders/settings) and Phase 6 (GST
+invoices, Shiprocket fulfilment, order notifications), built elsewhere. Merged rather than
+force-pushed over it. Two real conflicts, both mechanical, not judgement calls:
+
+- `next.config.ts` — both sides added a CSP `connect-src` exception (this session's
+  Cloudinary upload fetch, the other session's Razorpay Checkout calls). Combined into one
+  directive; kept the other session's new `frame-src` line as-is.
+- `DECISIONS.md` — both sides appended new entries at the same point. Reordered by date
+  (9 August before 21–22 August) rather than picking one side.
+
+Ran `pnpm install` (lockfile gained `@react-pdf/renderer`), applied the two pending
+migrations (`20260808120000_phase5_settings`, `20260810120000_phase6_fulfilment`) against
+the live Neon database, then reverified all four gates on the merged result: 289 tests
+(up from 191), clean typecheck/lint/build, every Phase 5/6 route present in the build
+output. Pushed as a normal merge commit, no force.
