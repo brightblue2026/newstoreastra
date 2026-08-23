@@ -26,6 +26,7 @@ export default async function NewProductPage() {
         brandOptions={brandOptions}
         categoryOptions={categoryOptions}
         submitLabel="Create product"
+        showVariantRows
       />
     </div>
   );

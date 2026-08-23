@@ -8,6 +8,7 @@ import { recordAudit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { MoneyError, parseRupeesToPaise } from '@/lib/money';
 import { requireCatalogueAccess } from '@/lib/session';
+import { variantFieldsSchema } from '../../variant-fields';
 
 export interface VariantFormState {
   error?: string;
@@ -16,27 +17,7 @@ export interface VariantFormState {
   >;
 }
 
-const HEX_COLOUR_PATTERN = /^#[0-9a-fA-F]{6}$/;
-
-const variantSchema = z.object({
-  sku: z.string().trim().min(1, 'SKU is required.').max(60),
-  variantName: z.string().trim().max(120).optional().or(z.literal('')),
-  variantHex: z
-    .string()
-    .trim()
-    .optional()
-    .or(z.literal(''))
-    .refine((value) => !value || HEX_COLOUR_PATTERN.test(value), {
-      message: 'Enter a 6-digit hex colour, e.g. #0F9CD6.',
-    }),
-  size: z.string().trim().min(1, 'Size is required.').max(60),
-  format: z.string().trim().max(60).optional().or(z.literal('')),
-  mrpRupees: z.string().trim().max(20).optional().or(z.literal('')),
-  priceRupees: z.string().trim().max(20).optional().or(z.literal('')),
-  wholesaleRupees: z.string().trim().max(20).optional().or(z.literal('')),
-  weightGrams: z.string().trim().max(10).optional().or(z.literal('')),
-  barcode: z.string().trim().max(60).optional().or(z.literal('')),
-});
+const variantSchema = variantFieldsSchema;
 
 function parseVariantForm(formData: FormData) {
   return variantSchema.safeParse({

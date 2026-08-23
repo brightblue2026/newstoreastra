@@ -12,6 +12,13 @@ Single Next.js app, single Postgres database.
 
 Brands: MX-3 (dish) · Rafasi (fabric) · Landfloro (floor) · Fairoze (personal care) ·
 ANSAF (car) · Ilfa Valley (tea) · Kenzaniya (honey, spices, nuts, seeds, pickles, ghee).
+**Plus MAKAFA (Premium Perfume & Fragrance)** — confirmed real 22 August 2026 (found on
+bbtcglobal.com, absent from the original brochure and master brief), in scope for later.
+Not seeded yet — catalogue work is currently MX-3 only, see DECISIONS.md.
+
+**Domains**: the store itself is hosted at brightbluefmcg.com. bbtcglobal.com is a
+separate, currently-live static corporate site — not this app. brightblue.in is the old
+WooCommerce site being replaced; do not treat it as a current property.
 
 BBTC holds an International Book of Records for the most fragrance variants of a
 dishwashing liquid — **24 for MX-3**. That is the headline asset; the design is built

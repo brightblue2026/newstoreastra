@@ -406,3 +406,85 @@ fragrances use a synthesized internal SKU (`MX3-<FRAGRANCE>-<SIZE>`) rather than
 fabricated barcode, because inventing a barcode risks colliding with a real one the
 business already uses elsewhere. Swap in the real code once the full size × fragrance
 barcode sheet is available.
+
+### Open question 3 resolved, open question 5 deferred by scope · 21 August 2026
+
+Client confirmed directly (not from a photographed document):
+
+- **Semi-Gel is a real second MX-3 format**, alongside Liquid. Resolves open question 3.
+  No size, price or SKU data for it has been supplied yet, so nothing has been seeded —
+  seeding it with guessed prices would repeat the exact mistake §7 forbids. Blocked on the
+  same kind of source data Liquid got (label photos or a price-tag photo) before
+  `seed-mx3.ts` gains a `format: 'Semi-Gel'` variant set.
+- **Catalogue work is scoped to MX-3 only for now.** The other six brand shells (seeded in
+  `bacba59`) stay as shells — no products under them yet. This makes open question 5
+  (Fairoze cosmetics licence) not currently blocking: Fairoze has no products in flight to
+  be blocked. Revisit when work moves past MX-3.
+
+### bbtcglobal.com / brightbluefmcg.com domain roles · 22 August 2026
+
+Client named the real production domain for the first time this session: **the store is
+hosted at brightbluefmcg.com**, not brightblue.in (the old WooCommerce site) or
+brightblue.vercel.app (the brand site named in the master brief) or bbtcglobal.com. This
+partially resolves open question 15 ("one property or two?") — the store's domain is now
+known — but bbtcglobal.com's exact relationship to brightblue.vercel.app is still
+unconfirmed.
+
+Fetched bbtcglobal.com directly (client's instruction) to cross-check contact/company
+details against the brochure-sourced master brief:
+
+- **Toll-free `1800 123 0621` confirmed** — matches the brochure and the already-live
+  `CONTACT.tollFree`. No change.
+- **Site email is `bbtcglobal@gmail.com`** — but the client separately gave the *store's*
+  email directly as `store-brightbluefmcg@gmail.com`. Different addresses, different
+  properties. `CONTACT.email` (`src/lib/contact.ts`) and `RESEND_FROM_EMAIL`
+  (`.env.example`) now use the store address per the client's explicit instruction, not the
+  corporate-site one. **`store-brightbluefmcg@gmail.com` is a Gmail address — Resend cannot
+  send transactional mail *as* a gmail.com address** (Google doesn't authorize Resend's
+  servers for gmail.com's SPF/DKIM). This will need either a real domain mailbox
+  (`orders@brightbluefmcg.com`, DNS-verified in Resend) with the Gmail address used only as
+  a reply-to/contact-display address, or sending through Google's own SMTP instead of
+  Resend for this address specifically. Flagged, not resolved — needs a decision before
+  Phase 6 email actually ships.
+- **An eighth brand: MAKAFA** (Premium Perfume & Fragrance) — not in the brochure, not in
+  the master brief, not seeded. Confirmed real by the client 22 August 2026. Noted in
+  `CLAUDE.md` as in-scope-for-later; **not seeded now**, consistent with the MX-3-only
+  scope decision above.
+- **Legal entity name conflict, left unresolved.** bbtcglobal.com lists "Bright Blue
+  Trading Corporation **Pvt Ltd**." The GSTIN already backfilled (`32DCVPK7871P1ZI`, from
+  the actual GST REG-06 certificate) is registered to a **proprietorship** — no "Pvt Ltd,"
+  proprietor Faisal Vathyedath Kunjimuhammed. A GST certificate outranks a website's About
+  page, so the seeded entity is **not** being changed over this. Flagging for the client to
+  confirm which is correct for invoicing — if a Pvt Ltd entity is real and distinct from the
+  proprietorship, that changes who the seller of record actually is.
+- **Head office pincode, now a three-way conflict.** Brochure header said 682035, brochure
+  footer said 682018, bbtcglobal.com now says **682017**. Still unresolved — the seeded
+  entity keeps the GST-certificate-backed 682035 pending a real answer, not the website's.
+- Several office addresses appear on bbtcglobal.com that aren't in the master brief's table
+  (UK office on High Holborn Street London, two Thrissur food offices, a Malappuram
+  packing centre, a second Kasaragod office). Not acted on — none of these affect the
+  seeded seller entity, and none was asked about specifically.
+- `organizationJsonLd.sameAs` (`src/app/layout.tsx`) changed from `brightblue.in` to
+  `https://www.bbtcglobal.com` — the old site is being replaced, not a property search
+  engines should be pointed at; bbtcglobal.com is confirmed live and real.
+
+### Bulk variant entry on product creation · 21 August 2026
+
+Client asked for a way to add a product's variants — not one at a time via
+`/admin/products/[id]/variants/new` — in the same screen that creates the product, so
+that once real Semi-Gel data arrives it (and any future brand's launch catalogue) doesn't
+mean dozens of separate page visits. Added `variant-rows.ts` (pure parsing/validation,
+unit tested) and `variant-rows-field.tsx` (the repeatable row UI) under
+`src/app/admin/(panel)/products/`; `createProductAction` now accepts an optional
+`variantsJson` batch alongside the product fields and creates the product and every row
+inside one `db.$transaction`, so a bad row can't leave a half-built catalogue. The
+existing one-variant-at-a-time pages are untouched — this is additive, for initial bulk
+entry, not a replacement.
+
+**Bulk image rows were deliberately left out of this pass.** `ProductImage.publicId` is
+required and is meant to hold a real Cloudinary asset id; there is still no admin path
+that creates a `ProductImage` row at all, and image upload stays blocked on real Cloudinary
+credentials per Phase 1's "Not done, deliberately" list. A pasted-URL row with a fabricated
+`publicId` would be the same category of guess this project already refuses to make on
+SKUs and prices, so it wasn't added here. Revisit once Cloudinary credentials exist and a
+signed upload widget can supply a real `publicId`.

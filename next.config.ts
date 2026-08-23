@@ -26,7 +26,10 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://res.cloudinary.com",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  // The admin image uploader POSTs the file straight from the browser to
+  // Cloudinary (src/app/admin/(panel)/products/[productId]/images/image-uploader.tsx)
+  // rather than through this app's server, so the fetch itself needs an exception.
+  "connect-src 'self' https://api.cloudinary.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

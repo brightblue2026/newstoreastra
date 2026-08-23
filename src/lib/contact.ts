@@ -1,18 +1,20 @@
 /**
  * How a customer reaches BBTC.
  *
- * From the master brief §"Toll free 18001230621 · info@brightblue.in". One
- * module so the "Price on request" enquiry link, the footer and any future
- * contact page cannot drift apart — most of this catalogue has no published
- * price yet, so this link is the primary conversion path today, not a
- * courtesy.
+ * Toll-free confirmed against the live bbtcglobal.com site (matches the
+ * brochure). Email is the store's own address, given directly rather than
+ * the brochure's `info@brightblue.in` — that domain is the old WooCommerce
+ * site this project replaces, not the store's contact channel. One module so
+ * the "Price on request" enquiry link, the footer and any future contact
+ * page cannot drift apart — most of this catalogue has no published price
+ * yet, so this link is the primary conversion path today, not a courtesy.
  */
 
 export const CONTACT = {
   tollFree: '18001230621',
   /** `tel:` needs the digits unpunctuated. */
   tollFreeHref: 'tel:18001230621',
-  email: 'info@brightblue.in',
+  email: 'store-brightbluefmcg@gmail.com',
 } as const;
 
 /**

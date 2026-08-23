@@ -8,6 +8,7 @@ import { recordAudit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 import { type FoodLabel, foodLabelIncomplete, parseClaims, parseSteps, readFoodLabel } from './format';
+import { parseVariantRowsJson } from './variant-rows';
 
 export interface ProductFormState {
   error?: string;
@@ -169,6 +170,13 @@ export async function createProductAction(
     };
   }
 
+  // Optional — a product can still be created with zero variants and have them added one
+  // at a time afterwards, same as before this existed. See `variant-rows.ts`.
+  const variantRows = parseVariantRowsJson(formData.get('variantsJson') as string | null);
+  if ('error' in variantRows) {
+    return { error: variantRows.error };
+  }
+
   const data = {
     name: parsed.data.name,
     slug: parsed.data.slug,
@@ -197,24 +205,49 @@ export async function createProductAction(
     isActive: false,
   };
 
-  let created;
   try {
-    created = await db.product.create({ data });
+    // All-or-nothing: a duplicate SKU on row 5 of 20 must not leave rows 1-4 orphaned,
+    // and must not leave a product with only half its declared catalogue. Every audit row
+    // is written in the same transaction too — a batch of 200 sequential round trips (one
+    // create plus one audit write per row) risked tripping Prisma's 5s interactive
+    // transaction timeout, and a mid-loop failure used to leave the AuditLog covering only
+    // some of a product's committed variants. `createManyAndReturn` is one round trip for
+    // every variant row; the audit writes ride along in the same transaction so they can
+    // never desync from what actually got created.
+    await db.$transaction(async (tx) => {
+      const product = await tx.product.create({ data });
+      await tx.auditLog.create({
+        data: { userId: user.id, action: 'create', entityType: 'Product', entityId: product.id, before: Prisma.JsonNull, after: product },
+      });
+
+      if (variantRows.rows.length > 0) {
+        const variants = await tx.productVariant.createManyAndReturn({
+          data: variantRows.rows.map((row) => ({ productId: product.id, ...row })),
+        });
+        await tx.auditLog.createMany({
+          data: variants.map((variant) => ({
+            userId: user.id,
+            action: 'create',
+            entityType: 'ProductVariant',
+            entityId: variant.id,
+            before: Prisma.JsonNull,
+            after: variant,
+          })),
+        });
+      }
+
+      return product;
+    });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const target = Array.isArray(error.meta?.target) ? error.meta.target.join(', ') : '';
+      if (target.includes('sku')) {
+        return { error: 'One of the variant SKUs is already in use by another product.' };
+      }
       return { error: 'That slug is already in use.', fieldErrors: { slug: 'Already taken.' } };
     }
     throw error;
   }
-
-  await recordAudit({
-    userId: user.id,
-    action: 'create',
-    entityType: 'Product',
-    entityId: created.id,
-    before: null,
-    after: created,
-  });
 
   revalidatePath('/admin/products');
   redirect('/admin/products');

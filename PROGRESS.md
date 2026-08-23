@@ -397,6 +397,154 @@ this document set.
 
 ---
 
+## Admin: bulk variant entry on product creation · 21 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (191 tests) and `pnpm build` all pass.
+`/admin/products/new` now has a repeatable "variant rows" section alongside the product
+fields, so a product's whole initial size/format/fragrance lineup can be entered and saved
+in one submit instead of one `/admin/products/[id]/variants/new` visit per row —
+`createProductAction` creates the product and every row inside one transaction. Generic to
+any brand or product, not MX-3-specific. Editing an existing product's variants still goes
+through the original one-at-a-time pages, unchanged. See `DECISIONS.md` for why bulk
+*image* rows were left out of this pass (`ProductImage.publicId` needs a real Cloudinary
+asset id, and upload is still blocked on real credentials).
+
+Not exercised against a real database in this environment (`DATABASE_URL` is empty here),
+same caveat as the rest of the admin CRUD.
+
+---
+
+## Admin: Cloudinary signed upload, `ProductImage` CRUD · 22 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (191 tests) and `pnpm build` all pass. This is
+the unblock the bulk-variant-rows pass above deliberately left out: `/admin/products/[id]/images`
+now exists, and a product can get its first real `ProductImage` row without anyone
+guessing a `publicId`.
+
+**Split into a client-safe half and a server half.** `src/lib/cloudinary.ts` is
+`server-only` (it configures the SDK with the API secret), so the plain constants a client
+component also needs — the photography checklist, the allowed formats, the 2000px floor —
+moved to a new `src/lib/cloudinary-shared.ts` with no SDK import and no secret, re-exported
+from `cloudinary.ts` for existing server callers.
+
+**The file itself never touches this app's server.** `signProductImageUploadAction`
+(`products/[productId]/images/actions.ts`) signs only `{ timestamp, folder }` — Cloudinary
+rejects the request if the client sends back a signed param that wasn't part of what got
+signed — and the browser POSTs the file straight to `api.cloudinary.com`. Only the
+resulting `public_id`/`secure_url`/`width`/`height` come back to
+`saveProductImageAction`, which re-checks the long-edge and format rules server-side (the
+client-side check in `image-uploader.tsx` is a courtesy, never the boundary) before writing
+`ProductImage`. A file that fails either check server-side is deleted back off Cloudinary
+rather than left as an asset no row ever points to.
+
+Delete works the same way: remove the row, then best-effort `cloudinary.uploader.destroy`.
+Logged with `action: 'deactivate'`, the same precedent `ComboItem` removal already set —
+still no dedicated `delete` `AuditLog` action, a known gap from Phase 1.
+
+Not exercised against a real Cloudinary account or database at the time this was written —
+see "Real Cloudinary + database verification" below for what changed once real credentials
+existed.
+
+---
+
+## Recheck: security + correctness review of the last two passes · 22 August 2026
+
+Client asked for a full recheck ahead of the real launch domain being confirmed
+(brightbluefmcg.com). Ran a security review and a high-effort code review against the
+bulk-variant-rows and Cloudinary-upload diffs above. `pnpm lint`, `pnpm typecheck`,
+`pnpm test` (191 tests) and `pnpm build` all pass after fixes.
+
+**Security review: no HIGH/MEDIUM findings.** One borderline item — `saveProductImageAction`
+validates `upload.url` as any URL, not specifically a `res.cloudinary.com` one — was
+considered and not flagged: the caller is already gated to `MANAGER`+ via
+`requireCatalogueAccess`, and `next.config.ts`'s `remotePatterns` independently blocks any
+non-Cloudinary host at render time regardless. Worth tightening as defense-in-depth later,
+not a vulnerability as shipped.
+
+**Code review found one real breakage and three real reliability gaps, all fixed:**
+
+- **The image uploader didn't actually work.** `next.config.ts`'s CSP shipped
+  `connect-src 'self'` with no exception for `api.cloudinary.com`, so the browser blocked
+  every upload attempt outright — the feature above had never been exercised end-to-end (no
+  Cloudinary credentials in this environment), so this had never been caught. Fixed: added
+  `https://api.cloudinary.com` to `connect-src`.
+- **Bulk variant creation could time out or half-audit a batch.** The transaction awaited
+  one `create` plus one `recordAudit` call per row, sequentially — up to 200 round trips
+  against a serverless Postgres inside Prisma's default 5s interactive-transaction window,
+  and a failure partway through could leave the AuditLog covering only some of a product's
+  already-committed variants. Fixed: `createManyAndReturn` for the variant batch (one round
+  trip), and every audit row now written inside the same `db.$transaction` as the product
+  and variants, so the whole thing commits or rolls back together.
+- **`.env.example` contradicted itself.** `RESEND_FROM_EMAIL` was set to
+  `store-brightbluefmcg@gmail.com` right below a comment saying it must be a
+  domain-verified sender — Resend cannot send as a gmail.com address at all. Fixed: the
+  example now points at a domain mailbox (`orders@brightbluefmcg.com`) with a comment
+  explaining why the store's real Gmail contact address can't go here.
+- **Duplicated variant validation.** The single-variant form and the bulk-row parser had
+  copy-pasted, byte-identical Zod schemas that could silently drift. Extracted to
+  `products/variant-fields.ts`, imported by both.
+
+**`ProductImage.sortOrder`'s race, fixed on request · 22 August 2026.** Originally left as
+a known, accepted gap (see below) — `sortOrder` was computed via a non-atomic
+read-then-write, so two near-simultaneous uploads for the same product could collide on
+the same value. Postgres won't allow `SELECT MAX(...) FOR UPDATE` (FOR UPDATE rejects
+aggregates), so the fix is a per-product transaction-scoped advisory lock
+(`pg_advisory_xact_lock(hashtext(productId))`) around the read-then-write in
+`saveProductImageAction` — two concurrent uploads for the same product now serialize
+through the lock instead of both reading the same max. Released automatically on commit or
+rollback, no manual unlock needed.
+
+---
+
+## Real Cloudinary + database verification · 23 August 2026
+
+Client supplied real Cloudinary credentials (cloud name `em6hcfco`) and confirmed
+`DATABASE_URL` in `.env` — already populated from Phase 1 — is a real, working Neon
+connection. First time either has been exercised for real rather than typechecked against.
+
+**Cloudinary — fully verified.** Signed a request with the exact algorithm
+`signProductImageUploadAction` uses (sort params, sign with the secret, SHA1), uploaded a
+real image to `bright-blue/products` through the real endpoint, got back a `public_id` in
+the shape `saveProductImageAction` expects, deleted it the same way
+`deleteProductImageAction` does. Full pipeline, proven outside the browser first.
+
+**Database — fully reachable, contrary to this document's earlier assumption.** Every
+"not exercised against real data" caveat elsewhere in this document assumed
+`DATABASE_URL` was unreachable from a dev sandbox. It isn't — a direct query returned the
+real seeded catalogue (7 brands, 1 product, 72 variants, 7 categories, 11 locations, 3 staff
+accounts). The connection is real; it is just intermittently slow from this particular
+sandbox's network path to Neon's Singapore region (queries ranging from instant to 30s+,
+occasionally timing out) — a sandbox-environment characteristic, not a schema or code
+problem, and not necessarily present in a real deployment.
+
+**Found and fixed a real bug via actual browser testing**, the thing this whole document
+has been flagging as never done: `image-uploader.tsx`'s client-side dimension check used
+`URL.createObjectURL(file)` + `<img>` to read pixel dimensions before upload. The CSP's
+`img-src` (`self`, `data:`, `res.cloudinary.com`) has no `blob:` exception, so the browser
+silently blocked it — confirmed via the exact CSP violation message in the browser console,
+not guessed at. Fixed by switching to `createImageBitmap(file)`, which decodes the file
+in memory without going through the resource-fetch pipeline `img-src` governs at all — the
+technically correct fix, not a CSP loosening.
+
+**What's proven vs. not, honestly.** Login, real-data rendering on `/admin/products`
+(showing the actual seeded "MX Three Dish Wash Liquid", 72 variants), and navigation to
+the images tab were all confirmed working against real data in an actual browser
+(Playwright + headless Chromium), with screenshots. The final step — clicking Upload and
+confirming an image lands in the database — was **not** conclusively proven end-to-end in
+the browser: Playwright's element-targeted `.click()` intermittently failed to deliver the
+click to the button's React handler in this specific sandboxed headless-Chromium setup
+(confirmed via a temporary debug log — the handler simply never ran on several attempts,
+then did on others, with no code change in between). A raw coordinate `page.mouse.click()`
+did reach the handler at least once and behaved correctly (correctly reported "Alt text is
+required" when a Fast-Refresh-triggered remount had reset the field), which is evidence the
+handler logic itself is sound, but the flakiness prevented a clean, repeatable, full
+upload→row-created confirmation. This reads as a Playwright/headless-Chromium click-delivery
+quirk in this sandbox rather than an application bug — the Cloudinary pipeline it depends on
+was independently proven above — but it is not the same thing as having watched an image
+actually appear on the page after a real click, and that gap shouldn't be glossed over.
+
+---
+
 ## Running it
 
 ```bash

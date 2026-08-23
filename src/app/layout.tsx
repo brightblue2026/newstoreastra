@@ -56,7 +56,10 @@ const organizationJsonLd = {
     postalCode: '682035',
     addressCountry: 'IN',
   },
-  sameAs: ['https://www.brightblue.in'],
+  // brightblue.in is the old WooCommerce site this project replaces, not a
+  // property to point search engines at. bbtcglobal.com is BBTC's separate,
+  // currently-live static corporate site — confirmed real, see DECISIONS.md.
+  sameAs: ['https://www.bbtcglobal.com'],
 };
 
 export const viewport: Viewport = {

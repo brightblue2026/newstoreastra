@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { ProductFormState } from './actions';
+import { VariantRowsField } from './variant-rows-field';
 
 export interface SelectOption {
   id: string;
@@ -87,12 +88,15 @@ export function ProductForm({
   brandOptions,
   categoryOptions,
   submitLabel,
+  showVariantRows,
 }: {
   action: (state: ProductFormState, formData: FormData) => Promise<ProductFormState>;
   initialValues?: ProductFormValues;
   brandOptions: SelectOption[];
   categoryOptions: SelectOption[];
   submitLabel: string;
+  /** Renders the bulk variant-row section — only on the create screen. See `variant-rows.ts`. */
+  showVariantRows?: boolean;
 }) {
   const [state, formAction] = useActionState(action, {} as ProductFormState);
   const values = initialValues ?? EMPTY_VALUES;
@@ -412,6 +416,8 @@ export function ProductForm({
           </div>
         </div>
       </div>
+
+      {showVariantRows && <VariantRowsField />}
 
       <div className="mt-8">
         <SubmitButton label={submitLabel} />

@@ -53,6 +53,12 @@ export default async function ProductsPage() {
                     >
                       Variants
                     </Link>
+                    <Link
+                      href={`/admin/products/${product.id}/images`}
+                      className="type-body text-signal"
+                    >
+                      Images ({product.images.length})
+                    </Link>
                     <Link href={`/admin/products/${product.id}`} className="type-body text-signal">
                       Edit
                     </Link>

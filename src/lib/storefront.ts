@@ -92,10 +92,11 @@ export type SellerEntity = {
 /**
  * The entity of record for the footer.
  *
- * Returns null until exactly one active seller exists. brief §14 Q6 is open:
- * brightblue.in publishes the same GSTIN for two different entities, which two
- * entities cannot share. Until that is resolved, printing a GSTIN would mean
- * picking one — so an ambiguous result prints nothing.
+ * Returns null unless exactly one active seller exists. brief §14 Q6 (resolved
+ * 9 August 2026, DECISIONS.md) turned out to be a brochure data error rather
+ * than a real duplicate GSTIN — but the guard against an ambiguous result
+ * stays: printing a GSTIN would mean picking one if a second seller ever gets
+ * added by mistake, so it prints nothing instead.
  */
 export async function getSellerEntity(): Promise<SellerEntity | null> {
   try {
