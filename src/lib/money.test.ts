@@ -3,6 +3,7 @@ import {
   MAX_PAISE,
   MoneyError,
   PRICE_ON_REQUEST,
+  amountInWords,
   applyBps,
   assertPaise,
   distributeProportionally,
@@ -223,5 +224,54 @@ describe('distributeProportionally', () => {
 
   it('rejects negative weights', () => {
     expect(() => distributeProportionally(100, [1, -1])).toThrow(MoneyError);
+  });
+});
+
+describe('amountInWords', () => {
+  it('spells the ordinary case', () => {
+    expect(amountInWords(14900)).toBe('Rupees One Hundred Forty Nine Only');
+    expect(amountInWords(100)).toBe('Rupees One Only');
+  });
+
+  it('includes paise only when there are any', () => {
+    expect(amountInWords(149950)).toBe(
+      'Rupees One Thousand Four Hundred Ninety Nine and Fifty Paise Only',
+    );
+    expect(amountInWords(5)).toBe('Rupees Zero and Five Paise Only');
+  });
+
+  it('zero is a sentence, not an empty string', () => {
+    expect(amountInWords(0)).toBe('Rupees Zero Only');
+  });
+
+  /*
+    The whole reason this is hand-rolled rather than an npm package: the
+    grouping above hundreds is 2-2-3, not 3-3-3. Getting this wrong prints a
+    legally wrong invoice that still looks plausible.
+  */
+  it('groups in lakh and crore, not thousands', () => {
+    expect(amountInWords(15_000_000)).toBe('Rupees One Lakh Fifty Thousand Only');
+    expect(amountInWords(100_000_000)).toBe('Rupees Ten Lakh Only');
+    // MAX_PAISE caps a single amount at ₹1 crore, so that is the largest
+    // invoice this can ever have to spell.
+    expect(amountInWords(MAX_PAISE)).toBe('Rupees One Crore Only');
+    expect(amountInWords(987_654_321)).toBe(
+      'Rupees Ninety Eight Lakh Seventy Six Thousand Five Hundred Forty Three and Twenty One Paise Only',
+    );
+  });
+
+  it('handles the teens and the round tens that trip naive implementations', () => {
+    expect(amountInWords(1_100)).toBe('Rupees Eleven Only');
+    expect(amountInWords(1_500)).toBe('Rupees Fifteen Only');
+    expect(amountInWords(2_000)).toBe('Rupees Twenty Only');
+    expect(amountInWords(7_000)).toBe('Rupees Seventy Only');
+    expect(amountInWords(10_000)).toBe('Rupees One Hundred Only');
+  });
+
+  it('agrees with formatINR on the same paise', () => {
+    // The figure and the words must never disagree — that is the point of
+    // printing both.
+    expect(formatINR(149900)).toBe('₹1,499.00');
+    expect(amountInWords(149900)).toContain('One Thousand Four Hundred Ninety Nine');
   });
 });

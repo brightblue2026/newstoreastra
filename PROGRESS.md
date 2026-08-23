@@ -362,6 +362,229 @@ slugs, and the only errors in the log are the expected `DATABASE_URL is not set`
 
 ---
 
+## Phase 5 — Checkout, payments, orders · **built, unexercised against a database** · 8 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (233 tests, up from 167) and `pnpm build` all
+pass. Every §12 Phase 5 checkbox is addressed except phone OTP, which is deferred with a
+reason below, and the MSG91 submission, which is BBTC's to make and is now written out
+ready to paste. Judgement calls are in `DECISIONS.md`.
+
+### What was built
+
+**Settings** — a new `Setting` table (`prisma/migrations/20260808120000_phase5_settings`,
+authored offline with `prisma migrate diff --from-schema`), read through
+`src/lib/settings.ts` with one Zod schema per key and a safe default for each.
+`/admin/settings` is ADMIN-only and holds three forms: **seller of record + GSTIN** (the
+mechanism that lets BBTC answer §14 Q6 themselves), **cash on delivery** (toggle, fee,
+min/max, pincode allowlist) and **delivery rates** (weight slabs, overflow charge, assumed
+unit weight, serviceable pincodes). It opens with four plain statements about whether orders
+can be taken at all — no seller of record, no Razorpay keys, no delivery rates, COD off —
+because each of those is otherwise discovered by a customer at the end of checkout. Every
+save is audited.
+
+**Pincode and shipping** — `src/lib/pincode.ts` maps a pincode to a delivery state offline,
+resolving only where a series unambiguously belongs to one state and reporting `ambiguous`
+or `unknown` otherwise; a definite pincode overrules whatever state the customer selected,
+because that is a tax decision. `src/lib/shipping.ts` rates the flat-rate slab table §10
+asks for as a Shiprocket fallback — currently the only rate source, since Shiprocket is
+Phase 6.
+
+**Razorpay** (`src/lib/razorpay.ts`) — order creation over REST and HMAC-SHA256 signature
+verification over `node:crypto`, no SDK added. `POST /api/webhooks/razorpay` verifies
+against the raw body, fails closed, and is idempotent by `razorpayPaymentId` and again by
+order state.
+
+**The order transaction** (`src/lib/orders.ts`) — §4 in one interactive `$transaction`:
+re-read prices through the transaction, re-run `calculateCart`, check inventory, increment
+`reserved`, take a gapless order number under a per-financial-year advisory lock, insert the
+`Order` and its `OrderItem` snapshots, increment discount usage. `src/lib/inventory.ts`
+holds the allocation arithmetic as pure functions and `src/lib/order-status.ts` the state
+machine, in which `PENDING_PAYMENT → CONFIRMED` is reachable by no actor but `'WEBHOOK'`.
+
+**Checkout** — `/checkout`, one page and three sections (contact, delivery, payment) with a
+live order summary. `src/server/actions/checkout.ts` exposes `quoteCheckout` (writes
+nothing) and `submitOrder` (the only thing that creates an order), both Zod-validated
+through `src/lib/cart-schema.ts`, which the cart action now shares rather than keeping a
+second copy of the same shape. The cart drawer finally has a checkout button.
+
+**Order pages** — `/order/[orderNumber]` confirmation and tracking, and `/order` for a
+customer who lost the link. Access is by HMAC capability token or the full mobile number on
+the order, never by order number alone, since numbers run in sequence. Both work with no
+client JavaScript. For a prepaid order the page says the payment is being confirmed until
+the webhook has actually landed.
+
+**Admin orders** — `/admin/orders` list with status and order-number/phone filters, and
+`/admin/orders/[orderId]` with items (HSN and rate per line), addresses, contact, the money,
+the per-HSN GST table, and only the status transitions the state machine allows a member of
+staff to make. There is deliberately no button that confirms a payment.
+
+**MSG91** — `docs/msg91-templates.md`: the four WhatsApp templates written out verbatim with
+every variable mapped to the field it comes from, the Utility-not-Marketing warning, the SMS
+and DLT note, and what BBTC has to answer before template 4 can go in.
+
+### Verified
+
+233 tests pass. The 66 new ones cover what can be proven without a database: pincode
+resolution including every ambiguous and unlisted series and a check that every state named
+resolves through `gst.ts` (17), shipping slab rating and weight (11), Razorpay signature
+verification including a key-reordered re-serialisation and an unconfigured secret (10),
+inventory allocation including refusing to partially reserve and never driving `reserved`
+negative (13), the order state machine and its stock effects (15).
+
+Against `pnpm dev` with an **empty `DATABASE_URL`**, which exercises the degrade paths:
+
+```
+/checkout /order /order/BB-2627-00001                200
+/admin/orders /admin/settings                        307 → /admin/login
+POST /api/webhooks/razorpay, no signature            400
+POST /api/webhooks/razorpay, forged signature        400
+POST /api/webhooks/razorpay, valid signature         500  (verified, then no database)
+/order/BB-2627-00001?t=<valid>    → past the gate, honest "cannot reach your order"
+/order/BB-2627-00001?t=<wrong>    → the unlock form
+```
+
+The 400-versus-500 split is the point of that webhook check: 400 means the signature was
+rejected, 500 means it was accepted and the database was not there. Every error in the dev
+log traces to the single expected `DATABASE_URL is not set` throw.
+
+### Not done, deliberately
+
+- **Nothing has touched a database, and this phase needed it most.** `DATABASE_URL` is
+  empty in this environment. So the order transaction, the advisory-lock order numbering,
+  the inventory reservation, the discount usage increment, the webhook's idempotency against
+  real rows and every admin order screen have been typechecked, unit tested where they are
+  pure, and rendered — never run. **This is the first thing to do next:** paste the Neon
+  string into `.env`, `pnpm prisma migrate deploy`, mark a seller entity in
+  `/admin/settings`, and place a COD order end to end. That single path exercises the
+  transaction, the numbering and the stock hold without needing Razorpay keys at all.
+- **No ₹1 test transaction.** Phase 5's "done when" needs one, and it needs live test keys:
+  `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` are
+  all unset. The webhook path was proven as far as signature verification with a locally
+  supplied secret; the half that needs Razorpay to actually send something is untested.
+- **Phone OTP for returning customers is not built.** It needs two things this deployment
+  does not have: MSG91 credentials to send a code, and a shared store to hold the challenge
+  and count attempts — the same gap that leaves staff login unthrottled. An OTP flow with
+  in-memory attempt counting is fake protection on Vercel's serverless model, and one that
+  cannot send a code is dead. Guest checkout is complete and is the whole customer-facing
+  path; `submitOrder` already attaches an order to a signed-in user when there is one, so
+  adding the provider later changes no order code.
+- **No email or WhatsApp is sent on confirmation.** Phase 6, and the templates are the part
+  that had to happen now.
+- **Shiprocket is not called.** Serviceability comes from the admin's pincode prefix list
+  and the rate from the slab table — which §10 wants as the fallback anyway, so Phase 6 adds
+  a live rate in front of it rather than replacing it.
+- **`perCustomerLimit` is only reachable for a signed-in user,** which today means staff.
+  The query is written and correct; there are no customer accounts for it to apply to yet.
+- **A cancelled unpaid order does not give back its discount usage.** §4 puts the increment
+  in the creation transaction, so an order that is never paid has consumed a coupon use.
+  Worth revisiting alongside a scheduled sweep of stale `PENDING_PAYMENT` orders, which also
+  does not exist.
+- **Still no Cloudinary upload,** so no product can legitimately publish, so nothing can
+  actually be bought until that or a manual image URL lands.
+
+---
+
+## Phase 6 — Fulfilment, invoices, communications · **built, unexercised against a database** · 10 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (276 tests, up from 233) and `pnpm build` all
+pass. Every §12 Phase 6 checkbox is addressed. The one thing the phase's "done when" asks
+for — an accountant's approval of a generated mixed-rate invoice — now has an artefact to
+review, which is the point of `pnpm invoice:sample`.
+
+### Merge reconciliation, first
+
+This session began three commits behind `origin/main`, which carried the resolved open
+questions, the real MX-3 catalogue seed and a new CSP. Rebased Phase 5 on top. Two things
+came out of it worth recording:
+
+- **The CSP silently killed the entire payment flow.** `default-src 'self'` blocks
+  `checkout.razorpay.com`, and the Razorpay modal is a cross-origin iframe no directive
+  permitted. Nothing surfaces until a customer clicks Pay. Five directives widened, each
+  documented in `next.config.ts` with the reason.
+- **`razorpay-webhook.ts` was superseded.** Written as prep before Phase 5 existed; Phase 5
+  built the real thing in `razorpay.ts`. Two exported `verifyWebhookSignature` functions
+  with different signatures, only a test importing the dead one. Removed.
+
+### What was built
+
+**Invoice numbering** (`src/lib/invoice-number.ts`, `assignInvoiceNumber` in `invoice.ts`)
+— `BBTC/2627/00001`, gapless per financial year under a per-FY advisory lock, derived from
+the highest committed number rather than a counter. Fifteen characters: **CGST Rule 46(b)
+caps an invoice number at sixteen**, and the obvious `BB/INV/2627/00001` is seventeen. A
+test asserts the length at the maximum sequence, because otherwise an auditor finds it.
+
+**When the number is taken is a judgement call** — §10 says "inside the order transaction",
+§12 says "no gaps", and for a prepaid order those pull apart. Resolved by taking it in the
+transaction that moves an order to CONFIRMED, which for COD *is* the creation transaction.
+Both readings hold. In `DECISIONS.md`.
+
+**The GST invoice PDF** (`invoice-pdf.tsx`, `@react-pdf/renderer` per §5) — per-HSN tax
+summary table with intra-state and inter-state layouts that differ rather than zeroing
+columns, per-line HSN and rate, amount in words in the Indian numbering system
+(`amountInWords` in `money.ts` — lakh and crore, not thousands), FSSAI and cosmetics
+licences on the orders that contain those goods. Nothing is recalculated: every figure
+comes from the order's stored snapshot.
+
+**`pnpm invoice:sample`** writes two real PDFs — one Kerala, one Tamil Nadu — from the same
+fixture the tests assert against, so the reviewed document and the tested document cannot
+drift. Verified by decompressing the content streams: four HSN rows, nil-rated jaggery
+showing 0.00 tax against a real taxable value, ₹1,491.67 + ₹161.33 = ₹1,653.00.
+
+**Shiprocket** (`shiprocket.ts` + pure `shiprocket-tracking.ts`) — token auth with a
+nine-day cache, rate shopping, order push, AWB assignment, label URL, and a tracking
+webhook at `POST /api/webhooks/shiprocket`. `delivery.ts` is the seam that decides between
+a live rate and the slab table, and it distinguishes *"nobody delivers there"* from *"we
+could not find out"* — conflating them would refuse orders BBTC can fulfil every time the
+API blinks.
+
+**Communications** — `email.ts` (Resend over REST, no SDK) sends the confirmation with the
+invoice PDF attached and a shipped notice; `msg91.ts` sends the four WhatsApp templates
+from `docs/msg91-templates.md` with an SMS fallback. `notifications.ts` is the single entry
+point, always called *after* a transition commits and never inside it.
+
+**Fulfilment actions** (`src/server/actions/fulfilment.ts`) — push to Shiprocket, assign an
+AWB and ship, fetch a label, and **record an AWB by hand**. The manual path matters: BBTC
+already ships DTDC directly, and §10's "never block an order because a third party is down"
+applies to dispatch as much as to checkout.
+
+**Invoice download** — `GET /api/invoice/[orderNumber]`, one route for both audiences:
+a customer's capability token or a staff session. Rendered on demand, never stored — the
+document is derived from immutable snapshots, so re-rendering is deterministic.
+
+### Verified
+
+276 tests pass, up from 233. The 43 new ones cover invoice numbering including the Rule
+46(b) length limit and mutual rejection against order numbers (12), `amountInWords`
+including the 2-2-3 lakh/crore grouping that is the whole reason it is hand-rolled (6),
+mixed-rate invoice arithmetic and PDF rendering (8), Shiprocket tracking-webhook parsing
+including **an assertion that no courier scan can ever map to CONFIRMED** (11), and phone
+normalisation that refuses rather than truncates (6).
+
+### Not done, deliberately
+
+- **Still nothing has touched a database.** `DATABASE_URL` is empty in this environment. The
+  invoice sequence's advisory lock, the order transaction that now raises an invoice, the
+  Shiprocket push and every notification have been typechecked, unit tested where pure, and
+  rendered — never run against Postgres. This remains the first thing to do next.
+- **No admin UI for the fulfilment actions or the new shipping settings.** The server
+  actions and the settings schema are built and guarded; the buttons and form fields on
+  `/admin/orders/[orderId]` and `/admin/settings` are not wired to them yet. That is the
+  next visible piece of work.
+- **No third party has actually been called.** Shiprocket, Resend and MSG91 all have unset
+  credentials, so every integration has been exercised only down its unconfigured path —
+  which is the path that must degrade cleanly, and does.
+- **MSG91 templates are still unapproved,** and `bbtc_order_delivered` remains blocked on
+  §14 Q18 (the return policy, which differs for food). A template with no id configured is
+  skipped with a log rather than faked.
+- **No credit notes.** Once raised, an invoice number stays on the order even if it is later
+  cancelled — which is correct under GST, where a raised invoice is reversed with a credit
+  note, never deleted. Credit notes are not built, so a post-confirmation cancellation needs
+  the accountant to raise one outside this system.
+- **No retry queue for notifications.** A failed WhatsApp or email is logged, not retried.
+  Doing it properly needs a durable job store this deployment does not have.
+
+---
+
 ## Blocking Phase 1 · 4 of 6 resolved 9 August 2026
 
 Per §14. Real source documents (trade licence, two FSSAI Basic Registrations, GST

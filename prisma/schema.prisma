@@ -9,8 +9,8 @@
 //     in an order.
 //   - Cascade only parent→child within the catalogue. Never cascade into Order.
 //
-// NOTE: no migration has been run against this file yet. Six open questions in
-// brief §14 block the first one — see DECISIONS.md.
+// NOTE: the first migration is applied. Six open questions in brief §14 still
+// block real catalogue data — see DECISIONS.md.
 
 generator client {
   provider = "prisma-client"
@@ -329,13 +329,22 @@ model Order {
   razorpayPaymentId String?
 
   shiprocketOrderId String?
-  awbNumber         String?
-  courierName       String?
-  trackingUrl       String?
+  // Shiprocket keys the AWB assignment and the label off the *shipment*, not
+  // the order, so both ids have to be kept — see lib/shiprocket.ts.
+  shiprocketShipmentId String?
+  awbNumber            String?
+  courierName          String?
+  trackingUrl          String?
+  labelUrl             String?
 
   sellerEntityId String // which BBTC entity sold this — see §11
   invoiceNumber  String? @unique
   invoiceUrl     String?
+  // When the tax invoice was raised, which is when the order was confirmed —
+  // not when it was placed. A prepaid order placed at 23:50 and confirmed by
+  // webhook at 00:05 belongs in the next day's GST return, and for a March
+  // order, potentially the next financial year's.
+  invoicedAt     DateTime?
 
   notes     String?
   createdAt DateTime @default(now())
@@ -402,6 +411,20 @@ model ContentBlock {
   key       String   @unique // "home_hero", "announcement_bar", "world_record"
   data      Json // Zod-validated per key
   isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+// Operational settings an administrator owns: COD controls and the flat-rate
+// shipping slabs (brief §10). Not in §7 — added in Phase 5, because §10 says
+// "controls in admin settings" and there was nowhere for them to live. Same
+// key + validated-JSON shape as ContentBlock, kept separate because this is
+// not content: it decides what a customer is charged, and it is ADMIN-only
+// where content is MANAGER-editable. Read through src/lib/settings.ts, which
+// validates every row against a schema chosen by the key.
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique // "checkout_cod", "shipping_rates"
+  data      Json
   updatedAt DateTime @updatedAt
 }
 

@@ -8,15 +8,16 @@ export default async function AdminHomePage() {
   return (
     <div>
       <h1 className="type-display-sm">Admin</h1>
-      <p className="mt-4 type-body-lg text-ink-soft">
-        Signed in as {user.email}. The catalogue, orders and offers screens arrive in
-        Phase 1 and after.
-      </p>
+      <p className="mt-4 type-body-lg text-ink-soft">Signed in as {user.email}.</p>
 
       <dl className="mt-12 grid gap-6 border-t border-line pt-6 sm:grid-cols-3">
         <div>
           <dt className="type-caption text-ink-soft">Orders and fulfilment</dt>
-          <dd className="mt-2 type-body">Available to you</dd>
+          <dd className="mt-2 type-body">
+            <Link href="/admin/orders" className="text-signal">
+              Orders
+            </Link>
+          </dd>
         </div>
         <div>
           <dt className="type-caption text-ink-soft">Products and pricing</dt>
@@ -47,7 +48,13 @@ export default async function AdminHomePage() {
         <div>
           <dt className="type-caption text-ink-soft">Users and settings</dt>
           <dd className="mt-2 type-body">
-            {canAdminister(user.role) ? 'Available to you' : 'Administrator only'}
+            {canAdminister(user.role) ? (
+              <Link href="/admin/settings" className="text-signal">
+                Settings
+              </Link>
+            ) : (
+              'Administrator only'
+            )}
           </dd>
         </div>
       </dl>

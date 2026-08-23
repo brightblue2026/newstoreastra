@@ -19,20 +19,45 @@ import type { NextConfig } from 'next';
  * is a much worse failure mode than the CSP being slightly looser locally,
  * so eval is scoped to development only — the production build never eval's
  * generated code and doesn't need it.
+ *
+ * **Razorpay Checkout needs four of these directives widened, and a fifth
+ * added.** This CSP and the checkout screen were built on parallel branches and
+ * met in a merge, where `default-src 'self'` silently blocked the whole payment
+ * flow: the `checkout.razorpay.com` script never loads, and even if it did, the
+ * payment modal is a cross-origin iframe that `frame-src` must permit. The
+ * failure is invisible until someone actually clicks Pay, which is why it is
+ * spelled out here rather than left as a hostname in a list:
+ *
+ *   - `script-src`  — checkout.razorpay.com serves checkout.js itself.
+ *   - `frame-src`   — the modal, and the bank/3-D Secure pages inside it.
+ *   - `connect-src` — checkout.js calls api.razorpay.com and posts telemetry to
+ *                     lumberjack.razorpay.com.
+ *   - `img-src`     — bank, card-network and UPI-app logos off cdn.razorpay.com.
+ *   - `form-action` — netbanking and 3-D Secure redirect by form POST to
+ *                     api.razorpay.com.
+ *
+ * Nothing here is widened for COD, which needs no third party at all.
  */
+const RAZORPAY_CHECKOUT = 'https://checkout.razorpay.com';
+const RAZORPAY_API = 'https://api.razorpay.com';
+/** Covers cdn., lumberjack. and the regional hosts Checkout picks at runtime. */
+const RAZORPAY_ANY = 'https://*.razorpay.com';
+
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://res.cloudinary.com",
+  `img-src 'self' data: https://res.cloudinary.com ${RAZORPAY_ANY}`,
   "font-src 'self' data:",
   // The admin image uploader POSTs the file straight from the browser to
   // Cloudinary (src/app/admin/(panel)/products/[productId]/images/image-uploader.tsx)
-  // rather than through this app's server, so the fetch itself needs an exception.
-  "connect-src 'self' https://api.cloudinary.com",
+  // rather than through this app's server, so the fetch itself needs an exception —
+  // alongside Razorpay's own connect-src needs above.
+  `connect-src 'self' https://api.cloudinary.com ${RAZORPAY_API} ${RAZORPAY_ANY}`,
+  `frame-src ${RAZORPAY_CHECKOUT} ${RAZORPAY_API} ${RAZORPAY_ANY}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  `form-action 'self' ${RAZORPAY_API}`,
   "object-src 'none'",
 ].join('; ');
 
