@@ -886,6 +886,36 @@ project has built ahead of its credentials.
 
 ---
 
+## Wired the Shiprocket fulfilment actions into the admin order page · 24 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (294 tests) and `pnpm build` all pass. Closes
+the gap Phase 6's own notes named: `pushToShiprocket`, `assignAwbAndShip`, `fetchLabel`
+and `recordManualAwb` existed as server actions with no caller anywhere in `src/` —
+confirmed by grep before writing anything, so this wasn't guessed at.
+
+**`FulfilmentActions`** (`orders/[orderId]/fulfilment-actions.tsx`, new) — each action
+already takes one plain object rather than `(prevState, formData)`, so this follows the
+same direct-call pattern `discount-form.tsx`'s preview button already established, not
+`useActionState`. Shows push/AWB/tracking state, offers exactly the next legal action
+(push → assign AWB → get label), and the manual-AWB fallback stays available throughout
+for the DTDC-direct path §10 already accounts for. Rendered only once an order is past
+`PENDING_PAYMENT`, matching the existing gate on the status buttons above it.
+
+**`OrderView` gained three fields** (`shiprocketOrderId`, `shiprocketShipmentId`,
+`labelUrl`) it needed to know button state but never selected before.
+
+**Fixed the invoice link while in the area.** The page said "invoicing is Phase 6" —
+stale copy from before Phase 6 existed — and would have linked through
+`Order.invoiceUrl`, which is a real column but is *never populated*: the actual PDF is
+served on demand at `GET /api/invoice/[orderNumber]`, deliberately not stored (see that
+route's own comment). Fixed to link there instead, session-authorised the same way the
+route already supports for staff.
+
+Not exercised against a real Shiprocket account — no credentials in this environment,
+same caveat as everything else waiting on them.
+
+---
+
 ## Running it
 
 ```bash

@@ -56,6 +56,9 @@ export interface OrderView {
   awbNumber: string | null;
   courierName: string | null;
   trackingUrl: string | null;
+  shiprocketOrderId: string | null;
+  shiprocketShipmentId: string | null;
+  labelUrl: string | null;
   invoiceNumber: string | null;
   invoiceUrl: string | null;
   notes: string | null;
@@ -150,6 +153,9 @@ export async function getOrderByNumber(orderNumber: string): Promise<OrderView |
       awbNumber: true,
       courierName: true,
       trackingUrl: true,
+      shiprocketOrderId: true,
+      shiprocketShipmentId: true,
+      labelUrl: true,
       invoiceNumber: true,
       invoiceUrl: true,
       notes: true,
@@ -212,6 +218,9 @@ export async function getOrderByNumber(orderNumber: string): Promise<OrderView |
     awbNumber: order.awbNumber,
     courierName: order.courierName,
     trackingUrl: order.trackingUrl,
+    shiprocketOrderId: order.shiprocketOrderId,
+    shiprocketShipmentId: order.shiprocketShipmentId,
+    labelUrl: order.labelUrl,
     invoiceNumber: order.invoiceNumber,
     invoiceUrl: order.invoiceUrl,
     notes: order.notes,

@@ -6,6 +6,7 @@ import { formatINR } from '@/lib/money';
 import { ORDER_STATUS_LABELS, OrderStatus, staffTransitions } from '@/lib/order-status';
 import { getOrderByNumber } from '@/lib/order-view';
 import { requireOrderAccess } from '@/lib/session';
+import FulfilmentActions from './fulfilment-actions';
 import StatusForm from './status-form';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,17 @@ export default async function OrderDetailPage({
             This order has not been paid. Only a signature-verified Razorpay webhook can confirm
             it — there is deliberately no button here to do it by hand.
           </p>
+        )}
+
+        {status !== OrderStatus.PENDING_PAYMENT && (
+          <FulfilmentActions
+            orderId={order.id}
+            shiprocketShipmentId={order.shiprocketShipmentId}
+            awbNumber={order.awbNumber}
+            courierName={order.courierName}
+            trackingUrl={order.trackingUrl}
+            labelUrl={order.labelUrl}
+          />
         )}
       </section>
 
@@ -257,9 +269,24 @@ export default async function OrderDetailPage({
           )}
 
           <p className="mt-4 type-caption text-ink-soft">
-            {order.invoiceNumber
-              ? `Invoice ${order.invoiceNumber}`
-              : 'No invoice raised yet — invoicing is Phase 6.'}
+            {order.invoiceNumber ? (
+              <>
+                Invoice {order.invoiceNumber}
+                {' — '}
+                {/* Staff-authorised by session — no capability token needed here,
+                    unlike the customer-facing link on the order tracking page. */}
+                <a
+                  href={`/api/invoice/${order.orderNumber}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  download
+                </a>
+              </>
+            ) : (
+              'No invoice raised yet — one is raised automatically when the order is confirmed.'
+            )}
           </p>
         </section>
       </div>
