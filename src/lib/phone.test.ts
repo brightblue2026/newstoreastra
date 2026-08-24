@@ -46,4 +46,10 @@ describe('toMsg91Number', () => {
     // message to a real person who did not order anything.
     expect(toMsg91Number('9198470123450000')).toBeNull();
   });
+
+  it('does not mistake a bare ten-digit mobile starting "91" for a country-code prefix', () => {
+    // 9198765432 is a real, valid mobile: ten digits, starts 6-9. Blindly
+    // stripping a leading "91" would wrongly leave the 8-digit "98765432".
+    expect(toMsg91Number('9198765432')).toBe('919198765432');
+  });
 });

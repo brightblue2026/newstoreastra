@@ -9,6 +9,7 @@ import { CONTACT } from '@/lib/contact';
 import { cartLineKey } from '@/lib/cart-line';
 import { useCartStore } from '@/lib/cart-store';
 import { formatINR } from '@/lib/money';
+import { normaliseIndianMobile } from '@/lib/phone';
 import { normalisePincode, resolvePincode } from '@/lib/pincode';
 import { STATE_CODES } from '@/lib/gst';
 import { quoteCheckout, submitOrder } from '@/server/actions/checkout';
@@ -282,7 +283,11 @@ export default function CheckoutForm() {
     }
   };
 
-  const contactComplete = /^[6-9][0-9]{9}$/.test(phone.replace(/\D/g, '').slice(-10));
+  // Same rule the server validates with (`phoneSchema` in `cart-schema.ts`),
+  // via the one shared implementation — this used to just take the last ten
+  // digits, which could tell a customer checkout was ready when the server
+  // would still reject the number, or vice versa.
+  const contactComplete = normaliseIndianMobile(phone) !== null;
   const deliveryComplete =
     address.fullName.trim().length > 1 &&
     address.line1.trim().length > 3 &&

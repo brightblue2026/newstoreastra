@@ -230,14 +230,42 @@ async function inventoryFor(
   return byVariant;
 }
 
+/**
+ * How a batch of allocation steps changes `Inventory` rows. Each mode maps to
+ * exactly the field deltas the four call sites below used to build by hand.
+ */
+type AllocationMode = 'reserve' | 'commit' | 'release' | 'restock';
+
+const ALLOCATION_SQL: Readonly<Record<AllocationMode, Prisma.Sql>> = Object.freeze({
+  reserve: Prisma.sql`SET reserved = i.reserved + v.qty`,
+  commit: Prisma.sql`SET reserved = i.reserved - v.qty, quantity = i.quantity - v.qty`,
+  release: Prisma.sql`SET reserved = i.reserved - v.qty`,
+  restock: Prisma.sql`SET quantity = i.quantity + v.qty`,
+});
+
+/**
+ * Applies every step in one statement rather than one round trip per row —
+ * a cart with N distinct variants used to cost N sequential awaited updates
+ * while holding this interactive transaction's connection, on every
+ * reservation, commit, release and restock.
+ */
 async function applySteps(
   tx: Prisma.TransactionClient,
   steps: AllocationStep[],
-  change: (quantity: number) => Prisma.InventoryUpdateInput,
+  mode: AllocationMode,
 ): Promise<void> {
-  for (const step of steps) {
-    await tx.inventory.update({ where: { id: step.inventoryId }, data: change(step.quantity) });
-  }
+  if (steps.length === 0) return;
+
+  const values = Prisma.join(
+    steps.map((step) => Prisma.sql`(${step.inventoryId}::text, ${step.quantity}::integer)`),
+  );
+
+  await tx.$executeRaw`
+    UPDATE "Inventory" AS i
+    ${ALLOCATION_SQL[mode]}
+    FROM (VALUES ${values}) AS v(id, qty)
+    WHERE i.id = v.id
+  `;
 }
 
 export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResult> {
@@ -370,7 +398,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
         reservations.push(...plan);
       }
 
-      await applySteps(tx, reservations, (quantity) => ({ reserved: { increment: quantity } }));
+      await applySteps(tx, reservations, 'reserve');
 
       // 5. The order number, under a per-financial-year advisory lock.
       const orderNumber = await nextOrderNumber(tx);
@@ -423,11 +451,20 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
                   ? (snapshot.choiceSnapshot as unknown as Prisma.InputJsonValue)
                   : Prisma.DbNull,
                 quantity: snapshot.quantity,
-                // Per physical unit, from the line's own pre-discount subtotal.
-                // `totalPaise` is net of every discount, including this line's
-                // share of an order-level one, so the items sum to exactly what
-                // was charged for goods.
-                unitPricePaise: Math.round(line.subtotalPaise / snapshot.quantity),
+                // `totalPaise` (netPaise) is the authoritative, discount-inclusive
+                // amount actually charged for this line, and must stay exactly
+                // that — order items have to sum to what was really charged.
+                // `unitPricePaise` is derived from that *same* number, not a
+                // separate pre-discount subtotal (the two used to disagree even
+                // before rounding, whenever a discount applied). For a combo
+                // component, `snapshot.quantity` is the physical unit count
+                // (e.g. 3 bottles) while the line itself was priced as one
+                // package share (§8's `distributeProportionally`), so this
+                // division is not always exact — Rate × Qty can be up to
+                // `quantity - 1` paise off Amount when it doesn't divide evenly.
+                // That is an unavoidable consequence of pricing indivisible
+                // paise across several physical units, not a bug in the total.
+                unitPricePaise: Math.round(line.netPaise / snapshot.quantity),
                 totalPaise: line.netPaise,
                 hsnCode: snapshot.hsnCode,
                 gstRate: snapshot.gstRate,
@@ -444,19 +481,17 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
         },
       });
 
-      // 7. Discount usage.
-      for (const applied of priced.appliedDiscounts) {
-        await tx.discount.update({
-          where: { id: applied.discountId },
+      // 7. Discount usage. One statement regardless of how many discounts
+      // stacked — every increment here is +1, so `updateMany` covers it.
+      if (priced.appliedDiscounts.length > 0) {
+        await tx.discount.updateMany({
+          where: { id: { in: priced.appliedDiscounts.map((applied) => applied.discountId) } },
           data: { usageCount: { increment: 1 } },
         });
       }
 
       if (isCod) {
-        await applySteps(tx, reservations, (quantity) => ({
-          reserved: { decrement: quantity },
-          quantity: { decrement: quantity },
-        }));
+        await applySteps(tx, reservations, 'commit');
 
         /*
           A COD order is created CONFIRMED — there is no payment to wait for —
@@ -700,6 +735,15 @@ async function discountLabels(ids: string[]): Promise<Map<string, string | null>
   return labels;
 }
 
+/**
+ * Adds a system note without discarding whatever was already there — most
+ * often the customer's own delivery instructions from checkout, which a
+ * later system-generated note (e.g. a payment-start failure) must not erase.
+ */
+function appendNote(existing: string | null, addition: string): string {
+  return existing ? `${existing}\n\n${addition}` : addition;
+}
+
 export type TransitionResult = { ok: true } | { ok: false; error: string };
 
 /**
@@ -720,11 +764,19 @@ export async function transitionOrder(input: {
 }): Promise<TransitionResult> {
   return db.$transaction(
     async (tx) => {
+      // Row lock, taken before anything is read: a redelivered webhook (or a
+      // staff click racing one) must not see the pre-transition status twice.
+      // The second caller blocks here until the first's transaction commits
+      // or rolls back, then re-reads the now-current status below and hits
+      // the idempotent early return instead of double-processing.
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+
       const order = await tx.order.findUnique({
         where: { id: input.orderId },
         select: {
           id: true,
           status: true,
+          notes: true,
           items: { select: { variantId: true, quantity: true } },
         },
       });
@@ -743,22 +795,19 @@ export async function transitionOrder(input: {
       const stock = await inventoryFor(tx, [...units.keys()]);
       const effect = inventoryEffect(order.status, input.to);
 
-      for (const [variantId, quantity] of units) {
-        const rows = stock.get(variantId) ?? [];
-        if (effect === 'commit') {
-          await applySteps(tx, planRelease(rows, quantity), (q) => ({
-            reserved: { decrement: q },
-            quantity: { decrement: q },
-          }));
-        } else if (effect === 'release') {
-          await applySteps(tx, planRelease(rows, quantity), (q) => ({
-            reserved: { decrement: q },
-          }));
-        } else if (effect === 'restock') {
-          await applySteps(tx, planRestock(rows, quantity), (q) => ({
-            quantity: { increment: q },
-          }));
-        }
+      // One batch across every variant on the order, not one call per
+      // variant — `effect` is decided once for the whole transition, not
+      // per line, so every variant's steps can go into the same statement.
+      if (effect === 'commit' || effect === 'release') {
+        const steps = [...units].flatMap(([variantId, quantity]) =>
+          planRelease(stock.get(variantId) ?? [], quantity),
+        );
+        await applySteps(tx, steps, effect);
+      } else if (effect === 'restock') {
+        const steps = [...units].flatMap(([variantId, quantity]) =>
+          planRestock(stock.get(variantId) ?? [], quantity),
+        );
+        await applySteps(tx, steps, 'restock');
       }
 
       await tx.order.update({
@@ -767,7 +816,10 @@ export async function transitionOrder(input: {
           status: input.to,
           ...(input.paymentStatus ? { paymentStatus: input.paymentStatus } : {}),
           ...(input.razorpayPaymentId ? { razorpayPaymentId: input.razorpayPaymentId } : {}),
-          ...(input.note ? { notes: input.note } : {}),
+          // Appended, never replaced — `notes` is also where the customer's own
+          // delivery instructions from checkout live, and a system note (e.g.
+          // "payment could not be started") must not erase those.
+          ...(input.note ? { notes: appendNote(order.notes, input.note) } : {}),
         },
       });
 
@@ -790,4 +842,66 @@ export async function transitionOrder(input: {
     },
     { timeout: 20_000, maxWait: 10_000 },
   );
+}
+
+/**
+ * How long a prepaid order gets to actually pay before its stock hold is
+ * released back to everyone else. Not spec — no document names a number —
+ * chosen to comfortably exceed how long Razorpay Checkout itself stays open
+ * on screen, so this only ever catches a cart genuinely abandoned mid-payment,
+ * never one someone is still looking at.
+ */
+export const STALE_ORDER_MINUTES = 60;
+
+export interface ExpireStaleOrdersResult {
+  found: number;
+  cancelled: string[];
+  failed: { orderNumber: string; error: string }[];
+}
+
+/**
+ * Releases the inventory hold on every `PENDING_PAYMENT` order older than
+ * `STALE_ORDER_MINUTES` — the missing half of the reservation pattern
+ * `inventory.ts` already implements. A reservation with no expiry is not a
+ * reservation, it is a slow leak: every abandoned Razorpay checkout would
+ * otherwise hold real stock away from a customer who would actually pay.
+ *
+ * Meant to be called on a schedule (see `/api/cron/expire-stale-orders`), not
+ * from a request path — it can process an unbounded number of orders and has
+ * no reason to run inside anything a customer is waiting on.
+ *
+ * Cancelling here never restocks — `inventoryEffect` gives `PENDING_PAYMENT →
+ * CANCELLED` a `release` effect, not `restock`, because nothing was ever
+ * actually decremented for an order that never got confirmed. No customer
+ * notification either: cancellation has no entry in `eventForStatus`, and a
+ * customer who never finished paying does not need to be told they didn't.
+ */
+export async function expireStaleOrders(
+  now: Date = new Date(),
+): Promise<ExpireStaleOrdersResult> {
+  const cutoff = new Date(now.getTime() - STALE_ORDER_MINUTES * 60 * 1000);
+
+  const stale = await db.order.findMany({
+    where: { status: OrderStatus.PENDING_PAYMENT, createdAt: { lt: cutoff } },
+    select: { id: true, orderNumber: true },
+  });
+
+  const cancelled: string[] = [];
+  const failed: { orderNumber: string; error: string }[] = [];
+
+  for (const order of stale) {
+    const result = await transitionOrder({
+      orderId: order.id,
+      to: OrderStatus.CANCELLED,
+      actor: 'STAFF',
+      note: `Automatically cancelled: payment was not completed within ${STALE_ORDER_MINUTES} minutes.`,
+    });
+    if (result.ok) {
+      cancelled.push(order.orderNumber);
+    } else {
+      failed.push({ orderNumber: order.orderNumber, error: result.error });
+    }
+  }
+
+  return { found: stale.length, cancelled, failed };
 }

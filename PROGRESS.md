@@ -768,6 +768,124 @@ actually appear on the page after a real click, and that gap shouldn't be glosse
 
 ---
 
+## Fixed all 13 findings from the Phase 5/6 code review · 24 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (290 tests, up from 289) and `pnpm build` all
+pass. Every finding from the multi-agent review of `adrifayin`'s merged Phase 5/6 work
+(see the code-review report) fixed, not just logged:
+
+- **`transitionOrder` now takes a row lock** (`SELECT ... FOR UPDATE`) before reading an
+  order's status, closing the race where a redelivered Razorpay webhook could double-
+  decrement stock and mint/overwrite a duplicate GST invoice number. `assignInvoiceNumber`
+  also reordered to lock before its idempotency check, matching `nextOrderNumber`'s
+  already-correct pattern — it was the inconsistent one.
+- **The admin's only wired order-status control now notifies customers.**
+  `transitionOrderAction` (`/admin/orders/[id]`'s StatusForm) was the sole live path that
+  never called `notifyOrderEvent`; the code that did pair a transition with a notification
+  (`assignAwbAndShip`/`recordManualAwb`) was never imported anywhere. Both gaps closed —
+  the dead fulfilment-notification pairing is also deduplicated into one shared
+  `ensureShippedViaPacked` helper.
+- **OUT_FOR_DELIVERY notifications are reachable now.** The Shiprocket webhook's dedup
+  check used to return early on "already at this status" before ever reaching the
+  notification call, silently dropping the out-for-delivery message on every shipment
+  that had an earlier IN TRANSIT scan (the common case). Transition and notification are
+  now decided separately.
+- **Invoice tax-head layout fixed for nil-rated intra-state orders** — `intraState` is now
+  computed with `gst.ts`'s own `isIntraStateSupply(shipTo.state)`, the same function that
+  decided the real split at order time, instead of being guessed back from tax amounts
+  that are indistinguishable (both zero) for an all-nil-rated order.
+- **Phone validation fixed and unified.** `9198765432` — a real, valid mobile that happens
+  to start "91" — used to be wrongly rejected by `cart-schema.ts`'s blind prefix-strip.
+  Extracted the already-correct, length-aware disambiguation from `phone.ts`'s
+  `toMsg91Number` into a shared `normaliseIndianMobile`, now used by `cart-schema.ts`
+  (server) and `CheckoutForm.tsx` (client) as well — the same rule, decided once, closing
+  a real case where the client's "ready to submit" check and the server's validation could
+  disagree.
+- **System notes no longer overwrite customer notes.** `transitionOrder`'s `note` field
+  used to replace `Order.notes` outright, silently destroying a customer's own delivery
+  instructions if e.g. a Razorpay order-creation failure appended a system note. Now
+  appended.
+- **Both webhook bodies are Zod-validated** — Razorpay's with a real schema replacing a
+  compile-time-only type assertion; Shiprocket's with a schema loose enough to keep its
+  deliberate field-name tolerance (every field optional, `.passthrough()`) while still
+  being a real runtime check instead of a raw cast.
+- **Combo line "Rate" is now derived from the same authoritative amount printed as
+  "Amount"**, not a separate pre-discount subtotal — the two used to disagree even before
+  rounding, whenever any discount applied. A small residual (up to `quantity - 1` paise)
+  remains possible when a component's apportioned total doesn't divide evenly across its
+  physical unit count; documented in place rather than hidden, since eliminating it
+  entirely would require misstating either the physical quantity shipped or the amount
+  actually charged, both worse.
+- **Webhook responses no longer block on the notification pipeline.** Both webhook routes
+  used to `await notifyOrderEvent` (SMS + PDF render + email) before returning 200,
+  spending the provider's own retry/timeout budget on work the order confirmation doesn't
+  need to wait for. Moved to Next's `after()` — unlike a bare unawaited promise, it keeps
+  running after the response is sent rather than risking being killed when the serverless
+  function freezes.
+- **Inventory allocation batched from one round trip per row to one statement per
+  transition.** `applySteps` now issues a single `UPDATE ... FROM (VALUES ...)` covering
+  every step across every variant on the order, instead of looping `tx.inventory.update`
+  per row while holding the interactive transaction's connection open. Discount-usage
+  incrementing batched the same way, via `updateMany` (safe here because
+  `appliedDiscounts` is already guaranteed duplicate-free — confirmed by reading
+  `pricing.ts`'s construction of it before relying on that).
+
+Not fixed as a targeted change: the two "razor blade" efficiency notes about independent
+lookups running sequentially (`quoteOrder`'s `resolveCartLines`/`loadDiscountCandidates`,
+`notifications.ts`'s WhatsApp/email dispatch) and the JSX-duplication findings
+(`TaxSummary`'s intra/inter branches, the storefront/admin order-page address and money
+row markup) — real, but lower-stakes than the eleven above, and set aside for a dedicated
+pass rather than folded in here.
+
+---
+
+## Built the two gaps the research pass surfaced: a stale-order sweep and rate limiting · 24 August 2026
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (294 tests, up from 290) and `pnpm build` all
+pass.
+
+**Stale-order sweep.** `expireStaleOrders` (`src/lib/orders.ts`) cancels any
+`PENDING_PAYMENT` order older than `STALE_ORDER_MINUTES` (60 — not spec, chosen to
+comfortably exceed how long Razorpay Checkout stays open on screen), releasing its
+inventory hold through the same `transitionOrder` path everything else uses — this is the
+missing expiry half of the reservation pattern `inventory.ts` already implements, the same
+one Shopify's own published architecture pairs with a cleanup job. `GET
+/api/cron/expire-stale-orders` triggers it, guarded by a `CRON_SECRET` bearer token the
+same way the Shiprocket webhook guards itself; `vercel.json` schedules it every 15
+minutes via Vercel Cron. No new service required — this is a Vercel platform feature, not
+an added dependency.
+
+**Rate limiting**, over Upstash Redis (`src/lib/rate-limit.ts`) — built the same way every
+other integration in this project was: against documented behaviour, ahead of real
+credentials, gated by `isRateLimitConfigured()` so an unconfigured deployment logs a
+warning and allows every request rather than breaking checkout the moment this file
+existed. `@upstash/ratelimit` + `@upstash/redis` added (REST-based, no persistent
+connection needed — works from any serverless runtime). Applied to:
+
+- **Staff login** (`src/auth.ts`) — 5 attempts per 5 minutes, keyed by the *email being
+  attempted*, not IP: that is what a brute force actually targets, and is the shared store
+  the existing constant-time-dummy-hash comment already said this needed.
+- **`submitOrder`** (`src/server/actions/checkout.ts`) — 10 orders per 10 minutes, keyed
+  by IP via `headers()`. `quoteCheckout` (read-only, no side effects, called on every
+  address edit) is deliberately not limited — throttling it would degrade normal use for
+  no abuse-prevention benefit.
+- **Both webhook routes** — a coarse per-IP ceiling (60/min Razorpay, 120/min Shiprocket)
+  checked before signature/token verification, so raw volume can't spend compute on HMAC
+  work. This is a volume floor, not the auth boundary — signature/token verification is
+  still what actually gates the request.
+
+`clientIpFrom` split into its own module (`src/lib/client-ip.ts`) for the same reason
+`shiprocket-tracking.ts` was split from `shiprocket.ts`: `rate-limit.ts` is `server-only`
+(it touches the Upstash token), and Vitest can't import a `server-only` module directly,
+so the one pure, testable piece lives apart from it.
+
+Not exercised against a real Upstash account or Vercel Cron in this environment — no
+credentials, and cron triggers don't fire outside an actual Vercel deployment. Typechecked
+and built against the documented API shapes, same caveat as every other integration this
+project has built ahead of its credentials.
+
+---
+
 ## Running it
 
 ```bash

@@ -326,7 +326,10 @@ model Order {
   paymentMethod     PaymentMethod
   paymentStatus     PaymentStatus @default(PENDING)
   razorpayOrderId   String?
-  razorpayPaymentId String?
+  // Unique (nullable, so COD/unpaid orders collide with nothing): defense in
+  // depth alongside `transitionOrder`'s row lock — a second order can never
+  // end up stamped with a payment id that already belongs to another one.
+  razorpayPaymentId String? @unique
 
   shiprocketOrderId String?
   // Shiprocket keys the AWB assignment and the label off the *shipment*, not

@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { OrderStatus, PaymentStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
 import { transitionOrder } from '@/lib/orders';
 import { notifyOrderEvent } from '@/lib/notifications';
 import { verifyWebhookSignature } from '@/lib/razorpay';
+import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 
 /*
   POST /api/webhooks/razorpay — brief §10:
@@ -43,17 +45,42 @@ export const dynamic = 'force-dynamic';
 const PAID_EVENTS = new Set(['payment.captured', 'payment.authorized', 'order.paid']);
 const FAILED_EVENTS = new Set(['payment.failed']);
 
-interface RazorpayWebhookBody {
-  event?: string;
-  payload?: {
-    payment?: {
-      entity?: { id?: string; order_id?: string; status?: string; error_description?: string };
-    };
-    order?: { entity?: { id?: string } };
-  };
-}
+const razorpayWebhookSchema = z.object({
+  event: z.string().optional(),
+  payload: z
+    .object({
+      payment: z
+        .object({
+          entity: z
+            .object({
+              id: z.string().optional(),
+              order_id: z.string().optional(),
+              status: z.string().optional(),
+              error_description: z.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+      order: z
+        .object({
+          entity: z.object({ id: z.string().optional() }).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
 
 export async function POST(request: Request) {
+  // A coarse ceiling per source IP, ahead of the signature check below — this
+  // is not the idempotency mechanism (that is `transitionOrder`'s row lock),
+  // it only stops raw volume from spending compute on HMAC verification for
+  // every request. Razorpay's own delivery rate is nowhere near this limit.
+  const ip = clientIpFrom(request.headers);
+  const withinLimit = await checkRateLimit('webhook-razorpay', ip, 60, 60);
+  if (!withinLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const rawBody = await request.text();
   const signature = request.headers.get('x-razorpay-signature');
 
@@ -63,12 +90,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  let body: RazorpayWebhookBody;
+  let parsedJson: unknown;
   try {
-    body = JSON.parse(rawBody) as RazorpayWebhookBody;
+    parsedJson = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: 'Malformed body' }, { status: 400 });
   }
+
+  const parsed = razorpayWebhookSchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    console.warn('[razorpay] signed webhook did not match the expected shape:', parsed.error.message);
+    return NextResponse.json({ error: 'Malformed body' }, { status: 400 });
+  }
+  const body = parsed.data;
 
   const event = body.event ?? '';
   const payment = body.payload?.payment?.entity;
@@ -154,9 +188,14 @@ export async function POST(request: Request) {
       never be told an order is confirmed by a transaction that then failed.
 
       `notifyOrderEvent` swallows its own failures, so this cannot turn a
-      successful confirmation into a 500 that makes Razorpay retry.
+      successful confirmation into a 500 that makes Razorpay retry. Handed to
+      `after()` rather than awaited: the order is already confirmed by this
+      point, so Razorpay's own retry/timeout budget shouldn't be spent waiting
+      on SMS + PDF render + email, and `after()` (unlike a bare unawaited
+      promise) keeps running after the response is sent rather than risking
+      being killed when the serverless function freezes.
     */
-    await notifyOrderEvent({ orderId: order.id, event: 'CONFIRMED' });
+    after(() => notifyOrderEvent({ orderId: order.id, event: 'CONFIRMED' }));
 
     console.info('[razorpay] confirmed', order.orderNumber);
     return NextResponse.json({ received: true, order: order.orderNumber, status: 'confirmed' });

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { OrderStatus } from '@/generated/prisma/enums';
 import { recordAudit } from '@/lib/audit';
 import { db } from '@/lib/db';
+import { notifyOrderEvent } from '@/lib/notifications';
 import { transitionOrder } from '@/lib/orders';
 import { requireOrderAccess } from '@/lib/session';
 
@@ -56,6 +57,13 @@ export async function transitionOrderAction(
   });
 
   if (!result.ok) return { error: result.error };
+
+  // Outside the transition's own transaction, matching both webhook routes —
+  // a notification failure must never be able to roll back a status change,
+  // and it must only ever fire for a transition that actually committed. This
+  // was the only order-status path in the admin that skipped it; the manual
+  // fulfilment actions (assignAwbAndShip, recordManualAwb) already call it.
+  await notifyOrderEvent({ orderId: parsed.data.orderId, event: parsed.data.to });
 
   const after = await db.order.findUnique({
     where: { id: parsed.data.orderId },

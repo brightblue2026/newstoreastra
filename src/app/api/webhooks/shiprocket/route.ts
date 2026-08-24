@@ -1,10 +1,11 @@
 import { timingSafeEqual } from 'node:crypto';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { OrderStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
 import { transitionOrder } from '@/lib/orders';
 import { parseTrackingWebhook, trackingUrlFor } from '@/lib/shiprocket';
 import { notifyOrderEvent } from '@/lib/notifications';
+import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 
 /*
   POST /api/webhooks/shiprocket — brief §12 Phase 6, "tracking webhook".
@@ -38,6 +39,14 @@ function secretMatches(provided: string | null, expected: string): boolean {
 }
 
 export async function POST(request: Request) {
+  // Same coarse per-IP ceiling as the Razorpay route, ahead of the token
+  // check — a volume floor, not the auth boundary.
+  const ip = clientIpFrom(request.headers);
+  const withinLimit = await checkRateLimit('webhook-shiprocket', ip, 120, 60);
+  if (!withinLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const expected = process.env.SHIPROCKET_WEBHOOK_TOKEN?.trim();
   if (!expected) {
     console.warn('[shiprocket] webhook rejected: no SHIPROCKET_WEBHOOK_TOKEN configured');
@@ -102,8 +111,46 @@ export async function POST(request: Request) {
   }
 
   const target = OrderStatus[event.status];
+  const alreadyAtTarget = order.status === target;
 
-  if (order.status === target) {
+  // SHIPPED, IN TRANSIT and OUT FOR DELIVERY all map to the same OrderStatus —
+  // an IN TRANSIT scan typically arrives first and moves the order to SHIPPED,
+  // so by the time the OUT FOR DELIVERY scan lands, the order is already at
+  // `target` and there is no status transition left to make. That must not
+  // mean no notification: this scan is still new information the customer
+  // hasn't been told. So the transition and the notification are decided
+  // separately below, rather than one early return skipping both.
+  const isOutForDeliveryScan = event.outForDelivery && target === OrderStatus.SHIPPED;
+
+  if (!alreadyAtTarget) {
+    const result = await transitionOrder({
+      orderId: order.id,
+      to: target,
+      actor: 'STAFF',
+    });
+
+    if (!result.ok) {
+      /*
+        An illegal transition here is expected traffic, not a fault: Shiprocket
+        re-sends scans, and a DELIVERED scan can arrive after staff have already
+        marked the order RETURNED. Acknowledged with a 200 so Shiprocket stops
+        retrying something that will never succeed, and logged so a genuinely
+        wrong mapping is visible.
+      */
+      console.warn(
+        '[shiprocket]',
+        order.orderNumber,
+        `could not move ${order.status} → ${target}:`,
+        result.error,
+      );
+      return NextResponse.json({
+        received: true,
+        order: order.orderNumber,
+        ignored: result.error,
+      });
+    }
+  } else if (!isOutForDeliveryScan) {
+    // Genuinely nothing new to do or say — e.g. a duplicate SHIPPED scan.
     return NextResponse.json({
       received: true,
       order: order.orderNumber,
@@ -111,40 +158,18 @@ export async function POST(request: Request) {
     });
   }
 
-  const result = await transitionOrder({
-    orderId: order.id,
-    to: target,
-    actor: 'STAFF',
-  });
+  // Notifications are dispatched after the status has actually moved (or, for
+  // the out-for-delivery case, confirmed unchanged), and never inside the
+  // transaction — see `notifications.ts`. Handed to `after()` rather than
+  // awaited so a slow SMS/email/PDF pipeline doesn't eat into Shiprocket's own
+  // retry/timeout budget for what is, from here, a purely local operation.
+  after(() =>
+    notifyOrderEvent({
+      orderId: order.id,
+      event: isOutForDeliveryScan ? 'OUT_FOR_DELIVERY' : target,
+    }),
+  );
 
-  if (!result.ok) {
-    /*
-      An illegal transition here is expected traffic, not a fault: Shiprocket
-      re-sends scans, and a DELIVERED scan can arrive after staff have already
-      marked the order RETURNED. Acknowledged with a 200 so Shiprocket stops
-      retrying something that will never succeed, and logged so a genuinely
-      wrong mapping is visible.
-    */
-    console.warn(
-      '[shiprocket]',
-      order.orderNumber,
-      `could not move ${order.status} → ${target}:`,
-      result.error,
-    );
-    return NextResponse.json({
-      received: true,
-      order: order.orderNumber,
-      ignored: result.error,
-    });
-  }
-
-  // Notifications are dispatched after the status has actually moved, and
-  // never inside the transaction — see `notifications.ts`.
-  await notifyOrderEvent({
-    orderId: order.id,
-    event: event.outForDelivery && target === OrderStatus.SHIPPED ? 'OUT_FOR_DELIVERY' : target,
-  });
-
-  console.info('[shiprocket]', order.orderNumber, '→', target);
+  console.info('[shiprocket]', order.orderNumber, '→', isOutForDeliveryScan ? 'OUT_FOR_DELIVERY' : target);
   return NextResponse.json({ received: true, order: order.orderNumber, status: target });
 }

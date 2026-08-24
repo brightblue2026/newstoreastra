@@ -16,7 +16,7 @@ import {
   invoiceNumberPrefix,
   parseInvoiceNumber,
 } from '@/lib/invoice-number';
-import { PLACE_OF_SUPPLY_STATE, stateCode, type HsnTaxRow } from '@/lib/gst';
+import { PLACE_OF_SUPPLY_STATE, isIntraStateSupply, stateCode, type HsnTaxRow } from '@/lib/gst';
 
 /*
   Invoicing — brief §10 and §12 Phase 6.
@@ -65,15 +65,19 @@ export async function assignInvoiceNumber(
   orderId: string,
   now: Date = new Date(),
 ): Promise<string> {
+  const prefix = invoiceNumberPrefix(now);
+
+  // Locked before the idempotency check, not after — matching `nextOrderNumber`'s
+  // pattern. Two concurrent callers must not both see "no number yet" and both
+  // proceed to mint one; the second must see the first's committed number once
+  // it acquires the lock.
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`bbtc:invoice-number:${prefix}`}))`;
+
   const existing = await tx.order.findUnique({
     where: { id: orderId },
     select: { invoiceNumber: true },
   });
   if (existing?.invoiceNumber) return existing.invoiceNumber;
-
-  const prefix = invoiceNumberPrefix(now);
-
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`bbtc:invoice-number:${prefix}`}))`;
 
   const rows = await tx.$queryRaw<{ invoiceNumber: string }[]>`
     SELECT "invoiceNumber" FROM "Order"
@@ -254,9 +258,12 @@ export async function buildInvoiceData(orderId: string): Promise<InvoiceData> {
 
     placeOfSupply: shipTo?.state ?? PLACE_OF_SUPPLY_STATE,
     placeOfSupplyCode: stateCode(shipTo?.state),
-    // Taken from the stored split, not recomputed — the invoice must show the
-    // heads the customer was actually charged under.
-    intraState: order.igstPaise === 0 && order.cgstPaise + order.sgstPaise > 0,
+    // Same function that decided the split at order time (`gst.ts`'s
+    // `buildTaxByHsn` calls the same `isIntraStateSupply`), applied to the
+    // same destination state — not inferred from the tax *amounts*, which are
+    // indistinguishable (both zero) for an all-nil-rated order and would pick
+    // the wrong tax head for a genuinely intra-state nil-rated supply.
+    intraState: isIntraStateSupply(shipTo?.state),
 
     lines: order.items.map((item) => ({
       name: item.nameSnapshot,

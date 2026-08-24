@@ -1,8 +1,10 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { placeOrderInputSchema, quoteInputSchema } from '@/lib/cart-schema';
 import { orderAccessToken } from '@/lib/order-access';
 import { notifyOrderEvent } from '@/lib/notifications';
+import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
 import {
   OrderConfigurationError,
@@ -76,6 +78,15 @@ export type SubmitOrderResult =
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
+  // By IP, not by account: every order here is a guest order until phone OTP
+  // exists, so there is no account to key a limit to yet — see the checkout
+  // module comment above.
+  const ip = clientIpFrom(await headers());
+  const limit = await checkRateLimit('submit-order', ip, 10, 10 * 60);
+  if (!limit.allowed) {
+    return { ok: false, error: 'Too many orders placed too quickly. Please wait a few minutes and try again.' };
+  }
+
   const parsed = placeOrderInputSchema.safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};

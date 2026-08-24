@@ -8,6 +8,30 @@
  * `fetch` calls with a documented fallback.
  */
 
+import { z } from 'zod';
+
+/**
+ * Every field is optional and the object accepts unknown extras (`.passthrough`)
+ * — Shiprocket is not consistent about field names between event types, and
+ * this is deliberately tolerant of that, per `parseTrackingWebhook` below. What
+ * this schema actually buys over a bare `unknown` cast: the payload must be an
+ * object, and any of the known fields, if present, must be a string or number
+ * rather than an array/object/boolean that would silently coerce into a
+ * misleading string via `stringOrNull`/`String()`.
+ */
+const shiprocketWebhookSchema = z
+  .object({
+    current_status: z.union([z.string(), z.number()]).optional(),
+    shipment_status: z.union([z.string(), z.number()]).optional(),
+    status: z.union([z.string(), z.number()]).optional(),
+    awb: z.union([z.string(), z.number()]).optional(),
+    awb_code: z.union([z.string(), z.number()]).optional(),
+    order_id: z.union([z.string(), z.number()]).optional(),
+    channel_order_id: z.union([z.string(), z.number()]).optional(),
+    courier_name: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough();
+
 /**
  * Shiprocket's tracking statuses, mapped to this store's order statuses.
  *
@@ -58,8 +82,9 @@ export interface TrackingEvent {
  * token comparison, not a parse.
  */
 export function parseTrackingWebhook(payload: unknown): TrackingEvent | null {
-  if (!payload || typeof payload !== 'object') return null;
-  const body = payload as Record<string, unknown>;
+  const parsed = shiprocketWebhookSchema.safeParse(payload);
+  if (!parsed.success) return null;
+  const body = parsed.data;
 
   const rawStatus = String(body.current_status ?? body.shipment_status ?? body.status ?? '').trim();
   if (rawStatus === '') return null;

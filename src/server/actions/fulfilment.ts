@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import { recordAudit } from '@/lib/audit';
 import { requireOrderAccess } from '@/lib/session';
 import { readCheckoutSettings } from '@/lib/settings';
-import { transitionOrder } from '@/lib/orders';
+import { transitionOrder, type TransitionResult } from '@/lib/orders';
 import { notifyOrderEvent } from '@/lib/notifications';
 import { totalWeightGrams } from '@/lib/shipping';
 import {
@@ -18,6 +18,24 @@ import {
   trackingUrlFor,
 } from '@/lib/shiprocket';
 import type { OrderAddressSnapshot } from '@/lib/orders';
+
+/**
+ * Moves CONFIRMED → PACKED → SHIPPED, recording the PACKED step for real when
+ * staff assign an AWB straight from CONFIRMED (see the comment at its call
+ * site below). Safe to call when the order is already at or past SHIPPED —
+ * `transitionOrder` is idempotent by design (moving to the status an order is
+ * already in is a no-op), so neither caller needs its own guard for that.
+ */
+async function ensureShippedViaPacked(
+  orderId: string,
+  currentStatus: OrderStatus,
+): Promise<TransitionResult> {
+  if (currentStatus === OrderStatus.CONFIRMED) {
+    const packed = await transitionOrder({ orderId, to: OrderStatus.PACKED, actor: 'STAFF' });
+    if (!packed.ok) return packed;
+  }
+  return transitionOrder({ orderId, to: OrderStatus.SHIPPED, actor: 'STAFF' });
+}
 
 /*
   Fulfilment — the three buttons a member of staff presses, in order:
@@ -219,16 +237,7 @@ export async function assignAwbAndShip(input: unknown): Promise<FulfilmentResult
     rather than skipped: the order passes through PACKED and on to SHIPPED, and
     the audit trail shows both.
   */
-  if (order.status === OrderStatus.CONFIRMED) {
-    const packed = await transitionOrder({ orderId: order.id, to: OrderStatus.PACKED, actor: 'STAFF' });
-    if (!packed.ok) return { ok: false, error: packed.error };
-  }
-
-  const shipped = await transitionOrder({
-    orderId: order.id,
-    to: OrderStatus.SHIPPED,
-    actor: 'STAFF',
-  });
+  const shipped = await ensureShippedViaPacked(order.id, order.status);
   if (!shipped.ok) return { ok: false, error: shipped.error };
 
   await recordAudit({
@@ -320,18 +329,8 @@ export async function recordManualAwb(input: unknown): Promise<FulfilmentResult>
     data: { awbNumber, courierName, trackingUrl: trackingUrlFor(awbNumber) },
   });
 
-  if (order.status === OrderStatus.CONFIRMED) {
-    const packed = await transitionOrder({ orderId: order.id, to: OrderStatus.PACKED, actor: 'STAFF' });
-    if (!packed.ok) return { ok: false, error: packed.error };
-  }
-  if (order.status !== OrderStatus.SHIPPED) {
-    const shipped = await transitionOrder({
-      orderId: order.id,
-      to: OrderStatus.SHIPPED,
-      actor: 'STAFF',
-    });
-    if (!shipped.ok) return { ok: false, error: shipped.error };
-  }
+  const shipped = await ensureShippedViaPacked(order.id, order.status);
+  if (!shipped.ok) return { ok: false, error: shipped.error };
 
   await recordAudit({
     userId: user.id,

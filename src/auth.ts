@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { authConfig } from '@/auth.config';
 import { db } from '@/lib/db';
 import { verifyPassword } from '@/lib/password';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * Staff sign-in. Customers do not have a password — they sign in by phone OTP,
@@ -29,6 +30,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+
+        // Per email, not per IP: the account being guessed against is what a
+        // brute force actually targets, and this is the shared store the
+        // constant-time-dummy-hash comment below always said this needed.
+        const limit = await checkRateLimit('staff-login', email, 5, 5 * 60);
+        if (!limit.allowed) return null;
 
         const user = await db.user.findUnique({
           where: { email },

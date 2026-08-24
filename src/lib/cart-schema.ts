@@ -12,6 +12,7 @@
  */
 
 import { z } from 'zod';
+import { normaliseIndianMobile } from '@/lib/phone';
 
 export const cartLineSchema = z.object({
   kind: z.enum(['VARIANT', 'COMBO']),
@@ -47,12 +48,22 @@ export const pincodeSchema = z
  * Ten digits, optionally with +91 or a leading 0, and the first digit is 6–9 —
  * every Indian mobile series. Stored as the bare ten digits so WhatsApp, SMS and
  * a courier's manifest all read the same number.
+ *
+ * `normaliseIndianMobile` (`src/lib/phone.ts`) is the single place this rule
+ * is decided — length-aware, so it never mistakes a bare ten-digit mobile
+ * that happens to start "91" (e.g. 9198765432) for a country-code prefix.
  */
 export const phoneSchema = z
   .string()
   .trim()
-  .transform((value) => value.replace(/[\s-]/g, '').replace(/^(\+91|91|0)/, ''))
-  .refine((value) => /^[6-9][0-9]{9}$/.test(value), 'Enter a ten-digit mobile number.');
+  .transform((value, ctx) => {
+    const mobile = normaliseIndianMobile(value);
+    if (!mobile) {
+      ctx.addIssue({ code: 'custom', message: 'Enter a ten-digit mobile number.' });
+      return z.NEVER;
+    }
+    return mobile;
+  });
 
 export const addressSchema = z.object({
   fullName: z.string().trim().min(2, 'Enter the full name.').max(120),

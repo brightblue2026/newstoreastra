@@ -767,3 +767,71 @@ migrations (`20260808120000_phase5_settings`, `20260810120000_phase6_fulfilment`
 the live Neon database, then reverified all four gates on the merged result: 289 tests
 (up from 191), clean typecheck/lint/build, every Phase 5/6 route present in the build
 output. Pushed as a normal merge commit, no force.
+
+### Fixed all 13 code-review findings, compared the result against researched industry practice · 24 August 2026
+
+All 13 findings from the multi-agent review of the merged Phase 5/6 work were fixed, not
+just logged — full detail under "Fixed all 13 findings from the Phase 5/6 code review" in
+`PROGRESS.md`. Highlights: `transitionOrder` now row-locks the order before reading its
+status (closes the webhook-redelivery race that could double-decrement stock and mint a
+duplicate GST invoice number); the admin's only working order-status control now actually
+notifies customers; the Shiprocket OUT_FOR_DELIVERY message is reachable; phone validation
+unified into one correct, shared implementation; both webhook bodies are Zod-validated.
+
+Then researched how the areas this touches are actually done professionally (webhook
+idempotency patterns, e-commerce inventory reservation, Next.js serverless background
+work, GST invoice numbering, OWASP e-commerce guidance) and checked this codebase against
+each:
+
+- **Row-level locking for webhook idempotency is confirmed standard practice** (Stripe/
+  Razorpay integration guides converge on `SELECT ... FOR UPDATE` or an equivalent), which
+  is exactly what was just added. Added a second, independent layer matching what the same
+  research calls out as a common complement: `Order.razorpayPaymentId` is now a unique
+  constraint (`20260824055832_unique_razorpay_payment_id`) — nullable-safe (COD/unpaid
+  orders never collide), applied to the live database, all gates reverified after.
+- **The `reserved`/`quantity` inventory split matches Shopify's own documented
+  architecture** (they moved this exact pattern from Redis to Postgres/MySQL at scale) —
+  validates the existing design rather than changing it.
+- **`after()` for webhook background work matches Next.js's own documented pattern** for
+  this exact scenario (acknowledge the webhook immediately, do notification work without
+  blocking the response) — validates the fix already made above.
+- **GST invoice numbering requirements (gapless, unique per financial year, ≤16 chars,
+  new series each 1 April) are already correctly implemented** — no change needed, this
+  confirms rather than finds a gap.
+- **Two real gaps surfaced that were not in the original 13**, both flagged rather than
+  built, because both need an infrastructure decision (which cron mechanism, which
+  rate-limit store) that shouldn't be picked silently:
+  1. No sweeper releases a stale `PENDING_PAYMENT` order's inventory hold. The reservation
+     pattern this codebase already uses is exactly the industry-standard one *except* for
+     the expiry half — Shopify's version explicitly pairs reservations with a periodic
+     cleanup job. `PROGRESS.md`'s Phase 5 notes already named the related discount-usage
+     side of this gap; the inventory-hold side is the same missing piece.
+  2. No rate limiting exists anywhere in the app — not just staff login (already
+     self-documented as blocked on "no shared store this deployment has"), but now also
+     guest checkout (`submitOrder`) and both webhook routes, which OWASP's current
+     e-commerce guidance names as exactly the flows scripted abuse targets. Same
+     blocker as the login case: needs a shared store (Upstash Redis or similar).
+
+### Both gaps built, thresholds chosen where no spec names one · 24 August 2026
+
+Client approved building both. Neither number below is spec — no document names one — so
+both are logged as judgement calls rather than left implicit:
+
+- **`STALE_ORDER_MINUTES = 60`** — chosen to comfortably exceed how long Razorpay Checkout
+  realistically stays open on a customer's screen, so the sweep only ever catches a cart
+  genuinely abandoned mid-payment, never one someone is still looking at. Revisit if real
+  usage shows checkouts routinely taking longer.
+- **Rate-limit thresholds** — staff login 5/5min per email (matches common brute-force
+  throttling convention); `submitOrder` 10/10min per IP (generous enough for a household
+  or office NAT placing a few real orders, tight enough to blunt scripted order spam);
+  webhook routes 60/min (Razorpay) and 120/min (Shiprocket) per IP — both are volume
+  floors miles above real delivery rates from either provider, not tuned against any
+  documented rate limit of theirs.
+- **`Ratelimit.slidingWindow`**, not a fixed or token-bucket window — Upstash's own
+  default recommendation, and it avoids the fixed-window edge case where a burst can land
+  two full quotas back to back across a window boundary.
+- **Chose to key `submitOrder`'s limit by IP, not by account** — every order today is a
+  guest order (phone OTP for returning customers is still Phase 5's deferred item), so
+  there is no account to key it to yet. Revisit once customer accounts exist; IP alone is
+  coarser (a shared office/NAT IP shares one budget) but is the only identity available
+  now.
