@@ -835,3 +835,23 @@ both are logged as judgement calls rather than left implicit:
   there is no account to key it to yet. Revisit once customer accounts exist; IP alone is
   coarser (a shared office/NAT IP shares one budget) but is the only identity available
   now.
+
+### Hosting is Hostinger, not Vercel · 24 August 2026
+
+Client confirmed the real deployment target is Hostinger (a domain-registrar/hosting
+company, not Vercel) — the first time this was named. Nothing in the app is actually
+Vercel-locked: this is a standard self-hosted Next.js app (server actions, API routes,
+middleware, ISR all work under a plain `next start` process, verified directly — see
+PROGRESS.md). **One real consequence**: `vercel.json`'s cron entry only works on Vercel.
+Left in the repo — harmless if unused — but the stale-order sweep needs a different
+trigger once deployed:
+
+- On a Hostinger **VPS**: a crontab entry running `curl` against
+  `/api/cron/expire-stale-orders` with the `CRON_SECRET` bearer token, same as any
+  Linux-hosted cron job.
+- On Hostinger's **managed Node.js hosting** (no shell/crontab access): an external
+  scheduler (cron-job.org or similar, free tier is enough) hitting the same URL.
+
+Which of the two Hostinger products this actually runs on is still open — the exact setup
+steps differ enough (PM2 + Nginx for a VPS vs a managed build/deploy pipeline) that this
+is deferred until the client picks one, rather than guessed at.

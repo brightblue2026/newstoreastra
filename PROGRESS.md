@@ -916,6 +916,36 @@ same caveat as everything else waiting on them.
 
 ---
 
+## Verified under a real production server, not just `pnpm dev` · 24 August 2026
+
+Client confirmed hosting is Hostinger, not Vercel (logged in `DECISIONS.md`) — a
+temporary/anonymous Vercel deployment was attempted first and hit an unrelated local
+network flake fetching Google Fonts during the build; abandoned once the actual hosting
+target was named, since nothing about that attempt was Hostinger-specific anyway.
+
+What actually matters for either host: `pnpm build && pnpm start` runs the app exactly as
+a real Node.js process, no dev-mode scaffolding (no Fast Refresh, no `'unsafe-eval'` CSP
+exception, minified bundles) — the same process model as Hostinger's managed Node.js
+hosting or a PM2-managed VPS process. Ran it and drove it with a real browser:
+
+- Every major route (storefront, admin, checkout, sitemap, robots.txt) returns 200 with
+  clean server logs — only the expected pg SSL-mode deprecation notice and the expected
+  "no CRON_SECRET configured" rejection.
+- Startup: ready in under 2 seconds.
+- Logged in, browsed the real seeded catalogue in `/admin/products`, opened `/admin/settings`
+  — all against live data, all clean.
+- Opened the cart drawer — a client component — and confirmed it renders and animates
+  correctly under production's actual CSP (dev's `'unsafe-eval'` exception is gone here).
+  **Zero console errors**, where the equivalent `pnpm dev` pass earlier this session had
+  the Chromium-autofill `style={{}}` hydration noise. Whether that's because production
+  mode genuinely doesn't trigger it or because this run got lucky isn't distinguishable
+  from one run — but not a single error surfaced.
+
+This is the closest thing to "how it will actually run" that's checkable without the
+credentials or the real host — a materially stronger signal than `pnpm dev` ever was.
+
+---
+
 ## Running it
 
 ```bash
