@@ -14,22 +14,36 @@ import {
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 
+/** 20 MB — comfortably above any real product photo, well below "someone parked a video here". */
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
 export interface UploadSignature {
   cloudName: string;
   apiKey: string;
   folder: string;
   timestamp: number;
   signature: string;
+  allowedFormats: string;
+  maxFileSize: number;
 }
 
 export type SignResult = { ok: true; signature: UploadSignature } | { ok: false; error: string };
 
 /**
  * Called directly from the uploader before it POSTs the file straight to
- * Cloudinary — the file itself never passes through this server. Only the
- * three params actually being signed (`timestamp`, `folder`) may be sent back
- * with the upload; adding an unsigned param there would fail Cloudinary's own
- * signature check.
+ * Cloudinary — the file itself never passes through this server. Every param
+ * actually being signed (`timestamp`, `folder`, `allowed_formats`,
+ * `max_file_size`) must be sent back unchanged with the upload, or Cloudinary's
+ * own signature check fails; adding an unsigned param there would too.
+ *
+ * `resource_type` is deliberately NOT signed — Cloudinary excludes it from the
+ * string that gets signed regardless (it's chosen by the URL path, e.g.
+ * `/image/upload` vs `/raw/upload`), so including it here would only produce
+ * a signature that can never match. `allowed_formats` is what actually stops
+ * a validly-signed request from being replayed against a different endpoint
+ * to upload a non-image: Cloudinary rejects the format at its own layer no
+ * matter which resource-type path the request is sent to — verified directly
+ * against the real account before shipping this, not assumed from the docs.
  */
 export async function signProductImageUploadAction(): Promise<SignResult> {
   await requireCatalogueAccess();
@@ -41,8 +55,9 @@ export async function signProductImageUploadAction(): Promise<SignResult> {
   }
 
   const timestamp = Math.round(Date.now() / 1000);
+  const allowedFormats = ALLOWED_IMAGE_FORMATS.join(',');
   const signature = cloudinary.utils.api_sign_request(
-    { timestamp, folder: CLOUDINARY_FOLDER },
+    { timestamp, folder: CLOUDINARY_FOLDER, allowed_formats: allowedFormats, max_file_size: MAX_UPLOAD_BYTES },
     process.env.CLOUDINARY_API_SECRET!,
   );
 
@@ -54,6 +69,8 @@ export async function signProductImageUploadAction(): Promise<SignResult> {
       folder: CLOUDINARY_FOLDER,
       timestamp,
       signature,
+      allowedFormats,
+      maxFileSize: MAX_UPLOAD_BYTES,
     },
   };
 }
@@ -63,8 +80,19 @@ export interface SaveImageResult {
   error?: string;
 }
 
+/**
+ * Every asset this app ever legitimately creates lives under `CLOUDINARY_FOLDER`
+ * — enforced here so a `publicId` naming something outside it (a brand logo,
+ * anything else in the same Cloudinary account) is rejected before it ever
+ * reaches a destroy call, rather than trusted because it merely looks
+ * plausible.
+ */
+function isOwnedPublicId(publicId: string): boolean {
+  return publicId.startsWith(`${CLOUDINARY_FOLDER}/`);
+}
+
 const uploadResultSchema = z.object({
-  publicId: z.string().trim().min(1),
+  publicId: z.string().trim().min(1).refine(isOwnedPublicId, 'Not a recognised upload.'),
   url: z.string().trim().url(),
   format: z.string().trim().min(1),
   width: z.number().int().positive(),
@@ -72,8 +100,15 @@ const uploadResultSchema = z.object({
   alt: z.string().trim().min(1, 'Alt text is required.').max(200),
 });
 
+/**
+ * Only ever destroys an asset under this app's own Cloudinary folder — a
+ * caller-supplied `publicId` naming something else (a brand logo, anything
+ * else in the same Cloudinary account) is silently refused rather than
+ * trusted, since a MANAGER session should be able to affect this store's
+ * product images and nothing else in the account.
+ */
 async function safeDestroy(publicId: string): Promise<void> {
-  if (!isCloudinaryConfigured()) return;
+  if (!isCloudinaryConfigured() || !isOwnedPublicId(publicId)) return;
   try {
     await cloudinary.uploader.destroy(publicId);
   } catch {

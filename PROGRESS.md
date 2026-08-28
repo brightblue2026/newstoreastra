@@ -946,6 +946,43 @@ credentials or the real host — a materially stronger signal than `pnpm dev` ev
 
 ---
 
+## Full-surface security/correctness review · 28 August 2026
+
+All four gates pass: `pnpm lint`, `pnpm typecheck`, `pnpm test` (302 tests), `pnpm build`.
+
+Four parallel background agents audited money/GST/pricing, auth/session/access,
+Cloudinary/uploads/Sentry, and admin-catalogue/discounts respectively, each cross-checked
+against research into how real e-commerce platforms handle the same problem. 16 real
+findings were fixed; 3 were flagged as business/product decisions rather than bugs (see
+`DECISIONS.md` for the full list and reasoning behind each). Highlights:
+
+- A real money exploit in combo pricing (a choiceOf-empty slot let a customer redeem a
+  pricier size for a cheaper one's package price) — closed in `resolveComboUnits`, with
+  new tests including an explicit "rejected even when the admin listed it in `choiceOf`"
+  case.
+- Session role/active-status staleness, confirmed independently by 3 of the 4 agents —
+  `currentUser()` now re-reads role and active status from the database on every call
+  instead of trusting the JWT's claims for the token's lifetime.
+- A rate-limit bypass via a spoofed `x-forwarded-for` leftmost hop, and a missing rate
+  limit on order lookup-by-phone (confirmed by 2 of 4 agents).
+- Cloudinary uploads now actually enforce format and size (verified against the real
+  account, not just assumed), and deletes can no longer touch anything outside the
+  product's own folder.
+- `MAX_PAISE` is now enforced on order-level totals, not just individual line prices; the
+  order-number and invoice-number sequences now share one `now` so they can't straddle a
+  financial-year boundary independently; a fixed combo slot's own variant is now checked
+  for `isActive` the same way the choice-slot path already was; discount priority
+  tiebreaking is now deterministic; a discount-usage race that could oversell a limited
+  offer is closed with a conditional `UPDATE`; `quoteOrder` and `placeOrder` now agree on
+  per-customer discount usage.
+
+Not exercised: Razorpay and Shiprocket remain untestable end-to-end until the store is
+hosted and those accounts exist, per the client's own constraint — this round relied on
+code review, the existing test suite (extended with new cases for each behavioural fix),
+and production-mode (`next start`) verification rather than live third-party calls.
+
+---
+
 ## Running it
 
 ```bash

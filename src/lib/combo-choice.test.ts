@@ -79,6 +79,33 @@ describe('resolveComboUnits', () => {
     expect(resolved!.chosenLabels).toEqual([]);
   });
 
+  it('rejects a fixed slot whose own variant was deactivated since the combo was built', () => {
+    const deactivated = variant({ id: 'v-lemon-off', isActive: false });
+    const map = new Map([[deactivated.id, deactivated]]);
+    const resolved = resolveComboUnits(
+      [slot({ isChoice: false, variant: deactivated })],
+      {},
+      map,
+    );
+
+    expect(resolved).toBeNull();
+  });
+
+  it('rejects a fixed slot whose own product was deactivated since the combo was built', () => {
+    const deactivated = variant({
+      id: 'v-lemon-off-product',
+      product: { ...lemon.product, isActive: false },
+    });
+    const map = new Map([[deactivated.id, deactivated]]);
+    const resolved = resolveComboUnits(
+      [slot({ isChoice: false, variant: deactivated })],
+      {},
+      map,
+    );
+
+    expect(resolved).toBeNull();
+  });
+
   it('honours a valid choice and ships that variant instead of the slot default', () => {
     const resolved = resolveComboUnits(
       [slot({ choiceOf: [lemon.id, rose.id, jasmin.id] })],
@@ -169,7 +196,7 @@ describe('resolveComboUnits', () => {
     ).toBeNull();
   });
 
-  it('accepts any variant of the slot product when choiceOf is empty', () => {
+  it('accepts any same-priced variant of the slot product when choiceOf is empty', () => {
     const resolved = resolveComboUnits(
       [slot()],
       { choices: [{ itemId: 'item-1', variantIds: [jasmin.id] }] },
@@ -177,6 +204,50 @@ describe('resolveComboUnits', () => {
     );
 
     expect(resolved!.units).toEqual([{ variant: jasmin, units: 1 }]);
+  });
+
+  it('rejects a pricier variant of the same product when choiceOf is empty', () => {
+    // Same product, different size — MX-3's real catalogue has exactly this
+    // shape (24 fragrances x 3 sizes, one product id). Picking the 900ml for
+    // the 225ml slot's package price must not be possible.
+    const large = variant({ id: 'v-lemon-900', variantName: 'Lemon', pricePaise: 62_000 });
+    const withLarge = new Map(variants).set(large.id, large);
+
+    expect(
+      resolveComboUnits(
+        [slot()],
+        { choices: [{ itemId: 'item-1', variantIds: [large.id] }] },
+        withLarge,
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects a pricier variant even when the admin explicitly listed it in choiceOf', () => {
+    // Defense in depth: an admin restriction list naming the wrong size's id
+    // by mistake must not reopen the same hole.
+    const large = variant({ id: 'v-lemon-900', variantName: 'Lemon', pricePaise: 62_000 });
+    const withLarge = new Map(variants).set(large.id, large);
+
+    expect(
+      resolveComboUnits(
+        [slot({ choiceOf: [large.id] })],
+        { choices: [{ itemId: 'item-1', variantIds: [large.id] }] },
+        withLarge,
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects a pick when either side has no price to compare', () => {
+    const priceless = variant({ id: 'v-lemon-poa', variantName: 'Lemon', pricePaise: null });
+    const withPriceless = new Map(variants).set(priceless.id, priceless);
+
+    expect(
+      resolveComboUnits(
+        [slot()],
+        { choices: [{ itemId: 'item-1', variantIds: [priceless.id] }] },
+        withPriceless,
+      ),
+    ).toBeNull();
   });
 
   it('rejects a pick that does not exist', () => {

@@ -76,14 +76,19 @@ export function ImageUploader({ productId }: { productId: string }) {
         setError(signResult.error);
         return;
       }
-      const { cloudName, apiKey, folder, timestamp, signature } = signResult.signature;
+      const { cloudName, apiKey, folder, timestamp, signature, allowedFormats, maxFileSize } =
+        signResult.signature;
 
+      // Every one of these has to match exactly what was signed, or
+      // Cloudinary's own signature check fails the request.
       const body = new FormData();
       body.set('file', file);
       body.set('api_key', apiKey);
       body.set('timestamp', String(timestamp));
       body.set('signature', signature);
       body.set('folder', folder);
+      body.set('allowed_formats', allowedFormats);
+      body.set('max_file_size', String(maxFileSize));
 
       const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',

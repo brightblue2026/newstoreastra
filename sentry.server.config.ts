@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { scrubCapabilityToken } from '@/lib/sentry-scrub';
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -15,7 +16,17 @@ Sentry.init({
       delete event.request.headers.cookie;
       delete event.request.headers.authorization;
     }
+    if (event.request?.url) event.request.url = scrubCapabilityToken(event.request.url);
     delete event.user;
+    return event;
+  },
+
+  // The order-access capability token (`?t=…`) is a standing credential for
+  // that order, not a cookie or auth header — sendDefaultPii and the header
+  // stripping above don't cover a query parameter. 10% of transactions are
+  // sampled in production, same exposure as an error event.
+  beforeSendTransaction(event) {
+    if (event.request?.url) event.request.url = scrubCapabilityToken(event.request.url);
     return event;
   },
 });

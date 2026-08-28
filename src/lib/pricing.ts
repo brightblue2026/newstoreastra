@@ -457,6 +457,8 @@ export function calculateCart(input: CalculateCartInput): PriceResult {
   );
 
   const totalPaise = lineResults.reduce((sum, l) => sum + l.netPaise, 0) + shippingPaise + codFeePaise;
+  assertPaise(subtotalPaise, 'subtotal');
+  assertPaise(totalPaise, 'order total');
 
   return {
     lines: lineResults,

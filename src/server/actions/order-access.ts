@@ -3,7 +3,8 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { orderAccessToken, phoneMatches } from '@/lib/order-access';
+import { normalisePhone, orderAccessToken, phoneMatches } from '@/lib/order-access';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /*
   Unlocking an order page with the mobile number on it — brief §12 Phase 6's
@@ -37,6 +38,14 @@ export async function unlockOrder(formData: FormData): Promise<void> {
   }
 
   const orderNumber = parsed.data.orderNumber.toUpperCase();
+
+  // Keyed on the submitted phone, not the order number or IP: the real
+  // attack is a known phone number walked against every sequential order
+  // number, so this is what actually bounds that regardless of source IP.
+  const limit = await checkRateLimit('order-unlock', normalisePhone(parsed.data.phone), 5, 10 * 60);
+  if (!limit.allowed) {
+    redirect(`/order/${encodeURIComponent(orderNumber)}?denied=1`);
+  }
 
   const order = await db.order.findUnique({
     where: { orderNumber },

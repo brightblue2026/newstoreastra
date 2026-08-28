@@ -4,8 +4,13 @@ import { formatINR } from '@/lib/money';
 import { requireCatalogueAccess } from '@/lib/session';
 import { setComboActiveAction } from './actions';
 
-export default async function CombosPage() {
+export default async function CombosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ publishError?: string }>;
+}) {
   await requireCatalogueAccess();
+  const { publishError } = await searchParams;
 
   const combos = await db.combo.findMany({
     orderBy: { name: 'asc' },
@@ -23,6 +28,12 @@ export default async function CombosPage() {
           New combo
         </Link>
       </div>
+
+      {publishError && (
+        <p role="alert" className="mt-6 rounded-control border border-warning px-4 py-3 type-body text-warning">
+          {publishError}
+        </p>
+      )}
 
       {combos.length === 0 ? (
         <p className="mt-12 type-body text-ink-soft">No combos yet. Create the first one.</p>

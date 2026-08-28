@@ -173,7 +173,12 @@ export async function setComboActiveAction(comboId: string, isActive: boolean): 
   if (!existing) return;
 
   if (isActive && existing.items.length === 0) {
-    throw new Error('Cannot publish: add at least one component first.');
+    // See the equivalent guard in products/actions.ts — redirected rather
+    // than thrown, so the message survives Next's production redaction of
+    // thrown server-action errors instead of becoming a blank error page.
+    redirect(
+      `/admin/combos?publishError=${encodeURIComponent('Cannot publish: add at least one component first.')}`,
+    );
   }
 
   const updated = await db.combo.update({ where: { id: comboId }, data: { isActive } });

@@ -64,6 +64,7 @@ const DEFINITE: Readonly<Record<string, string>> = Object.freeze({
   '31': 'Rajasthan',
   '32': 'Rajasthan',
   '33': 'Rajasthan',
+  '34': 'Rajasthan',
   '36': 'Gujarat',
   '37': 'Gujarat',
   '38': 'Gujarat',

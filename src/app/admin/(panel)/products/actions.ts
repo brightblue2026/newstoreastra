@@ -348,10 +348,17 @@ export async function setProductActiveAction(productId: string, isActive: boolea
       !existing.isFoodProduct || !foodLabelIncomplete(readFoodLabel(existing.foodLabel));
 
     if (!hasVariant || !hasImage || !hasHsn || !foodOk) {
-      throw new Error(
+      // Redirected with the reason rather than thrown: a thrown Error from a
+      // server action has its message redacted in a production build (Next
+      // replaces it with an opaque digest), so the admin clicking "Publish"
+      // on an incomplete product used to get a blank error page instead of
+      // being told what's missing. This survives that redaction because it
+      // never throws at all.
+      const reason =
         'Cannot publish: needs at least one variant, one image, an HSN code' +
-          (existing.isFoodProduct ? ', and a complete food label.' : '.'),
-      );
+        (existing.isFoodProduct ? ', and a complete food label.' : '.');
+      revalidatePath('/admin/products');
+      redirect(`/admin/products?publishError=${encodeURIComponent(reason)}`);
     }
   }
 

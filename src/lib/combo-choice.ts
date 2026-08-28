@@ -94,6 +94,11 @@ export function resolveComboUnits<V extends ChoiceVariant>(
     if (choice && !item.isChoice) return null;
 
     if (!choice) {
+      // A fixed slot's own variant must still be sellable — a fragrance
+      // deactivated after a combo was built must pull the combo with it,
+      // the same as the VARIANT-path check above and the choice-path check
+      // below already require for a customer's own picks.
+      if (!item.variant.isActive || !item.variant.product.isActive) return null;
       units.push({ variant: item.variant, units: item.quantity });
       continue;
     }
@@ -111,6 +116,22 @@ export function resolveComboUnits<V extends ChoiceVariant>(
       const offered =
         allowed.size > 0 ? allowed.has(variant.id) : variant.productId === item.variant.productId;
       if (!offered) return null;
+
+      // A pick must not cost more than the slot's own variant. "Same product"
+      // is not "same price" — MX-3's 24 fragrances alone span three sizes at
+      // three different prices under one product id, so without this a
+      // choiceOf-empty slot lets a customer pick a pricier size for the
+      // combo's package price. Checked even when `choiceOf` explicitly names
+      // the id, so an admin's restriction list can't accidentally do the same
+      // thing by pasting in the wrong size's id. A null price on either side
+      // can't be compared, so it's refused rather than assumed safe.
+      if (
+        variant.pricePaise === null ||
+        item.variant.pricePaise === null ||
+        variant.pricePaise > item.variant.pricePaise
+      ) {
+        return null;
+      }
 
       countByVariant.set(variantId, (countByVariant.get(variantId) ?? 0) + 1);
       picks.push(variant.variantName ?? 'Variant');

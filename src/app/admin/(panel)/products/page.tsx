@@ -3,8 +3,13 @@ import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 import { setProductActiveAction } from './actions';
 
-export default async function ProductsPage() {
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ publishError?: string }>;
+}) {
   await requireCatalogueAccess();
+  const { publishError } = await searchParams;
 
   const products = await db.product.findMany({
     orderBy: { sortOrder: 'asc' },
@@ -22,6 +27,12 @@ export default async function ProductsPage() {
           New product
         </Link>
       </div>
+
+      {publishError && (
+        <p role="alert" className="mt-6 rounded-control border border-warning px-4 py-3 type-body text-warning">
+          {publishError}
+        </p>
+      )}
 
       {products.length === 0 ? (
         <p className="mt-12 type-body text-ink-soft">No products yet. Create the first one.</p>

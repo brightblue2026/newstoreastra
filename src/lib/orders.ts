@@ -122,6 +122,20 @@ export class OrderConfigurationError extends Error {
   }
 }
 
+/**
+ * Raised when a discount's `usageLimit` was hit by a concurrent order between
+ * this order's quote and its transaction — the customer can fix this, by
+ * trying again without the code. Thrown inside `placeOrder`'s transaction so
+ * the whole order rolls back rather than being created with a discount that
+ * technically oversold its limit.
+ */
+export class DiscountExhaustedError extends Error {
+  constructor() {
+    super('A discount on this order just reached its usage limit.');
+    this.name = 'DiscountExhaustedError';
+  }
+}
+
 function snapshotAddress(address: OrderAddressInput, state: string): OrderAddressSnapshot {
   return {
     fullName: address.fullName.trim(),
@@ -356,7 +370,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
       }
 
       const { discounts } = await loadDiscountCandidates(input.discountCode, tx);
-      const customerUsage = input.userId ? await customerDiscountUsage(tx, input.userId) : undefined;
+      const customerUsage = input.userId ? await customerDiscountUsage(input.userId, tx) : undefined;
 
       const priced = calculateCart({
         lines: resolved.lines,
@@ -400,8 +414,14 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
 
       await applySteps(tx, reservations, 'reserve');
 
-      // 5. The order number, under a per-financial-year advisory lock.
-      const orderNumber = await nextOrderNumber(tx);
+      // 5. The order number, under a per-financial-year advisory lock. Shared
+      // with the invoice number below so both sequences read the financial
+      // year from the same instant — otherwise an order placed in the last
+      // millisecond of one financial year could roll to the new year's order
+      // sequence but the old year's invoice sequence (or vice versa) if the
+      // two calls straddled midnight on 31 March independently.
+      const now = new Date();
+      const orderNumber = await nextOrderNumber(tx, now);
 
       // A COD order has no payment to wait for, so it is confirmed on
       // placement — and its hold becomes a real decrement immediately, which is
@@ -481,13 +501,23 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
         },
       });
 
-      // 7. Discount usage. One statement regardless of how many discounts
-      // stacked — every increment here is +1, so `updateMany` covers it.
+      // 7. Discount usage. The increment IS the ceiling check, not a separate
+      // read-then-write: `loadDiscountCandidates` read `usageCount` outside
+      // any lock, so under concurrent checkouts several transactions can all
+      // see "1 below the limit" and all pass. Only a conditional UPDATE that
+      // re-checks the limit at write time, inside this transaction, actually
+      // closes that — if fewer rows matched than discounts applied, some
+      // discount hit its limit between the read and here, and the whole
+      // order rolls back rather than overselling the offer.
       if (priced.appliedDiscounts.length > 0) {
-        await tx.discount.updateMany({
-          where: { id: { in: priced.appliedDiscounts.map((applied) => applied.discountId) } },
-          data: { usageCount: { increment: 1 } },
-        });
+        const ids = Prisma.join(priced.appliedDiscounts.map((applied) => applied.discountId));
+        const updated = await tx.$executeRaw`
+          UPDATE "Discount" SET "usageCount" = "usageCount" + 1
+          WHERE id IN (${ids}) AND ("usageLimit" IS NULL OR "usageCount" < "usageLimit")
+        `;
+        if (updated < priced.appliedDiscounts.length) {
+          throw new DiscountExhaustedError();
+        }
       }
 
       if (isCod) {
@@ -500,7 +530,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
           PENDING_PAYMENT → CONFIRMED. A prepaid order gets nothing yet: it is
           not a supply until Razorpay says it was paid for.
         */
-        await assignInvoiceNumber(tx, order.id);
+        await assignInvoiceNumber(tx, order.id, now);
       }
 
       return { ok: true as const, order: { ...order, razorpayOrderId: null } };
@@ -523,10 +553,10 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
  * that never happened has not been spent.
  */
 async function customerDiscountUsage(
-  tx: Prisma.TransactionClient,
   userId: string,
+  client: Prisma.TransactionClient = db,
 ): Promise<Record<string, number>> {
-  const rows = await tx.$queryRaw<{ discountId: string; uses: bigint }[]>`
+  const rows = await client.$queryRaw<{ discountId: string; uses: bigint }[]>`
     SELECT applied->>'discountId' AS "discountId", count(*) AS uses
     FROM "Order", jsonb_array_elements("appliedDiscounts") AS applied
     WHERE "userId" = ${userId}
@@ -679,6 +709,13 @@ export async function quoteOrder(input: {
   const codAvailable = settings.cod.enabled && codCheck.eligible;
   const codFeePaise = input.paymentMethod === 'COD' && codAvailable ? codCheck.feePaise : 0;
 
+  // Same call `placeOrder` makes before pricing — without it, a signed-in
+  // customer at their `perCustomerLimit` saw the discounted total quoted
+  // here (nothing checked their usage) and was then charged the
+  // undiscounted total when the order was actually placed, with nothing
+  // surfacing the difference since the browser never sends a total.
+  const customerUsage = input.userId ? await customerDiscountUsage(input.userId) : undefined;
+
   const priced = calculateCart({
     lines: resolved.lines,
     discounts,
@@ -688,6 +725,7 @@ export async function quoteOrder(input: {
     codFeePaise,
     paymentMethod: input.paymentMethod,
     customerId: input.userId ?? undefined,
+    customerUsage,
   });
 
   const labels = await discountLabels(priced.appliedDiscounts.map((d) => d.discountId));

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MoneyError } from './money';
 import { calculateCart, type CartLine, type DiscountInput } from './pricing';
 
 let nextId = 0;
@@ -56,6 +57,14 @@ describe('calculateCart', () => {
     expect(result.totalPaise).toBe(0);
     expect(result.lines).toEqual([]);
     expect(result.appliedDiscounts).toEqual([]);
+  });
+
+  it('refuses a total past MAX_PAISE rather than silently returning a huge order', () => {
+    const lines = [makeLine({ unitPricePaise: 999_999_900, quantity: 3 })];
+
+    expect(() =>
+      calculateCart({ lines, discounts: [], paymentMethod: PAYMENT, now: NOW }),
+    ).toThrow(MoneyError);
   });
 
   it('caps a 10% discount at ₹100 on a ₹2,000 cart', () => {

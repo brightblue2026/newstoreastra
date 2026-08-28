@@ -7,6 +7,7 @@ import { notifyOrderEvent } from '@/lib/notifications';
 import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
 import {
+  DiscountExhaustedError,
   OrderConfigurationError,
   placeOrder,
   quoteOrder,
@@ -121,6 +122,12 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
       return {
         ok: false,
         error: 'Orders are not being accepted right now. Please call 1800 123 0621.',
+      };
+    }
+    if (error instanceof DiscountExhaustedError) {
+      return {
+        ok: false,
+        error: 'A discount on this order just ran out. Remove the code and try again.',
       };
     }
     console.error('[checkout] could not place the order:', error);

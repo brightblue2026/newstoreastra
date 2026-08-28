@@ -12,9 +12,13 @@
  *      placed. An HMAC of the order number under `AUTH_SECRET`, so it is
  *      unforgeable without the secret and needs no table to store.
  *   2. The **full mobile number** on the order. Ten digits, checked in constant
- *      time. Not the last four: there is no shared rate-limit store in this
- *      deployment yet (see PROGRESS.md), and four digits against a sequential
- *      order number is a few thousand guesses. Ten is not.
+ *      time. Not the last four: even with the rate limit below, four digits
+ *      against a sequential order number is a few thousand guesses. Ten is
+ *      not. `unlockOrder` (`src/server/actions/order-access.ts`) rate-limits
+ *      by the submitted phone number — the real attack this credential faces
+ *      isn't guessing someone's phone number, it's the reverse: holding a
+ *      known number and walking every order number against it, since the
+ *      numbers are sequential and gapless.
  *
  * The token deliberately does not expire. It is a link a customer keeps in
  * their browser history and their WhatsApp thread, and an order they can still

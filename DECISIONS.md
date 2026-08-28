@@ -294,9 +294,17 @@ two customer-facing halves that were left as "needs a cart shape that can hold c
   carries one id per unit rather than a set. Three bottles of Lemon is a real order.
 - **Every pick is re-validated server-side** in `src/lib/combo-choice.ts` — active variant,
   active product, inside `choiceOf` when the admin restricted the slot and otherwise a
-  variant of the slot's own product, and exactly as many picks as the slot has units. A
-  combo's price is its package price either way, so a forged choice buys nothing cheaper;
-  what it could do is put a fragrance BBTC never offered onto a picking list. The
+  variant of the slot's own product, exactly as many picks as the slot has units, **and no
+  more expensive than the slot's own variant** (added 24 August 2026 — see below; this
+  entry originally claimed "a forged choice buys nothing cheaper," which was true only
+  when every variant of a product shares one price. MX-3's real catalogue doesn't: 24
+  fragrances × 3 sizes under one product id, at three different prices. A choiceOf-empty
+  slot let a customer pick a pricier size for the smaller size's package price — a real
+  underpayment, not just an unintended fragrance — found by a security-review agent, fixed
+  by comparing `pricePaise` on every pick, including against an admin's explicit
+  `choiceOf` list, since a restriction list naming the wrong size's id by mistake
+  shouldn't reopen the same hole. A null price on either side can't be compared and is
+  refused rather than assumed safe.). The
   resolution is a pure function in its own module precisely so it can be tested without a
   database, which is the only kind of test this environment can run.
 - **An unresolvable choice makes the line unavailable rather than substituting the slot
@@ -855,3 +863,128 @@ trigger once deployed:
 Which of the two Hostinger products this actually runs on is still open — the exact setup
 steps differ enough (PM2 + Nginx for a VPS vs a managed build/deploy pipeline) that this
 is deferred until the client picks one, rather than guessed at.
+
+### Full-surface security/correctness review · 28 August 2026
+
+Client asked for every feature, security control, and working piece tested, gaps found
+and fixed by research, against how other real stores handle the same problems. Four
+parallel background agents each audited a different surface — money/GST/pricing, auth/
+session/access, Cloudinary/uploads/Sentry, and admin-catalogue/discounts — cross-checked
+against each other and against direct web research before anything was changed. Findings
+that two or more agents independently reached the same conclusion on were treated as
+higher-confidence; those are called out below.
+
+**Fixed, all four gates (`lint`/`typecheck`/`test`/`build`) green after each:**
+
+- **Combo choice let a customer redeem a cheaper size's package price for a pricier one.**
+  MX-3's 72 variants (24 fragrances × 3 sizes) all share one `productId`, so a
+  choiceOf-empty slot only checked "same product," not "same or lower price." Fixed in
+  `resolveComboUnits` (`src/lib/combo-choice.ts`) — a pick is now refused if it costs more
+  than the slot's own variant, even when the admin explicitly listed the pricier id in
+  `choiceOf`, and refused outright when either side has no published price to compare.
+  This also corrects this file's own earlier claim that "a forged choice buys nothing
+  cheaper" — it could.
+- **Zero/null-priced combo components used to silently vanish from the order** rather than
+  being charged the ₹0 they're worth — `cart-pricing.ts` was `.filter()`ing them out of the
+  line instead of keeping a real `OrderItem` at `unitPricePaise: 0`. A component with no
+  HSN now makes the whole combo line `unavailable` instead of silently dropping a
+  component while still charging for the package.
+- **Session role/active-status could go stale for the life of a JWT** (confirmed by 3 of
+  4 agents independently) — `currentUser()` trusted the token's `role`/`isActive` claims
+  rather than the database, so a deactivated staff account or a demoted admin kept its old
+  access until the token expired. `currentUser()` (`src/lib/session.ts`) now re-reads both
+  fields from `db.user` on every call — the single choke point every `require*Access()`
+  guard already goes through, so this fixes all of them at once.
+- **Rate limiting could be bypassed by spoofing `x-forwarded-for`'s leftmost hop**
+  (`src/lib/client-ip.ts` used to trust the first XFF entry, which a client controls;
+  proxies append to the right). Now checks `x-real-ip` first, then the rightmost XFF hop.
+  Added an explicit exploit-simulation test proving a forged leftmost entry no longer
+  moves the resolved IP.
+- **`unlockOrder` (order lookup by phone) had no rate limit** (confirmed by 2 of 4 agents)
+  — a phone number is much lower-entropy than the capability token this system otherwise
+  relies on, so it was crackable by brute force. Added the same `checkRateLimit` pattern
+  already used elsewhere in the codebase, 5 attempts / 10 minutes per phone.
+- **Cloudinary uploads only enforced folder scoping, not format or size** — signed
+  `allowed_formats` and `max_file_size` were accepted by the signing endpoint but never
+  actually signed, so a client could substitute its own values. Verified directly against
+  the real account (`resource_type` genuinely must not be signed, confirmed by testing;
+  `allowed_formats` genuinely is enforced once signed, confirmed by a live rejected
+  upload). Also closed a "destroy any asset in the whole Cloudinary account" gap — deletes
+  now refuse anything outside the product's own folder prefix.
+- **Server Action errors were losing their message in production** — Next.js redacts a
+  thrown Server Action error's `.message` to an opaque digest in production builds, which
+  was silently swallowing the publish-guard reasons on `/admin/products` and
+  `/admin/combos`. Switched both to `redirect()` with an encoded query-param reason
+  instead of throwing, and added a generic `admin/(panel)/error.tsx` boundary for
+  anything that still throws unexpectedly.
+- **Sentry could capture the order-access capability token** — the browser SDK records
+  `window.location.href` on both events and transactions, which is exactly where the
+  `?t=…` token on order-tracking/invoice pages lives, and `beforeSendTransaction` wasn't
+  scrubbing it in any of the three Sentry configs (only `beforeSend` was). Added a shared
+  `scrubCapabilityToken` and wired it into `beforeSendTransaction` in all three.
+- **Discount usage limits had a read-then-write race** — `loadDiscountCandidates` reads
+  `usageCount` outside any lock, so concurrent checkouts near a limit could all pass the
+  same check and all succeed. The increment inside `placeOrder` is now a single
+  conditional `UPDATE ... WHERE usageCount < usageLimit`; if fewer rows update than
+  discounts applied, the whole order rolls back with a new `DiscountExhaustedError`
+  rather than overselling the offer.
+- **`quoteOrder` never checked per-customer discount usage at all**, only `placeOrder`
+  did — a signed-in customer near their `perCustomerLimit` could see one (wrong,
+  discounted) total at the quote stage and be charged a different one at checkout.
+  `customerDiscountUsage` now runs in both, using the same signature already established
+  for `resolveSellerEntity`.
+- **`MAX_PAISE` was never enforced at the order-total level** — only individual line
+  unit prices were asserted. Added `assertPaise` on both `subtotalPaise` and `totalPaise`
+  at the end of `calculateCart` (`src/lib/pricing.ts`), so a cart engineered to sum past
+  ₹1 crore now fails loudly instead of silently placing an order Razorpay would likely
+  reject anyway, or worse, one it wouldn't.
+- **Order number and invoice number sequences could straddle a financial-year boundary
+  independently** — both `nextOrderNumber` and `assignInvoiceNumber` defaulted `now = new
+  Date()` on their own, so an order placed in the last instant of 31 March could file
+  under one FY's order sequence and the other FY's invoice sequence if the two calls
+  landed a moment apart. `placeOrder` now computes one `now` and threads it through both.
+- **A fixed (non-choice) combo slot's own variant was never checked for `isActive`** —
+  the choice-slot path and the VARIANT cart-line path both already refused a deactivated
+  variant or product; the fixed-slot fallback did not, so a combo could keep shipping a
+  fragrance pulled from sale as long as no customer touched its choice slots. Same guard
+  added to that branch in `resolveComboUnits`.
+- **Discount priority tiebreaking was nondeterministic** — `resolveConflicts` breaks a
+  tie on identical `priority` and identical value by array order, and the automatic-
+  discount query behind it had no `ORDER BY`, so which discount actually won a tie could
+  vary between otherwise-identical requests. Added `orderBy: [{ priority: 'desc' }, { id:
+  'asc' }]` to that query.
+- **`previewDiscountAction`'s two arguments were entirely unvalidated at runtime** — the
+  only admin action missing the project's own "every input is Zod-validated at the
+  boundary" rule (per `CLAUDE.md`). Added `sampleLinesSchema`/`previewSettingsSchema`.
+  Also added a date-validity `.refine()` on discount `startsAt`/`endsAt` so a malformed
+  date string fails with a field message instead of an opaque 500 from an unchecked `new
+  Date()`.
+- **Pincode prefix `34` was unmapped** — verified via research to belong wholly to
+  Rajasthan and added to `DEFINITE`. Deliberately did *not* add `35` (research was
+  inconclusive) or the Army Postal Service `9xxxxx` range (confirmed to be a functional
+  zone with no fixed state — mapping it to any one state would be actively wrong, not
+  just incomplete).
+
+**Researched and confirmed already correct, no change:**
+
+- Cloudinary `resource_type` must not be signed (determined by the upload URL path, not a
+  signable parameter) — confirmed against Cloudinary's own docs before touching the
+  signing code, so the fix above adds real enforcement without breaking uploads.
+- The `reserved`/`quantity` inventory-hold split, row-level webhook idempotency locking,
+  and the GST invoice-numbering rules were all re-checked against industry practice in
+  the prior review round (see above) and nothing here contradicted that.
+
+**Flagged rather than fixed — business/product decisions, not bugs:**
+
+- **Delivery and COD-handling fees are not taxed under GST in this codebase.** Whether
+  that's correct depends on how BBTC's invoices are meant to characterise those charges
+  (a disbursement vs. a taxable service) — a compliance question for whoever files the
+  GST returns, not a code defect to guess at.
+- **An unmapped ("unknown") pincode currently lets the customer's own state selection
+  stand.** One audit agent recommended making "unknown" a hard error instead. That is a
+  real checkout-friction-vs-compliance-risk tradeoff, and `pincode.ts`'s own documented
+  design intent ("an unknown state costs the customer one dropdown") already chose the
+  permissive side deliberately — changing it is a product decision, not a bug fix.
+- **No recovery path exists if the sole ADMIN account gets locked out by the per-email
+  login rate limit.** Worth having a break-glass plan (a second admin account, or a documented
+  manual unlock) before this ever goes live with only one admin.

@@ -278,8 +278,13 @@ export async function resolveCartLines(
       continue;
     }
 
-    const taxable = resolved.units.filter((unit) => unit.variant.product.hsnCode);
-    if (taxable.length === 0) {
+    // Every component needs an HSN to be taxed correctly — silently dropping
+    // the ones that don't (as a `.filter()` used to) would charge the full
+    // package price while shipping fewer items than were paid for, taxed as
+    // if the missing component was never part of the combo at all. Matches
+    // the VARIANT branch above: one untaxable item makes the whole line
+    // unavailable, not just that item.
+    if (resolved.units.some((unit) => !unit.variant.product.hsnCode)) {
       unavailable.push(cartLine);
       continue;
     }
@@ -294,12 +299,15 @@ export async function resolveCartLines(
     };
 
     const packageTotal = combo.pricePaise * cartLine.quantity;
-    const weights = taxable.map((unit) => (unit.variant.pricePaise ?? 0) * unit.units);
+    const weights = resolved.units.map((unit) => (unit.variant.pricePaise ?? 0) * unit.units);
     const shares = distributeProportionally(packageTotal, weights);
 
-    taxable.forEach((unit, index) => {
+    resolved.units.forEach((unit, index) => {
+      // No `share <= 0` early return: a component with a null/zero price (a
+      // free sachet, say) gets a zero-paise line rather than vanishing from
+      // the order — it still needs to be reserved, picked and shipped even
+      // though it isn't what's being charged for.
       const share = shares[index];
-      if (share <= 0) return;
       const variant = unit.variant;
       // Physical units shipped: this component's slot size times the number of
       // packages ordered.
@@ -354,6 +362,11 @@ export async function loadDiscountCandidates(
   const now = new Date();
   const automaticRows = await client.discount.findMany({
     where: { isActive: true, code: null, startsAt: { lte: now } },
+    // Without an explicit order, Postgres may return these rows in any
+    // order, and `resolveConflicts`'s priority tiebreak in pricing.ts falls
+    // back to array order when two exclusive discounts also tie on value —
+    // which would otherwise make the winner nondeterministic between calls.
+    orderBy: [{ priority: 'desc' }, { id: 'asc' }],
   });
   const couponRow = discountCode
     ? await client.discount.findFirst({

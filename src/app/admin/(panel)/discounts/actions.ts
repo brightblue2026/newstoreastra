@@ -90,8 +90,17 @@ const discountSchema = z
     perCustomerLimit: z.string().trim().max(10).optional().or(z.literal('')),
     stackable: z.coerce.boolean().optional(),
     priority: z.coerce.number().int().min(0).max(9999).default(0),
-    startsAt: z.string().trim().min(1, 'Start date is required.'),
-    endsAt: z.string().trim().optional().or(z.literal('')),
+    startsAt: z
+      .string()
+      .trim()
+      .min(1, 'Start date is required.')
+      .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Enter a valid start date.' }),
+    endsAt: z
+      .string()
+      .trim()
+      .optional()
+      .or(z.literal(''))
+      .refine((value) => !value || !Number.isNaN(Date.parse(value)), { message: 'Enter a valid end date.' }),
     targetIds: z.array(z.string()).optional().default([]),
   })
   .refine((data) => !data.endsAt || new Date(data.endsAt) > new Date(data.startsAt), {
@@ -375,12 +384,33 @@ export type DiscountPreviewResult =
  * approximation of it. `startsAt`/`endsAt` are taken from the form as typed,
  * so a discount that hasn't started yet honestly shows as not applying.
  */
+const sampleLinesSchema = z
+  .array(z.object({ variantId: z.string().trim().min(1), quantity: z.coerce.number().int().min(1).max(999) }))
+  .max(100);
+
+const previewSettingsSchema = z.object({
+  shippingState: z.string().trim().max(60).optional(),
+  paymentMethod: z.enum(['RAZORPAY', 'COD']),
+});
+
 export async function previewDiscountAction(
   formData: FormData,
-  sampleLines: Array<{ variantId: string; quantity: number }>,
-  settings: { shippingState?: string; paymentMethod: 'RAZORPAY' | 'COD' },
+  rawSampleLines: Array<{ variantId: string; quantity: number }>,
+  rawSettings: { shippingState?: string; paymentMethod: 'RAZORPAY' | 'COD' },
 ): Promise<DiscountPreviewResult> {
   await requireCatalogueAccess();
+
+  // The only action in the admin taking structured (non-FormData) arguments
+  // straight from client state, which is exactly the input this rule exists
+  // for — an unclamped quantity typed into the sample-cart picker used to
+  // reach `calculateCart` unvalidated and throw an unhandled 500.
+  const parsedLines = sampleLinesSchema.safeParse(rawSampleLines);
+  const parsedSettings = previewSettingsSchema.safeParse(rawSettings);
+  if (!parsedLines.success || !parsedSettings.success) {
+    return { ok: false, error: 'That sample cart is not valid.' };
+  }
+  const sampleLines = parsedLines.data;
+  const settings = parsedSettings.data;
 
   if (sampleLines.length === 0) {
     return { ok: false, error: 'Add at least one line to the sample cart.' };

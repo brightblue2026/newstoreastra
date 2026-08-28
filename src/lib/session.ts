@@ -1,5 +1,6 @@
 import { forbidden, redirect } from 'next/navigation';
 import { auth } from '@/auth';
+import { db } from '@/lib/db';
 import {
   UserRole,
   canAccessAdmin,
@@ -18,19 +19,36 @@ export interface SessionUser {
   isActive: boolean;
 }
 
-/** The signed-in user, or null. Never throws. */
+/**
+ * The signed-in user, or null. Never throws.
+ *
+ * `role` and `isActive` are re-read from `User` on every call rather than
+ * trusted from the JWT. The token only carries what was true at sign-in
+ * (`auth.config.ts`'s `jwt` callback writes them once, and the session lasts
+ * `maxAge: 60*60*12`), so without this a demotion or deactivation had no
+ * effect on an already-issued session for up to twelve hours — every guard
+ * in this file re-checked the same stale token, not the database, despite
+ * this function's own history claiming otherwise. One indexed lookup on an
+ * id already known from a verified session; admin traffic doesn't need a
+ * cache for this.
+ */
 export async function currentUser(): Promise<SessionUser | null> {
   const session = await auth();
-  const user = session?.user;
-  if (!user?.id || !user.role) return null;
-  if (user.isActive === false) return null;
+  const tokenUser = session?.user;
+  if (!tokenUser?.id || !tokenUser.role) return null;
+
+  const row = await db.user.findUnique({
+    where: { id: tokenUser.id },
+    select: { name: true, email: true, role: true, isActive: true },
+  });
+  if (!row || !row.isActive) return null;
 
   return {
-    id: user.id,
-    name: user.name ?? null,
-    email: user.email ?? null,
-    role: user.role,
-    isActive: user.isActive,
+    id: tokenUser.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    isActive: row.isActive,
   };
 }
 
@@ -40,7 +58,9 @@ export async function currentUser(): Promise<SessionUser | null> {
  *
  * Middleware already turned anonymous requests away, but middleware can be
  * bypassed by anything that reaches a server action directly, and a role can
- * change after a token was issued. Every mutation re-checks here.
+ * change after a token was issued. Every mutation re-checks here — against
+ * the database, via `currentUser()`, not just the token the middleware layer
+ * already trusted.
  */
 export async function requireRole(minimum: UserRole): Promise<SessionUser> {
   const user = await currentUser();
