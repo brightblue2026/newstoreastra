@@ -38,15 +38,79 @@ async function readImageDimensions(file: File): Promise<{ width: number; height:
   }
 }
 
+/**
+ * A `data:` URL, not a `blob:` one, for the same CSP reason as
+ * `readImageDimensions` above — `img-src` allows `data:` already, so this
+ * needs no CSP change to render a preview before anything is uploaded.
+ */
+function readPreviewDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Could not preview that file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * `fetch` gives no upload progress at all — the response promise only
+ * resolves once the whole round trip is done — so the Cloudinary POST
+ * specifically goes through `XMLHttpRequest` instead, purely for its
+ * `upload.onprogress` event. A multi-megabyte photo over a slow uplink is
+ * the normal case here, not the exception, so silence for the whole
+ * duration is a real gap, not a cosmetic one.
+ */
+function uploadWithProgress(
+  url: string,
+  body: FormData,
+  onProgress: (percent: number) => void,
+): Promise<{ ok: boolean; json: Record<string, unknown> }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    xhr.onload = () => {
+      try {
+        resolve({ ok: xhr.status >= 200 && xhr.status < 300, json: JSON.parse(xhr.responseText) });
+      } catch {
+        reject(new Error('Cloudinary returned an unexpected response.'));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error while uploading to Cloudinary.'));
+    xhr.send(body);
+  });
+}
+
 export function ImageUploader({ productId }: { productId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [alt, setAlt] = useState('');
+  const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+
+  async function handleFileChange() {
+    setError(null);
+    setSuccess(null);
+    const file = inputRef.current?.files?.[0];
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    try {
+      setPreview(await readPreviewDataUrl(file));
+    } catch {
+      setPreview(null);
+    }
+  }
 
   async function handleUpload() {
     setError(null);
+    setSuccess(null);
     const file = inputRef.current?.files?.[0];
     if (!file) {
       setError('Choose a file first.');
@@ -58,6 +122,7 @@ export function ImageUploader({ productId }: { productId: string }) {
     }
 
     setUploading(true);
+    setProgress(0);
     try {
       const format = file.type.split('/')[1]?.toLowerCase() ?? '';
       if (!(ALLOWED_IMAGE_FORMATS as readonly string[]).includes(format === 'jpg' ? 'jpeg' : format)) {
@@ -90,22 +155,24 @@ export function ImageUploader({ productId }: { productId: string }) {
       body.set('allowed_formats', allowedFormats);
       body.set('max_file_size', String(maxFileSize));
 
-      const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
+      const uploadResult = await uploadWithProgress(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         body,
-      });
-      const uploadJson = await uploadResponse.json();
-      if (!uploadResponse.ok) {
-        setError(uploadJson?.error?.message ?? 'Upload to Cloudinary failed.');
+        setProgress,
+      );
+      if (!uploadResult.ok) {
+        const message = uploadResult.json?.error as { message?: string } | undefined;
+        setError(message?.message ?? 'Upload to Cloudinary failed.');
         return;
       }
+      const uploadJson = uploadResult.json;
 
       const saveResult = await saveProductImageAction(productId, {
-        publicId: uploadJson.public_id,
-        url: uploadJson.secure_url,
-        format: uploadJson.format,
-        width: uploadJson.width,
-        height: uploadJson.height,
+        publicId: uploadJson.public_id as string,
+        url: uploadJson.secure_url as string,
+        format: uploadJson.format as string,
+        width: uploadJson.width as number,
+        height: uploadJson.height as number,
         alt: alt.trim(),
       });
       if (!saveResult.ok) {
@@ -113,13 +180,16 @@ export function ImageUploader({ productId }: { productId: string }) {
         return;
       }
 
+      setSuccess(`"${alt.trim()}" uploaded.`);
       setAlt('');
+      setPreview(null);
       if (inputRef.current) inputRef.current.value = '';
       router.refresh();
-    } catch {
-      setError('Something went wrong reading or uploading that file.');
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Something went wrong reading or uploading that file.');
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   }
 
@@ -151,12 +221,32 @@ export function ImageUploader({ productId }: { productId: string }) {
         ref={inputRef}
         type="file"
         accept={ACCEPT}
+        onChange={handleFileChange}
         className="mt-2 w-full type-body"
       />
+
+      {preview && (
+        // A local data: preview of a file that has not been uploaded
+        // anywhere yet — next/image needs a real, hostable src, and
+        // Cloudinary's own optimisation applies once this is uploaded and
+        // rendered as a real ProductImage instead.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={preview}
+          alt="Preview of the file chosen above, before upload"
+          className="mt-4 aspect-square w-32 rounded-control border border-line object-cover"
+        />
+      )}
 
       {error && (
         <p role="alert" className="mt-4 rounded-control border border-warning px-4 py-3 type-body text-warning">
           {error}
+        </p>
+      )}
+
+      {success && !uploading && (
+        <p role="status" className="mt-4 rounded-control border border-success px-4 py-3 type-body text-success">
+          {success}
         </p>
       )}
 
@@ -166,8 +256,24 @@ export function ImageUploader({ productId }: { productId: string }) {
         disabled={uploading}
         className="mt-6 rounded-control bg-signal px-6 py-3 type-body font-medium text-white disabled:opacity-60"
       >
-        {uploading ? 'Uploading…' : 'Upload'}
+        {uploading ? (progress !== null ? `Uploading… ${progress}%` : 'Uploading…') : 'Upload'}
       </button>
+
+      {uploading && (
+        <div
+          role="progressbar"
+          aria-label="Upload progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress ?? 0}
+          className="mt-3 h-1 w-full overflow-hidden rounded-full bg-line"
+        >
+          <div
+            className="motion-lift h-full bg-signal"
+            style={{ width: `${progress ?? 0}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }

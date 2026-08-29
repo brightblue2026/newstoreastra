@@ -1167,3 +1167,55 @@ The 24 real fragrance names *are* in the database, on that draft product's 72 va
 would make a genuine centrepiece for the record section. Surfacing them would mean reading
 from an unpublished product, which is exactly what the publish guard exists to prevent —
 so it is a product decision, not a change to make unilaterally.
+
+### Product image upload — the post-upload gap · 28 August 2026
+
+Client asked for a research pass on "everything," specifically calling out what happens
+after an upload. The upload path itself (`images/actions.ts`) had already been through
+the security review above — signed, folder-scoped, race-safe `sortOrder` assignment — but
+what an admin could actually *do* on that screen once photos existed stopped at "delete."
+Compared against how Shopify's and WooCommerce's media panels handle the same screen:
+
+- **No way to change which photo leads, short of delete-and-re-upload in the right
+  order.** `product.images[0]` (by `sortOrder`) is what the storefront shows on cards and
+  search results (`(storefront)/products/[slug]/page.tsx`), but nothing in the admin ever
+  showed that, or let it be changed. Added `moveProductImageAction` — an up/down swap of
+  two adjacent `sortOrder` values under the same per-product advisory lock the upload path
+  already uses, so two admins reordering at once still serialise correctly — and a "Cover
+  image" badge on whichever photo currently leads.
+  - **Not drag-and-drop.** Shopify's own panel is drag-to-reorder, but that needs a
+    pointer-events library this stack doesn't have, and CLAUDE.md's working agreement is
+    explicit: "ask before adding a dependency outside the locked stack," and "when
+    ambiguous, pick what keeps the admin simpler — the users are not technical." Two
+    buttons per photo cross that bar without a new dependency; revisit if a catalogue with
+    many photos per product makes one-step-at-a-time reordering genuinely tedious.
+- **Delete had no confirmation step**, for an action that is not reversible —
+  `deleteProductImageAction` calls `safeDestroy`, which actually removes the asset from
+  Cloudinary. Wrapped it in `window.confirm()` rather than building a custom dialog
+  component, for the same "keep the admin simple" reason as above.
+- **No feedback during the upload itself beyond a static "Uploading…" label** — for a
+  file that can legitimately be up to 20MB (`MAX_UPLOAD_BYTES`) on what may often be a
+  slower connection, that's silence for however long the POST takes. Switched the
+  Cloudinary POST from `fetch` (no progress API at all) to `XMLHttpRequest`, the only way
+  to get real `upload.onprogress` events in a browser, and added a percentage to the
+  button label plus a progress bar.
+- **No preview of the chosen file before uploading**, so a wrong file wasn't caught until
+  after the round trip. Added a local preview via `FileReader.readAsDataURL` — deliberately
+  not `URL.createObjectURL`, which produces a `blob:` URL the CSP's `img-src` (`self`,
+  `data:`, `res.cloudinary.com`) would silently block; the existing dimension-check code
+  in this same file already worked around the identical constraint via
+  `createImageBitmap` instead.
+- **A successful upload gave no confirmation beyond the grid silently updating** — nothing
+  for a screen-reader user, and nothing for a sighted one who wasn't watching the grid.
+  Added a `role="status"` success message naming the alt text that was just saved.
+- **Deliberately did not build multi-file (batch) upload.** WooCommerce and Shopify both
+  support it, but every image here needs its own real, specific alt text (the master
+  brief's photography checklist plus WCAG's own requirement) — a batch flow either forces
+  one shared alt text across every file in the batch, which is wrong on its face, or needs
+  a per-file alt-text queue UI, which is a real scope increase for a one-photographer-at-a-
+  time catalogue workflow. Flagged rather than built; revisit if the MX-3 Semi-Gel rollout
+  or a future brand's onboarding makes uploading many photos per sitting a routine event
+  rather than an occasional one.
+
+All four gates re-verified after: `pnpm typecheck`, `pnpm lint`, `pnpm test` (302, unchanged
+— no new pure logic to unit-test here, this is UI/interaction), `pnpm build`.
