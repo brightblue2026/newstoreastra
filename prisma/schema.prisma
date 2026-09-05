@@ -51,6 +51,7 @@ enum Segment {
   PERSONAL_CARE
   FOOD
   BEVERAGE
+  FRAGRANCE
 }
 
 model Category {

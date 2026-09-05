@@ -12,6 +12,7 @@ const SEGMENTS = [
   'PERSONAL_CARE',
   'FOOD',
   'BEVERAGE',
+  'FRAGRANCE',
 ] as const;
 
 function segmentLabel(segment: string): string {

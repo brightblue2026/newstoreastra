@@ -580,6 +580,51 @@ see `PROGRESS.md` for what is verified and what is not.
   the Pay button. Five directives widened with the reason for each recorded in
   `next.config.ts`.
 
+## bbtcglobal.com reviewed · 16 August 2026
+
+Full extract in `docs/bbtcglobal-catalogue.md`. One page; the sitemap has a single URL.
+
+- **The site is a secondary source, ranked below the client's documents.** It carries no
+  prices, no HSN codes, no pack sizes for half the food range, and does not name the 24 MX-3
+  fragrances the label photographs already gave us. Where the two disagree the documents
+  win — brightblue.in's brochure was already wrong once about MX-3 sizes.
+- **There is an eighth brand, MAKAFA (perfume).** Named in BBTC's own copy, absent from the
+  master brief §3/§11, the seed, and this repo entirely. `CLAUDE.md` corrected from seven
+  brands to eight. **Seeded on the client's instruction, 16 August 2026** — `Segment` gains
+  `FRAGRANCE` (migration `20260816090000_segment_fragrance`; appended to the enum because
+  `ALTER TYPE … ADD VALUE` cannot reorder, and display order comes from `sortOrder` anyway).
+  **Its accent `#6B4E9E` is the one invented colour in the seed** — every other came from the
+  client's frontend spec, which predates MAKAFA. Chosen to sit clear of Rafasi's `#7C5CD6`;
+  replace it when real perfume artwork arrives. No MAKAFA products: the site names none.
+- **`Fairoze` confirmed over `FAIROZ`,** 16 August 2026. The site uses both; the client
+  confirmed Fairoze, which is what was already seeded, so nothing changed.
+- **The storefront's own copy said "seven" in six visible places** — the homepage and shop
+  headings and four `content.ts` defaults, including the announcement bar. All corrected to
+  eight, and the segment lists that read "cleaning, personal care and food" now name
+  fragrance. Also `'24 fragrances of MX-3'` → `'24 fragrances of MX-3 dishwash'`: with a real
+  perfume brand in the portfolio, the unqualified line attributes the world record to the
+  wrong product. The admin brand form's hardcoded `SEGMENTS` array needed the new value too —
+  the Zod schema derives from `Object.values(Segment)` and picked it up on its own, but the
+  `<select>` did not, so no admin could have set a brand to Fragrance.
+- **Rafasi's Front Load / Top Load stays descriptive text on the variant, not a schema
+  field.** Client's call, 16 August 2026. It is neither a size nor a fragrance, so a
+  structured third axis would have meant a migration and a multiplied SKU count for one
+  brand. The cost is that load type is not filterable — acceptable while Rafasi has two
+  formulations. Revisit if a second brand acquires the same split.
+- **Two Kenzaniya products sit outside both FSSAI registrations.** Himalayan Pink Salt and
+  Marayoor Sharkara are covered by neither `21325201000650` (Biscuit, Tea) nor
+  `21326201000001` (Ghee, Pickles, Rice, Wheat, Millets, Chia seeds, flours, bread). Multi
+  Sweet Seed Mix and the caffeine-free Herbal Tea Bags are arguable. BBTC is publicly
+  marketing these today, so this is a live compliance question about the business, not just
+  a publish-gate question for the store. Raise it with the client alongside the ₹12 lakh
+  turnover cap.
+- **The Kaloor head-office address is not a GSTIN conflict.** The site gives Kaloor; the GST
+  registration's principal place is Pullepady. Kaloor is one of the four additional places of
+  business on the same GSTIN, so both are real. Invoices keep the principal place.
+- **Five new group companies appear** (Hanna Productions, Ilfa Productions, AGP Enterprises,
+  Hannasagar Productions, Shine Links Productions). None is evidenced as a seller of record,
+  so `Entity.isSeller` is untouched.
+
 ## Open questions blocking real catalogue data
 
 Per §14. Client supplied source documents on 9 August 2026 (trade licence, two FSSAI

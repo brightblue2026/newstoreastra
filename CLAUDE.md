@@ -6,15 +6,20 @@ Project memory. Loaded every session. Detailed spec lives in
 ## What this is
 
 Ecommerce store + admin panel for Bright Blue Trading Corporation, an FMCG manufacturer
-in Ernakulam, Kerala, founded 2019 by V.K. Faisal. **Seven brands, 100+ SKUs, spanning
-cleaning, personal care, and food.** Replaces a broken WooCommerce site.
+in Ernakulam, Kerala, founded 2019 by V.K. Faisal. **Eight brands, 100+ SKUs, spanning
+cleaning, personal care, food and fragrance.** Replaces a broken WooCommerce site.
 Single Next.js app, single Postgres database.
 
 Brands: MX-3 (dish) · Rafasi (fabric) · Landfloro (floor) · Fairoze (personal care) ·
-ANSAF (car) · Ilfa Valley (tea) · Kenzaniya (honey, spices, nuts, seeds, pickles, ghee).
-**Plus MAKAFA (Premium Perfume & Fragrance)** — confirmed real 22 August 2026 (found on
-bbtcglobal.com, absent from the original brochure and master brief), in scope for later.
-Not seeded yet — catalogue work is currently MX-3 only, see DECISIONS.md.
+ANSAF (car) · Ilfa Valley (tea) · Kenzaniya (honey, spices, nuts, seeds, pickles, ghee) ·
+MAKAFA (Premium Perfume & Fragrance).
+
+MAKAFA is the eighth brand — confirmed real 22 August 2026 (found on bbtcglobal.com,
+absent from the original brochure and master brief). It now has a `FRAGRANCE` segment,
+a seed row and a **provisional** accent colour; products and licences are still
+unseeded, and catalogue work remains MX-3 only. See `docs/bbtcglobal-catalogue.md` and
+DECISIONS.md. **This is not a fragrance store**: the 24 fragrances are MX-3 *dishwash*
+variants, and MAKAFA perfume is one brand of eight.
 
 **Domains**: the store itself is hosted at brightbluefmcg.com. bbtcglobal.com is a
 separate, currently-live static corporate site — not this app. brightblue.in is the old

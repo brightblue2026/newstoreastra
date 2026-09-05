@@ -75,7 +75,7 @@ export default async function ShopPage({
         </RevealItem>
         <RevealItem>
           <p className="mt-6 max-w-2xl type-body-lg text-ink-soft">
-            Seven houses, made in one factory in Ernakulam.
+            Eight houses, made in one factory in Ernakulam.
           </p>
         </RevealItem>
       </Reveal>

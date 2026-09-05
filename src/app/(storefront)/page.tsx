@@ -137,12 +137,12 @@ export default async function HomePage() {
         ))}
       </Reveal>
 
-      {/* 07 — the seven houses */}
+      {/* 07 — the eight houses */}
       {brands.length > 0 && (
         <section className="border-t border-line">
           <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
             <RevealItem>
-              <h2 className="type-display-sm">Seven houses, one factory</h2>
+              <h2 className="type-display-sm">Eight houses, one factory</h2>
             </RevealItem>
             <RevealItem className="mt-16">
               <HouseSpectrum brands={brands} />

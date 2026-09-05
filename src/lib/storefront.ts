@@ -26,7 +26,7 @@ export type HouseBrand = NavBrand & {
   logoUrl: string | null;
 };
 
-/** The seven houses, in their configured order. */
+/** The eight houses, in their configured order. */
 export async function getBrands(): Promise<HouseBrand[]> {
   try {
     const brands = await db.brand.findMany({

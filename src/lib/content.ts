@@ -89,9 +89,11 @@ export type ContentData<K extends ContentKey> = z.infer<(typeof SCHEMAS)[K]>;
 const DEFAULTS: { [K in ContentKey]: ContentData<K> } = {
   announcement_bar: {
     items: [
-      'Seven brands, one manufacturer',
+      'Eight brands, one manufacturer',
       'International Book of Records holder',
-      '24 fragrances of MX-3',
+      // "dishwash" is load-bearing now that MAKAFA sells actual perfume: without
+      // it, the record reads as though it were about the fragrance brand.
+      '24 fragrances of MX-3 dishwash',
       'Made in Kerala',
     ],
   },
@@ -101,7 +103,7 @@ const DEFAULTS: { [K in ContentKey]: ContentData<K> } = {
     before: '24 scents.',
     emphasis: 'One obsession.',
     after: '',
-    body: 'Home care, personal care and food, manufactured in Kerala since 2019. Seven brands under one roof.',
+    body: 'Home care, personal care, food and fragrance, manufactured in Kerala since 2019. Eight brands under one roof.',
     ctaLabel: 'Shop all',
     ctaHref: '/shop',
   },
@@ -115,7 +117,7 @@ const DEFAULTS: { [K in ContentKey]: ContentData<K> } = {
   trust_badges: {
     badges: [
       { label: 'Made in Kerala', detail: 'Registered in Ernakulam, manufactured in Palakkad' },
-      { label: 'Seven brands', detail: 'Cleaning, personal care and food, one manufacturer' },
+      { label: 'Eight brands', detail: 'Cleaning, personal care, food and fragrance, one manufacturer' },
       { label: 'Bulk & distributor', detail: 'Wholesale pricing for trade enquiries' },
       { label: 'Since 2019', detail: 'Founded by V.K. Faisal' },
     ],
@@ -149,9 +151,9 @@ const DEFAULTS: { [K in ContentKey]: ContentData<K> } = {
   },
 
   home_story: {
-    heading: 'One company, seven houses',
+    heading: 'One company, eight houses',
     paragraphs: [
-      'Bright Blue Trading Corporation was founded in 2019 by V.K. Faisal. What began as a single cleaning line has become seven brands spanning cleaning, personal care and food — all manufactured rather than resold.',
+      'Bright Blue Trading Corporation was founded in 2019 by V.K. Faisal. What began as a single cleaning line has become eight brands spanning cleaning, personal care, food and fragrance — all manufactured rather than resold.',
       'The registered office is in Ernakulam; manufacturing runs from Palakkad. Between them sit the formulation, filling and packing units that make every product sold here.',
     ],
   },
