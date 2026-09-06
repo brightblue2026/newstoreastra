@@ -86,50 +86,52 @@ export default async function ComboItemsPage({
           No components yet. This combo cannot publish without at least one.
         </p>
       ) : (
-        <table className="mt-8 w-full border-collapse">
-          <thead>
-            <tr className="border-b border-line text-left">
-              <th className="py-3 type-caption text-ink-soft">Variant</th>
-              <th className="py-3 type-caption text-ink-soft">Quantity</th>
-              <th className="py-3 type-caption text-ink-soft">Choice slot</th>
-              <th className="py-3 type-caption text-ink-soft">Price</th>
-              <th className="py-3 type-caption text-ink-soft" />
-            </tr>
-          </thead>
-          <tbody>
-            {combo.items.map((item) => (
-              <tr key={item.id} className="border-b border-line">
-                <td className="py-3 type-body">
-                  {item.variant.product.name}
-                  {item.variant.variantName ? ` — ${item.variant.variantName}` : ''}{' '}
-                  <span className="type-mono text-ink-soft">({item.variant.sku})</span>
-                </td>
-                <td className="py-3 type-body text-ink-soft">{item.quantity}</td>
-                <td className="py-3 type-body text-ink-soft">
-                  {item.isChoice ? (item.choiceOf.length > 0 ? 'Restricted' : 'Any') : '—'}
-                </td>
-                <td className="py-3 type-mono" data-price>
-                  {item.variant.pricePaise === null ? '—' : formatINR(item.variant.pricePaise)}
-                </td>
-                <td className="py-3 text-right">
-                  <div className="flex justify-end gap-4">
-                    <Link
-                      href={`/admin/combos/${combo.id}/items/${item.id}`}
-                      className="type-body text-signal"
-                    >
-                      Edit
-                    </Link>
-                    <form action={deleteComboItemAction.bind(null, combo.id, item.id)}>
-                      <button type="submit" className="type-body text-ink-soft underline">
-                        Remove
-                      </button>
-                    </form>
-                  </div>
-                </td>
+        <div className="mt-8 overflow-x-auto">
+          <table className="w-full min-w-3xl border-collapse">
+            <thead>
+              <tr className="border-b border-line text-left">
+                <th className="py-3 type-caption text-ink-soft">Variant</th>
+                <th className="py-3 type-caption text-ink-soft">Quantity</th>
+                <th className="py-3 type-caption text-ink-soft">Choice slot</th>
+                <th className="py-3 type-caption text-ink-soft">Price</th>
+                <th className="py-3 type-caption text-ink-soft" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {combo.items.map((item) => (
+                <tr key={item.id} className="border-b border-line">
+                  <td className="py-3 type-body">
+                    {item.variant.product.name}
+                    {item.variant.variantName ? ` — ${item.variant.variantName}` : ''}{' '}
+                    <span className="type-mono text-ink-soft">({item.variant.sku})</span>
+                  </td>
+                  <td className="py-3 type-body text-ink-soft">{item.quantity}</td>
+                  <td className="py-3 type-body text-ink-soft">
+                    {item.isChoice ? (item.choiceOf.length > 0 ? 'Restricted' : 'Any') : '—'}
+                  </td>
+                  <td className="py-3 type-mono" data-price>
+                    {item.variant.pricePaise === null ? '—' : formatINR(item.variant.pricePaise)}
+                  </td>
+                  <td className="py-3 text-right">
+                    <div className="flex justify-end gap-4">
+                      <Link
+                        href={`/admin/combos/${combo.id}/items/${item.id}`}
+                        className="type-body text-signal"
+                      >
+                        Edit
+                      </Link>
+                      <form action={deleteComboItemAction.bind(null, combo.id, item.id)}>
+                        <button type="submit" className="type-body text-ink-soft underline">
+                          Remove
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

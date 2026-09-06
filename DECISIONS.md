@@ -1033,3 +1033,41 @@ higher-confidence; those are called out below.
 - **No recovery path exists if the sole ADMIN account gets locked out by the per-email
   login rate limit.** Worth having a break-glass plan (a second admin account, or a documented
   manual unlock) before this ever goes live with only one admin.
+
+## Mobile navigation and admin table overflow · 6 September 2026
+
+- **The storefront had no mobile navigation at all.** Brands, Shop, Our story and
+  Stockists lived in a single `hidden md:flex` row, so below 768px a phone could reach
+  the logo and the cart and nothing else — the footer link list was the only way to move
+  around the site on the device most customers use. `Nav.tsx` now has a disclosure panel
+  below `md` carrying the primary links and all eight brands.
+- The toggle is a **text label** ("Menu" / "Close"), not a hamburger glyph: this project
+  has no icon set and CLAUDE.md rules out emoji. It matches `CartDrawer`'s "Close".
+- The panel reuses `CartDrawer`'s scroll-lock idiom — save `document.body.style.overflow`,
+  set `hidden`, restore the saved value — so two overlays closing in either order cannot
+  strand the page unscrollable.
+- The panel closes on Escape, on any link, and on crossing the `md` breakpoint. That last
+  one matters on a phone: rotating to landscape can cross 768px and would otherwise leave
+  the panel open behind a desktop bar with no visible way to dismiss it.
+- The header's hide-on-scroll-down is suppressed while either menu is open, so an open
+  panel cannot be carried off screen by a stray scroll.
+- **The brand mega-menu was still `lg:grid-cols-7`** — left over from seven brands, so
+  MAKAFA wrapped alone onto a second row. Now `sm:grid-cols-2 lg:grid-cols-4`: four
+  across, two even rows of eight.
+- **Seven admin tables overflowed horizontally on a phone.** Each is now wrapped in
+  `overflow-x-auto` with a `min-w-3xl` floor on the table, the pattern the orders table
+  already used — the wrapper scrolls rather than the page, and columns are not crushed
+  into unreadable slivers. The settings weight-slab table was **deliberately left alone**:
+  two input columns inside a `max-w-xl` form already fit, and a `min-w` floor there would
+  have created horizontal scrolling where there was none.
+
+**Bug fix, pre-existing and unrelated to the above:**
+
+- A **duplicate stock code in the bulk variant rows reported "That slug is already in
+  use."** The P2002 handler read only `error.meta.target`, which a Prisma driver adapter
+  never sets — it nests the cause under `meta.driverAdapterError.cause.constraint.fields`.
+  The check had therefore never matched in this configuration. Now read through
+  `unique-conflict.ts`, unit-tested against the real error shape this project produces and
+  verified end to end through the full product form. The single-variant form needed no
+  change: `sku` is the only unique column on `ProductVariant`, so its blanket message was
+  already correct.

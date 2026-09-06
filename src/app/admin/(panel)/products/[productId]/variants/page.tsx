@@ -42,65 +42,67 @@ export default async function VariantsPage({
           No variants yet. This product cannot publish without at least one.
         </p>
       ) : (
-        <table className="mt-8 w-full border-collapse">
-          <thead>
-            <tr className="border-b border-line text-left">
-              <th className="py-3 type-caption text-ink-soft">SKU</th>
-              <th className="py-3 type-caption text-ink-soft">Variant</th>
-              <th className="py-3 type-caption text-ink-soft">Size</th>
-              <th className="py-3 type-caption text-ink-soft">Price</th>
-              <th className="py-3 type-caption text-ink-soft">Status</th>
-              <th className="py-3 type-caption text-ink-soft" />
-            </tr>
-          </thead>
-          <tbody>
-            {product.variants.map((variant) => (
-              <tr key={variant.id} className="border-b border-line">
-                <td className="py-3 type-mono text-ink-soft">{variant.sku}</td>
-                <td className="py-3 type-body">
-                  {variant.variantHex && (
-                    <span
-                      aria-hidden
-                      className="mr-2 inline-block h-3 w-3 rounded-full align-middle"
-                      style={{ backgroundColor: variant.variantHex }}
-                    />
-                  )}
-                  {variant.variantName ?? '—'}
-                </td>
-                <td className="py-3 type-body text-ink-soft">
-                  {variant.size}
-                  {variant.format ? ` · ${variant.format}` : ''}
-                </td>
-                <td className="py-3 type-mono" data-price>
-                  {formatPrice(variant.pricePaise)}
-                </td>
-                <td className="py-3 type-body">{variant.isActive ? 'Active' : 'Inactive'}</td>
-                <td className="py-3 text-right">
-                  <div className="flex justify-end gap-4">
-                    <Link
-                      href={`/admin/products/${product.id}/variants/${variant.id}`}
-                      className="type-body text-signal"
-                    >
-                      Edit
-                    </Link>
-                    <form
-                      action={setVariantActiveAction.bind(
-                        null,
-                        product.id,
-                        variant.id,
-                        !variant.isActive,
-                      )}
-                    >
-                      <button type="submit" className="type-body text-ink-soft underline">
-                        {variant.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </form>
-                  </div>
-                </td>
+        <div className="mt-8 overflow-x-auto">
+          <table className="w-full min-w-3xl border-collapse">
+            <thead>
+              <tr className="border-b border-line text-left">
+                <th className="py-3 type-caption text-ink-soft">SKU</th>
+                <th className="py-3 type-caption text-ink-soft">Variant</th>
+                <th className="py-3 type-caption text-ink-soft">Size</th>
+                <th className="py-3 type-caption text-ink-soft">Price</th>
+                <th className="py-3 type-caption text-ink-soft">Status</th>
+                <th className="py-3 type-caption text-ink-soft" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {product.variants.map((variant) => (
+                <tr key={variant.id} className="border-b border-line">
+                  <td className="py-3 type-mono text-ink-soft">{variant.sku}</td>
+                  <td className="py-3 type-body">
+                    {variant.variantHex && (
+                      <span
+                        aria-hidden
+                        className="mr-2 inline-block h-3 w-3 rounded-full align-middle"
+                        style={{ backgroundColor: variant.variantHex }}
+                      />
+                    )}
+                    {variant.variantName ?? '—'}
+                  </td>
+                  <td className="py-3 type-body text-ink-soft">
+                    {variant.size}
+                    {variant.format ? ` · ${variant.format}` : ''}
+                  </td>
+                  <td className="py-3 type-mono" data-price>
+                    {formatPrice(variant.pricePaise)}
+                  </td>
+                  <td className="py-3 type-body">{variant.isActive ? 'Active' : 'Inactive'}</td>
+                  <td className="py-3 text-right">
+                    <div className="flex justify-end gap-4">
+                      <Link
+                        href={`/admin/products/${product.id}/variants/${variant.id}`}
+                        className="type-body text-signal"
+                      >
+                        Edit
+                      </Link>
+                      <form
+                        action={setVariantActiveAction.bind(
+                          null,
+                          product.id,
+                          variant.id,
+                          !variant.isActive,
+                        )}
+                      >
+                        <button type="submit" className="type-body text-ink-soft underline">
+                          {variant.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

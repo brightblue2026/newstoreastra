@@ -8,6 +8,7 @@ import { recordAudit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 import { type FoodLabel, foodLabelIncomplete, parseClaims, parseSteps, readFoodLabel } from './format';
+import { isVariantSkuConflict } from './unique-conflict';
 import { parseVariantRowsJson } from './variant-rows';
 
 export interface ProductFormState {
@@ -240,9 +241,11 @@ export async function createProductAction(
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const target = Array.isArray(error.meta?.target) ? error.meta.target.join(', ') : '';
-      if (target.includes('sku')) {
-        return { error: 'One of the variant SKUs is already in use by another product.' };
+      // Which field clashed is not readable from `meta.target` alone under a
+      // driver adapter — see `unique-conflict.ts`. Reading only that shape told
+      // the user their web address was taken when a stock code was the real clash.
+      if (isVariantSkuConflict(error)) {
+        return { error: 'One of the variant stock codes is already in use by another product.' };
       }
       return { error: 'That slug is already in use.', fieldErrors: { slug: 'Already taken.' } };
     }

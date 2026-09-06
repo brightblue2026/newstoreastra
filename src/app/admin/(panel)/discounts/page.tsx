@@ -49,50 +49,52 @@ export default async function DiscountsPage() {
       {discounts.length === 0 ? (
         <p className="mt-12 type-body text-ink-soft">No discounts yet. Create the first one.</p>
       ) : (
-        <table className="mt-8 w-full border-collapse">
-          <thead>
-            <tr className="border-b border-line text-left">
-              <th className="py-3 type-caption text-ink-soft">Name</th>
-              <th className="py-3 type-caption text-ink-soft">Code</th>
-              <th className="py-3 type-caption text-ink-soft">Value</th>
-              <th className="py-3 type-caption text-ink-soft">Scope</th>
-              <th className="py-3 type-caption text-ink-soft">Status</th>
-              <th className="py-3 type-caption text-ink-soft" />
-            </tr>
-          </thead>
-          <tbody>
-            {discounts.map((discount) => (
-              <tr key={discount.id} className="border-b border-line">
-                <td className="py-3 type-body">{discount.name}</td>
-                <td className="py-3 type-mono text-ink-soft">{discount.code ?? 'Automatic'}</td>
-                <td className="py-3 type-body text-ink-soft">{describeValue(discount)}</td>
-                <td className="py-3 type-body text-ink-soft">{discount.scope}</td>
-                <td className="py-3 type-body">{discount.isActive ? 'Active' : 'Inactive'}</td>
-                <td className="py-3 text-right">
-                  <div className="flex justify-end gap-4">
-                    <Link
-                      href={`/admin/discounts/${discount.id}`}
-                      className="type-body text-signal"
-                    >
-                      Edit
-                    </Link>
-                    <form
-                      action={setDiscountActiveAction.bind(
-                        null,
-                        discount.id,
-                        !discount.isActive,
-                      )}
-                    >
-                      <button type="submit" className="type-body text-ink-soft underline">
-                        {discount.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </form>
-                  </div>
-                </td>
+        <div className="mt-8 overflow-x-auto">
+          <table className="w-full min-w-3xl border-collapse">
+            <thead>
+              <tr className="border-b border-line text-left">
+                <th className="py-3 type-caption text-ink-soft">Name</th>
+                <th className="py-3 type-caption text-ink-soft">Code</th>
+                <th className="py-3 type-caption text-ink-soft">Value</th>
+                <th className="py-3 type-caption text-ink-soft">Scope</th>
+                <th className="py-3 type-caption text-ink-soft">Status</th>
+                <th className="py-3 type-caption text-ink-soft" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {discounts.map((discount) => (
+                <tr key={discount.id} className="border-b border-line">
+                  <td className="py-3 type-body">{discount.name}</td>
+                  <td className="py-3 type-mono text-ink-soft">{discount.code ?? 'Automatic'}</td>
+                  <td className="py-3 type-body text-ink-soft">{describeValue(discount)}</td>
+                  <td className="py-3 type-body text-ink-soft">{discount.scope}</td>
+                  <td className="py-3 type-body">{discount.isActive ? 'Active' : 'Inactive'}</td>
+                  <td className="py-3 text-right">
+                    <div className="flex justify-end gap-4">
+                      <Link
+                        href={`/admin/discounts/${discount.id}`}
+                        className="type-body text-signal"
+                      >
+                        Edit
+                      </Link>
+                      <form
+                        action={setDiscountActiveAction.bind(
+                          null,
+                          discount.id,
+                          !discount.isActive,
+                        )}
+                      >
+                        <button type="submit" className="type-body text-ink-soft underline">
+                          {discount.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
