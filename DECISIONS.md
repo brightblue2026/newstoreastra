@@ -1071,3 +1071,60 @@ higher-confidence; those are called out below.
   verified end to end through the full product form. The single-variant form needed no
   change: `sku` is the only unique column on `ProductVariant`, so its blanket message was
   already correct.
+
+## Missing-page and error handling on the storefront · 6 September 2026
+
+The storefront had no `not-found`, `error` or `loading` boundary of any kind — only the
+admin panel did. Three things followed from that, all confirmed against a real
+`next build` + `next start`, not just `next dev`:
+
+- **A missing product, brand, category or combo rendered a completely blank page.** Status
+  404, body empty: no message, no header, no footer, no way back. For a store replacing a
+  live WooCommerce site, whose old links will be followed for years, this was the worst
+  failure mode on the site.
+- An unmatched URL got Next's built-in black-on-white "404: This page could not be found".
+- A failed render fell through to Next's default error screen.
+
+**`notFound()` does not render a not-found boundary in this app's production build.** This
+was worth pinning down rather than guessing, because the obvious fix does not work. A
+boundary was tried at the route-group level (`(storefront)/not-found.tsx`) and again at the
+exact segment level (`products/[slug]/not-found.tsx`); both render correctly under
+`next dev` and both are ignored under `next start`, which returns 404 with an empty body.
+Ruled out along the way: the async storefront layout, ISR (`revalidate = 60`), and the
+Suspense boundary introduced by `loading.tsx` — the blank page reproduces with all three
+removed, and with no boundary files present at all. The likeliest remaining cause is the
+`authInterrupts` experimental flag, which cannot simply be turned off: `forbidden()` is
+what gives the admin role guards a 403 instead of a redirect.
+
+So the pages render the not-found view **directly** instead of calling `notFound()`:
+
+- `components/NotFoundView.tsx` is shared by products, brands, categories and combos, each
+  with its own wording. The order lookup uses its own `Shell`, matching the states already
+  around it.
+- The cost is an HTTP 200 where 404 would be correct. That is bought back with
+  `robots: { index: false, follow: true }` in each page's `generateMetadata`, so the page
+  cannot be indexed as a soft 404 while remaining a real, navigable page for a customer.
+  A blank page at the right status is worse for a customer than a good page at the wrong
+  one; `follow: true` keeps the crawler moving through the links on it.
+- `app/not-found.tsx` is kept and **does** work — an unmatched URL never enters the
+  storefront route group, so it is served by the root boundary at a correct 404. It is
+  deliberately synchronous and database-free: whatever is broken enough to land someone
+  there must not be able to make that page fail too.
+- The route-group `not-found.tsx` was deleted rather than left in place. Something that
+  renders only in development is worse than nothing — the next person would trust it.
+
+Also added:
+
+- `(storefront)/error.tsx`, mirroring the admin boundary: a branded recovery screen with a
+  working "Try again", and the digest surfaced because Next redacts the real message in
+  production and the digest is the only thing tying a customer's report to the server log.
+- `(storefront)/loading.tsx`, a skeleton shaped like `ProductGrid` — same gap, same
+  breakpoints, same square card — so content does not jump when it arrives. The pulse
+  needs no reduced-motion guard of its own; the global rule in `globals.css` flattens it.
+- **Search was reachable only from the footer.** It is now in the header alongside Shop,
+  Our story and Stockists, and in the mobile panel.
+
+**A note on verifying this work:** several intermediate readings during this session were
+wrong because `pkill -f "next start"` does not kill the Node process on Windows, so tests
+ran against a stale server still holding port 3000. Kill it by port
+(`Get-NetTCPConnection -LocalPort 3000`) before trusting any production check.

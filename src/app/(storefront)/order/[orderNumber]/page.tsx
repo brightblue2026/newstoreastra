@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { CONTACT } from '@/lib/contact';
 import { formatINR } from '@/lib/money';
 import { formatRate } from '@/lib/gst';
@@ -67,7 +66,19 @@ export default async function OrderPage({
     );
   }
 
-  if (!order) notFound();
+  if (!order) {
+    return (
+      <Shell title="We couldn't find that order">
+        <p className="type-body text-ink-soft">
+          Check the order number and the link from your confirmation — both have to match.
+          If it still doesn&apos;t open, call {CONTACT.tollFree} and we can look it up.
+        </p>
+        <Link href="/shop" className="mt-8 inline-block type-body text-signal">
+          Back to the catalogue
+        </Link>
+      </Shell>
+    );
+  }
 
   const awaitingPayment = order.status === OrderStatus.PENDING_PAYMENT;
 

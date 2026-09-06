@@ -30,7 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Local dev server output (`pnpm dev > dev.log`)
+# Local dev server output (`pnpm dev > dev.log
+prod.log`)
 dev.log
 
 # env files — secrets never enter the repo, but the template must

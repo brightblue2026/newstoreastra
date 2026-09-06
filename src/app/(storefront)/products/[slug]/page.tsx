@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
+import NotFoundView from '@/components/NotFoundView';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import ProductDetail from '@/components/ProductDetail';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid from '@/components/ProductGrid';
@@ -20,7 +20,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await getProductBySlug(slug);
 
-  if (!product) return { title: 'Product not found' };
+  if (!product) return { title: 'Product not found', robots: { index: false, follow: true } };
 
   return {
     title: product.metaTitle ?? product.name,
@@ -117,7 +117,12 @@ export default async function ProductDetailPage({
   const { slug } = await params;
 
   const product = await getProductBySlug(slug);
-  if (!product) notFound();
+  if (!product) return (
+      <NotFoundView
+        heading="We couldn't find that product"
+        body="The link may be out of date, or the product may no longer be listed. Everything we make is still here — start from the catalogue, or search for it by name."
+      />
+    );
 
   // Same brand, minus this product. A related rail is worth having only when
   // there is something to put in it.

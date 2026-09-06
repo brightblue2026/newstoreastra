@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import NotFoundView from '@/components/NotFoundView';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid, { EmptyListing } from '@/components/ProductGrid';
 import FilterBar from '@/components/FilterBar';
@@ -21,7 +21,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const brand = await getBrandBySlug(slug);
 
-  if (!brand) return { title: 'Brand not found' };
+  if (!brand) return { title: 'Brand not found', robots: { index: false, follow: true } };
 
   return {
     title: brand.name,
@@ -52,7 +52,12 @@ export default async function BrandPage({
   const [{ slug }, query] = await Promise.all([params, searchParams]);
 
   const brand = await getBrandBySlug(slug);
-  if (!brand) notFound();
+  if (!brand) return (
+      <NotFoundView
+        heading="We couldn't find that brand"
+        body="Bright Blue makes eight brands across cleaning, personal care, food and fragrance. The link may be out of date — every one of them is listed below."
+      />
+    );
 
   const sortParam = firstValue(query.sort);
   const sort: ProductSort = isProductSort(sortParam) ? sortParam : 'featured';

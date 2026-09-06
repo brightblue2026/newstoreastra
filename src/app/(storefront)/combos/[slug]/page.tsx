@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
+import NotFoundView from '@/components/NotFoundView';
 import Image from 'next/image';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import AddToCartButton from '@/components/AddToCartButton';
 import ComboChoices, { type ChoiceSlot } from '@/components/ComboChoices';
 import { getComboBySlug } from '@/lib/storefront';
@@ -19,7 +19,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const combo = await getComboBySlug(slug);
 
-  if (!combo) return { title: 'Combo not found' };
+  if (!combo) return { title: 'Combo not found', robots: { index: false, follow: true } };
 
   return {
     title: combo.name,
@@ -50,7 +50,12 @@ export default async function ComboPage({
   const { slug } = await params;
 
   const combo = await getComboBySlug(slug);
-  if (!combo) notFound();
+  if (!combo) return (
+      <NotFoundView
+        heading="We couldn't find that pack"
+        body="This bundle may have ended or been renamed. The individual products are still available in the catalogue."
+      />
+    );
 
   const choiceSlots: ChoiceSlot[] = combo.items
     .filter((item) => item.isChoice)

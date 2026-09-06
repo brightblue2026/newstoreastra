@@ -139,7 +139,7 @@ export default function Nav({
           >
             Brands
           </button>
-          {PRIMARY_LINKS.filter((link) => link.href !== '/search').map((link) => (
+          {PRIMARY_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}

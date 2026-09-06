@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
+import NotFoundView from '@/components/NotFoundView';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid, { EmptyListing } from '@/components/ProductGrid';
 import FilterBar from '@/components/FilterBar';
@@ -23,7 +23,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
 
-  if (!category) return { title: 'Category not found' };
+  if (!category) return { title: 'Category not found', robots: { index: false, follow: true } };
 
   return {
     title: category.name,
@@ -50,7 +50,12 @@ export default async function CategoryPage({
   const [{ slug }, query] = await Promise.all([params, searchParams]);
 
   const category = await getCategoryBySlug(slug);
-  if (!category) notFound();
+  if (!category) return (
+      <NotFoundView
+        heading="We couldn't find that category"
+        body="The link may be out of date. The whole catalogue is still browsable, and search will find anything by name."
+      />
+    );
 
   const brandSlug = firstValue(query.brand);
   const sortParam = firstValue(query.sort);
