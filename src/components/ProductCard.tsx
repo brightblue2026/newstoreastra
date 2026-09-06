@@ -14,7 +14,7 @@ import { formatPrice, isPurchasable } from '@/lib/money';
   stops there. The brand label is ink and the CTA is `--bb-signal`, on every
   card, in every brand. A CTA that changes colour per brand stops reading as
   "the button" and starts reading as decoration — and the one-accent rule exists
-  so a grid of seven houses doesn't turn into a paint chart.
+  so a grid of eight houses doesn't turn into a paint chart.
 */
 
 export type ProductCardData = {

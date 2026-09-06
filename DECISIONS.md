@@ -1128,3 +1128,42 @@ Also added:
 wrong because `pkill -f "next start"` does not kill the Node process on Windows, so tests
 ran against a stale server still holding port 3000. Kill it by port
 (`Get-NetTCPConnection -LocalPort 3000`) before trusting any production check.
+
+## Text alignment and typographic consistency · 6 September 2026
+
+- **The record line mixed two display sizes inline.** `24 fragrance variants of one
+  dishwashing liquid.` was a single `type-display-lg` paragraph with the headline in a
+  nested `type-display-sm` span. The word space between them was therefore set at the
+  larger size and grew with the viewport, and the two utilities carry different
+  line-heights (1.05 against 1.15), so the number and the headline sat on a ragged
+  baseline once either wrapped. Now a `flex flex-wrap items-baseline` row with an explicit
+  `gap-x-4`, which pins the baseline and fixes the gap.
+- **`type-caption` was the only utility in the scale with no `line-height`**, so every
+  caption inherited whatever its parent happened to set — captions in different containers
+  did not share a vertical rhythm, and a caption that wrapped took its leading from the
+  parent. Now `1.4`, matching the body rhythm.
+- **Nothing but one component guarded against long-word overflow.** Catalogue text is
+  typed by an admin, not a typesetter: a long SKU, a run-on product name, a customer's
+  email on an order page. One unbroken string pushed its container past the viewport and
+  made the whole column below it read as misaligned, worst on a phone. `overflow-wrap:
+  break-word` now sits on `body`, with `hyphens: auto` on h1–h3, where a clamp() size makes
+  an unbroken word most damaging and a mid-word break most visible.
+- **The hero's `after` field had no leading space.** It is empty by default, so nothing
+  showed today, but any value set through the admin content editor would have butted
+  straight against the italic emphasis. The space is conditional, so an empty `after`
+  cannot leave a trailing space in the heading.
+- Corrected the last five "seven" references (HouseSpectrum ×3, the brand page, ProductCard)
+  left from before MAKAFA became the eighth brand.
+
+**Why the site reads as static, which is not a design problem:** three of the homepage's
+nine sections render nothing, because each correctly refuses to show an empty frame —
+"How it's made" needs real photography (`home_steps` ships copy with `img: ''` by design),
+"Best sellers" needs published products, and "Combos" needs combos. The database currently
+has **0 published products, 0 combos and 0 images**; the one MX-3 product is an unpublished
+draft. No amount of additional motion changes that: the page is doing what §12 asks, and
+the gap is content, not craft.
+
+The 24 real fragrance names *are* in the database, on that draft product's 72 variants, and
+would make a genuine centrepiece for the record section. Surfacing them would mean reading
+from an unpublished product, which is exactly what the publish guard exists to prevent —
+so it is a product decision, not a change to make unilaterally.

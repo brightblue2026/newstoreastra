@@ -35,7 +35,7 @@ export async function generateMetadata({
 
   This is the one place the brand accent is fully spent: the rule under the
   name, and the section wash. The filter chips, the body copy and every CTA
-  stay ink and signal — seven houses each repainting the whole interface is
+  stay ink and signal — eight houses each repainting the whole interface is
   exactly what the one-accent rule exists to prevent.
 
   `--bb-accent` is set on the wrapper rather than passed down as a prop, so any

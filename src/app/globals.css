@@ -113,6 +113,25 @@
     font-size: 1rem;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    /*
+      Catalogue text is entered by an admin, not a typesetter: a long SKU, a
+      run-on product name, a customer's email on an order page. Without this a
+      single unbroken string pushes its container wider than the viewport, and
+      the whole column below it reads as misaligned — worst on a phone, where
+      there is no slack. Only one component guarded against this individually.
+    */
+    overflow-wrap: break-word;
+  }
+
+  /*
+    Headings set at clamp() sizes are where an unbroken word does the most
+    damage, and where a mid-word break is most obvious, so they get the
+    dictionary-aware break rather than the brute-force one.
+  */
+  h1,
+  h2,
+  h3 {
+    hyphens: auto;
   }
 
   :focus-visible {
@@ -178,6 +197,11 @@
   font-size: 0.875rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  /* The one utility in this scale that never set a line-height, so a caption
+     inherited whatever its parent happened to have — captions next to each
+     other in different containers did not share a vertical rhythm, and a
+     caption that wrapped to two lines set its own leading from the parent. */
+  line-height: 1.4;
 }
 
 /* SKUs, order numbers, admin tabular figures. */

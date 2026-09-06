@@ -15,15 +15,15 @@ export type SpectrumBrand = {
 };
 
 /*
-  Seven houses, one spectrum band.
+  Eight houses, one spectrum band.
 
   At rest the row divides evenly — one panel per brand, sharing width via
   `flexGrow` rather than a fixed fraction, so the layout holds whether one
-  brand exists or seven. Hovering or focusing a panel widens it (flexGrow is
+  brand exists or eight. Hovering or focusing a panel widens it (flexGrow is
   animated, not width, so the transition stays a cheap composited property)
   and reveals its tagline and product count. Panels within two positions of
   the active one borrow a sliver of its accent as a background tint — a
-  literal rendering of the section's claim: seven houses, one family of
+  literal rendering of the section's claim: eight houses, one family of
   colour, one factory.
 
   Every panel is a real `<Link>`. Hover and focus drive the same state, so

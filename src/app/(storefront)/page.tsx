@@ -99,7 +99,9 @@ export default async function HomePage() {
             <em className="font-accent text-[1.15em] italic text-ink-soft">
               {hero.emphasis}
             </em>
-            {hero.after}
+            {/* The space is conditional: `after` is empty by default, and a
+                bare {' '} would leave a trailing space in the heading. */}
+            {hero.after && <> {hero.after}</>}
           </h1>
         </RevealItem>
         <RevealItem>
@@ -116,8 +118,16 @@ export default async function HomePage() {
       <section className="bg-sky">
         <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
           <RevealItem>
-            <p className="type-display-lg">
-              <CountUp to={record.count} />{' '}
+            {/*
+              Baseline-aligned rather than inline: the two halves are different
+              type sizes with different line-heights, so relying on a word space
+              between them set the gap at the larger size and left the headline
+              sitting off the number's baseline once either wrapped.
+            */}
+            <p className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+              <span className="type-display-lg">
+                <CountUp to={record.count} />
+              </span>
               <span className="type-display-sm">{record.headline}</span>
             </p>
           </RevealItem>
