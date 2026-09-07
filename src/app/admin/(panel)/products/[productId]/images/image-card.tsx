@@ -33,10 +33,20 @@ export function ImageCard({
   }
 
   function remove() {
+    // `window.confirm` blocks the JS thread for as long as the native dialog
+    // is open, and starting the transition immediately after it returns —
+    // still inside the same click handler — drops the refresh: the delete
+    // commits (confirmed against the database), but React never repaints the
+    // grid without a manual reload. A `setTimeout` of 0 lets the browser
+    // finish unwinding the dialog's own event handling first, so the
+    // transition starts in a clean task instead of the one `confirm` just
+    // suspended.
     if (!window.confirm('Delete this image? This cannot be undone.')) return;
-    startTransition(async () => {
-      await deleteProductImageAction(productId, image.id);
-    });
+    setTimeout(() => {
+      startTransition(async () => {
+        await deleteProductImageAction(productId, image.id);
+      });
+    }, 0);
   }
 
   return (

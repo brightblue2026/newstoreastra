@@ -144,8 +144,20 @@ export function ImageUploader({ productId }: { productId: string }) {
       const { cloudName, apiKey, folder, timestamp, signature, allowedFormats, maxFileSize } =
         signResult.signature;
 
+      // A courtesy check only — Cloudinary itself does not enforce a size
+      // cap on this kind of upload (see the comment on
+      // `signProductImageUploadAction`), so the real enforcement is
+      // server-side in `saveProductImageAction`, after the fact, from
+      // Cloudinary's own reported byte count.
+      if (file.size > maxFileSize) {
+        setError(`File is too large — must be under ${Math.round(maxFileSize / (1024 * 1024))}MB.`);
+        return;
+      }
+
       // Every one of these has to match exactly what was signed, or
-      // Cloudinary's own signature check fails the request.
+      // Cloudinary's own signature check fails the request. `max_file_size`
+      // is deliberately not sent — Cloudinary excludes it from what it signs
+      // and does not enforce it here either way; see the same comment.
       const body = new FormData();
       body.set('file', file);
       body.set('api_key', apiKey);
@@ -153,7 +165,6 @@ export function ImageUploader({ productId }: { productId: string }) {
       body.set('signature', signature);
       body.set('folder', folder);
       body.set('allowed_formats', allowedFormats);
-      body.set('max_file_size', String(maxFileSize));
 
       const uploadResult = await uploadWithProgress(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
@@ -173,6 +184,7 @@ export function ImageUploader({ productId }: { productId: string }) {
         format: uploadJson.format as string,
         width: uploadJson.width as number,
         height: uploadJson.height as number,
+        bytes: uploadJson.bytes as number,
         alt: alt.trim(),
       });
       if (!saveResult.ok) {

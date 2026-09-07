@@ -1219,3 +1219,71 @@ Compared against how Shopify's and WooCommerce's media panels handle the same sc
 
 All four gates re-verified after: `pnpm typecheck`, `pnpm lint`, `pnpm test` (302, unchanged
 — no new pure logic to unit-test here, this is UI/interaction), `pnpm build`.
+
+### Live end-to-end admin walkthrough — three real, severe bugs found and fixed · 7 September 2026
+
+Client asked for every admin feature to actually be exercised and made to work, not just
+reviewed. Ran the built app under `next start` against the real database, drove it with a
+real headless Chromium through every catalogue/discount/combo create flow, image upload,
+reorder and delete, and both publish-toggle paths, using disposable `ZZTEST`-prefixed rows
+cleaned up (hard-deleted, not just deactivated) at the end of each pass. Three real,
+severe, previously-shipped bugs surfaced this way that no unit test could have caught,
+because all three are about the browser/FormData/DOM boundary the unit suite doesn't
+exercise:
+
+1. **Creating or editing any non-food product was completely broken**, and so was creating
+   any discount of any type. Root cause, identical in both files: several form fields only
+   exist in the DOM inside a conditional block (`{isFoodProduct && (...)}` in
+   `product-form.tsx`; a `{type === '…' && (...)}` block per discount type in
+   `discount-form.tsx`), so whenever that block isn't rendered, `formData.get(fieldName)`
+   returns `null` — not `undefined`. Every one of those fields was typed
+   `.optional().or(z.literal(''))`, and Zod's `.optional()` only ever accepts `undefined`;
+   `null` satisfies neither branch of the union, so the whole submission failed Zod
+   validation. Since the overwhelming majority of products aren't food products, and every
+   discount type only renders four of its five value fields, this meant **the two most
+   basic catalogue-admin actions — create/edit a product, create/edit a discount — failed
+   on essentially every real submission**, silently, with a generic "Check the highlighted
+   fields" banner naming no actual field (the broken fields aren't in either action's
+   field-error allow-list). Fixed by adding `.nullable()` to the seven affected fields in
+   `products/actions.ts` and the five in `discounts/actions.ts` — logged in code comments
+   at each site so the reasoning doesn't need rediscovering. Worth a wider note: any admin
+   form field that only exists in the DOM conditionally is a candidate for this exact bug;
+   the fix pattern is `.nullable()` (or normalise `formData.get(x) ?? ''` before parsing),
+   not `.optional()` alone.
+2. **The Cloudinary `max_file_size` signing added in the review round above was actively
+   breaking every single image upload with "Invalid Signature."** That round's DECISIONS.md
+   entry claimed both `allowed_formats` and `max_file_size` were "verified directly against
+   the real account" — true for the first, not actually true for the second. Testing a real
+   upload this round surfaced the 401 immediately, and Cloudinary's own error names the
+   exact string it expected to verify against — which never included `max_file_size` at
+   all. A follow-up direct test against the real account (signing without it, sending it
+   unsigned with an absurdly small limit) confirmed the parameter does nothing whatsoever
+   for a directly-signed upload like this one — a 19KB file uploaded successfully against a
+   1000-byte `max_file_size`. It appears to only mean anything on an *unsigned* upload
+   through a dashboard-configured upload preset, which this app doesn't use. Fixed by
+   removing it from the signed params and the upload body entirely, and replacing it with
+   what the codebase already does for image dimensions one function down: check Cloudinary's
+   own reported `bytes` after the file exists, and destroy the asset if it's over
+   `MAX_UPLOAD_BYTES`. The client keeps a courtesy pre-check against the same constant.
+   Corrected the incorrect claim in this file's own earlier entry and in `cloudinary.ts`'s
+   doc comment rather than leaving it to be rediscovered as a mystery regression.
+3. **Confirming an image delete through the browser's native dialog silently failed to
+   update the screen**, even though the delete itself succeeded — the row would still show
+   the deleted image until a manual reload. Root cause: `window.confirm()` blocks the JS
+   thread for as long as the native dialog is open; starting a `useTransition`-wrapped
+   server-action call immediately after it returns, still inside the same click handler,
+   drops the refresh — confirmed directly by patching `window.confirm` to resolve without a
+   real blocking dialog, which fixed it every time, and separately by confirming via direct
+   database query that the delete really had committed even when the UI didn't reflect it.
+   Fixed with a `setTimeout(fn, 0)` around the `startTransition` call in `image-card.tsx`,
+   letting the browser finish unwinding the dialog's own event handling before the
+   transition starts in a clean task. `moveProductImageAction` (no confirm dialog in its
+   path) never had this problem, which is what made the delete-only symptom worth chasing
+   down rather than assuming a shared cause.
+
+All three fixes verified by re-running the same live walkthrough clean afterward: every
+catalogue create flow, both image-upload passes, reorder, delete, and both publish toggles
+confirmed working via a combination of UI assertions and direct database checks. All four
+gates green: `pnpm typecheck`, `pnpm lint`, `pnpm test` (302, unchanged), `pnpm build`. No
+test-data residue left in the real database — every `ZZTEST`-prefixed row created during
+the walkthrough was hard-deleted afterward, not merely deactivated.

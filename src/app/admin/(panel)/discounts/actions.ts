@@ -79,11 +79,18 @@ const discountSchema = z
     scope: z.enum(Object.values(DiscountScope) as [DiscountScope, ...DiscountScope[]], {
       message: 'Choose a scope.',
     }),
-    valuePercent: z.string().trim().max(10).optional().or(z.literal('')),
-    valueRupees: z.string().trim().max(20).optional().or(z.literal('')),
-    buyQty: z.string().trim().max(6).optional().or(z.literal('')),
-    getQty: z.string().trim().max(6).optional().or(z.literal('')),
-    tiers: z.string().optional().or(z.literal('')),
+    // `.nullable()`: each of these five only renders in the DOM inside its
+    // own `{type === '…' && (...)}` block in discount-form.tsx, so for any
+    // given `type` the other four are absent from the form entirely and
+    // `formData.get(...)` returns `null` for them — not `undefined`, which is
+    // all `.optional()` accepts. Without this every discount type failed to
+    // create or save (the four unused fields for that type always tripped
+    // the schema).
+    valuePercent: z.string().trim().max(10).optional().or(z.literal('')).nullable(),
+    valueRupees: z.string().trim().max(20).optional().or(z.literal('')).nullable(),
+    buyQty: z.string().trim().max(6).optional().or(z.literal('')).nullable(),
+    getQty: z.string().trim().max(6).optional().or(z.literal('')).nullable(),
+    tiers: z.string().optional().or(z.literal('')).nullable(),
     minOrderRupees: z.string().trim().max(20).optional().or(z.literal('')),
     maxDiscountRupees: z.string().trim().max(20).optional().or(z.literal('')),
     usageLimit: z.string().trim().max(10).optional().or(z.literal('')),
@@ -155,7 +162,7 @@ function parseOptionalRupees(raw: string | undefined): number | null {
   return parseRupeesToPaise(raw);
 }
 
-function parseOptionalInt(raw: string | undefined, label: string): number | null {
+function parseOptionalInt(raw: string | null | undefined, label: string): number | null {
   if (!raw) return null;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) {

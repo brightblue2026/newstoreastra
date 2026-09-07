@@ -47,13 +47,19 @@ const productSchema = z.object({
   usageSteps: z.string().optional().or(z.literal('')),
   isFoodProduct: z.coerce.boolean().optional(),
   isCosmetic: z.coerce.boolean().optional(),
-  netQty: z.string().trim().max(60).optional().or(z.literal('')),
-  batch: z.string().trim().max(60).optional().or(z.literal('')),
-  mfgDate: z.string().trim().max(30).optional().or(z.literal('')),
-  bestBefore: z.string().trim().max(60).optional().or(z.literal('')),
-  vegMark: z.string().trim().max(20).optional().or(z.literal('')),
-  nutrition: z.string().trim().max(2000).optional().or(z.literal('')),
-  allergens: z.string().trim().max(500).optional().or(z.literal('')),
+  // `.nullable()` on top of the usual optional-or-empty-string shape: these
+  // six only exist in the DOM inside the `isFoodProduct` block in
+  // product-form.tsx, so on any non-food product `formData.get(...)` returns
+  // `null` for every one of them — not `undefined`, which is all `.optional()`
+  // ever accepts. Without it, every non-food product (the overwhelming
+  // majority of the catalogue) failed to create or save at all.
+  netQty: z.string().trim().max(60).optional().or(z.literal('')).nullable(),
+  batch: z.string().trim().max(60).optional().or(z.literal('')).nullable(),
+  mfgDate: z.string().trim().max(30).optional().or(z.literal('')).nullable(),
+  bestBefore: z.string().trim().max(60).optional().or(z.literal('')).nullable(),
+  vegMark: z.string().trim().max(20).optional().or(z.literal('')).nullable(),
+  nutrition: z.string().trim().max(2000).optional().or(z.literal('')).nullable(),
+  allergens: z.string().trim().max(500).optional().or(z.literal('')).nullable(),
   isFeatured: z.coerce.boolean().optional(),
   sortOrder: z.coerce.number().int().min(0).max(9999).default(0),
   metaTitle: z.string().trim().max(70).optional().or(z.literal('')),

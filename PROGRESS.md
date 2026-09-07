@@ -983,6 +983,26 @@ and production-mode (`next start`) verification rather than live third-party cal
 
 ---
 
+## Live end-to-end admin walkthrough · 7 September 2026
+
+All four gates pass: `pnpm lint`, `pnpm typecheck`, `pnpm test` (302 tests), `pnpm build`.
+
+Ran the built app under `next start` against the real database and drove every admin
+screen with a real headless Chromium — sign-in, category/brand/product/discount/combo
+create, variant create, image upload (twice), reorder, delete, combo-item add, and both
+publish toggles — using disposable `ZZTEST`-prefixed rows, hard-deleted from the database
+afterward rather than left as inactive rows. Found and fixed three real, severe bugs that
+no unit test surfaces because they live at the browser/FormData/DOM boundary: creating or
+editing any non-food product was completely broken, so was creating any discount,
+Cloudinary's `max_file_size` signing (added in the review round above) was breaking every
+image upload outright, and confirming an image delete through the native browser dialog
+silently failed to refresh the screen. Full root-cause detail and the fix for each in
+`DECISIONS.md`. Re-ran the same walkthrough clean afterward — every flow confirmed
+working, several cross-checked directly against the database rather than trusting the
+screen alone.
+
+---
+
 ## Running it
 
 ```bash

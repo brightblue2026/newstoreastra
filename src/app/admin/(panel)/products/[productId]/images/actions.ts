@@ -32,9 +32,9 @@ export type SignResult = { ok: true; signature: UploadSignature } | { ok: false;
 /**
  * Called directly from the uploader before it POSTs the file straight to
  * Cloudinary — the file itself never passes through this server. Every param
- * actually being signed (`timestamp`, `folder`, `allowed_formats`,
- * `max_file_size`) must be sent back unchanged with the upload, or Cloudinary's
- * own signature check fails; adding an unsigned param there would too.
+ * actually being signed (`timestamp`, `folder`, `allowed_formats`) must be
+ * sent back unchanged with the upload, or Cloudinary's own signature check
+ * fails; adding an unsigned param there would too.
  *
  * `resource_type` is deliberately NOT signed — Cloudinary excludes it from the
  * string that gets signed regardless (it's chosen by the URL path, e.g.
@@ -44,6 +44,22 @@ export type SignResult = { ok: true; signature: UploadSignature } | { ok: false;
  * to upload a non-image: Cloudinary rejects the format at its own layer no
  * matter which resource-type path the request is sent to — verified directly
  * against the real account before shipping this, not assumed from the docs.
+ *
+ * `max_file_size` is deliberately NOT signed or sent either, despite an
+ * earlier version of this file doing both. Verified directly against the
+ * real account: Cloudinary's own signature check excludes it from the string
+ * it expects (a real upload's error names the exact string it computed, and
+ * `max_file_size` was never in it) — signing it made every single upload fail
+ * with "Invalid Signature", full stop. Sending it unsigned "works" in the
+ * sense that Cloudinary accepts the request, but a follow-up test uploading a
+ * 19KB file with `max_file_size=1000` still succeeded — it is not enforced at
+ * all for a directly-signed upload like this one (it only does anything on an
+ * unsigned upload through a dashboard-configured upload preset, which this
+ * app does not use). The real size cap is `MAX_UPLOAD_BYTES` below, checked
+ * against Cloudinary's own reported `bytes` once the file already exists,
+ * exactly like the width/height check a few lines down — an oversized upload
+ * is destroyed rather than prevented up front, because Cloudinary itself
+ * gives this app no way to prevent it up front.
  */
 export async function signProductImageUploadAction(): Promise<SignResult> {
   await requireCatalogueAccess();
@@ -57,7 +73,7 @@ export async function signProductImageUploadAction(): Promise<SignResult> {
   const timestamp = Math.round(Date.now() / 1000);
   const allowedFormats = ALLOWED_IMAGE_FORMATS.join(',');
   const signature = cloudinary.utils.api_sign_request(
-    { timestamp, folder: CLOUDINARY_FOLDER, allowed_formats: allowedFormats, max_file_size: MAX_UPLOAD_BYTES },
+    { timestamp, folder: CLOUDINARY_FOLDER, allowed_formats: allowedFormats },
     process.env.CLOUDINARY_API_SECRET!,
   );
 
@@ -70,6 +86,9 @@ export async function signProductImageUploadAction(): Promise<SignResult> {
       timestamp,
       signature,
       allowedFormats,
+      // Still handed to the client so its own pre-upload courtesy check and
+      // this action's post-upload enforcement read the same number — not
+      // signed or sent to Cloudinary, which does nothing with it here.
       maxFileSize: MAX_UPLOAD_BYTES,
     },
   };
@@ -97,6 +116,7 @@ const uploadResultSchema = z.object({
   format: z.string().trim().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
+  bytes: z.number().int().positive(),
   alt: z.string().trim().min(1, 'Alt text is required.').max(200),
 });
 
@@ -126,7 +146,15 @@ async function safeDestroy(publicId: string): Promise<void> {
  */
 export async function saveProductImageAction(
   productId: string,
-  upload: { publicId: string; url: string; format: string; width: number; height: number; alt: string },
+  upload: {
+    publicId: string;
+    url: string;
+    format: string;
+    width: number;
+    height: number;
+    bytes: number;
+    alt: string;
+  },
 ): Promise<SaveImageResult> {
   const user = await requireCatalogueAccess();
 
@@ -140,6 +168,15 @@ export async function saveProductImageAction(
   if (!product) {
     await safeDestroy(parsed.data.publicId);
     return { ok: false, error: 'That product no longer exists.' };
+  }
+
+  // Cloudinary itself does not enforce a size cap on a directly-signed
+  // upload like this one — see the long comment on `signProductImageUploadAction`
+  // — so this is the only place a file over `MAX_UPLOAD_BYTES` is actually
+  // caught, after the fact, from Cloudinary's own reported `bytes`.
+  if (parsed.data.bytes > MAX_UPLOAD_BYTES) {
+    await safeDestroy(parsed.data.publicId);
+    return { ok: false, error: `Image must be under ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.` };
   }
 
   const longEdge = Math.max(parsed.data.width, parsed.data.height);
