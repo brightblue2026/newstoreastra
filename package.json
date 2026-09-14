@@ -16,7 +16,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "invoice:sample": "tsx --tsconfig tsconfig.scripts.json scripts/sample-invoice.ts"
+    "invoice:sample": "tsx --tsconfig tsconfig.scripts.json scripts/sample-invoice.ts",
+    "user:create": "tsx scripts/create-staff-user.ts"
   },
   "dependencies": {
     "@auth/core": "0.41.3",

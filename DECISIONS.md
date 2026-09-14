@@ -1287,3 +1287,39 @@ confirmed working via a combination of UI assertions and direct database checks.
 gates green: `pnpm typecheck`, `pnpm lint`, `pnpm test` (302, unchanged), `pnpm build`. No
 test-data residue left in the real database — every `ZZTEST`-prefixed row created during
 the walkthrough was hard-deleted afterward, not merely deactivated.
+
+---
+
+## Admin panel setup — first real staff account, and the env scaffold
+
+**The first staff account is made by a script, not a screen.** The panel has no user
+management, so there was no way to create a real login: you cannot sign in to create the
+account you need in order to sign in. `pnpm user:create --email you@example.com --name
+"Your Name" [--role ADMIN]` (`scripts/create-staff-user.ts`) is that bootstrap. It upserts
+on the address, so re-running it is also the password-reset and role-change path for as
+long as no screen exists. A full `/admin/users` CRUD is a real feature and is deliberately
+*not* what this is — it is the smallest thing that unblocks having a non-shared login.
+
+**The password is never a command-line argument.** Arguments land in shell history and are
+visible to anything that can list processes. It is read from a hidden prompt, or from
+`STAFF_PASSWORD` for a non-interactive run. Minimum 12 characters, and the seeded
+`ChangeMe!Dev1` is rejected outright so the dev credential cannot be promoted by accident.
+
+**The audit row stores the user row without the hash.** `recordAudit` could not be reused —
+it is `server-only` and this runs under `tsx` — so the script writes the same shape
+directly. `before`/`after` are the row minus `passwordHash`: an audit trail should not
+become a second place a credential is stored. Verified: both rows written, neither
+contains the hash.
+
+**`.env` scaffolded with every remaining key, all empty except `CRON_SECRET`.** Both
+integration guards (`isRazorpayConfigured`, `isCloudinaryConfigured`) test truthiness, so
+an empty string reads as unconfigured and each integration keeps failing closed — the
+scaffold cannot make anything half-work. `CRON_SECRET` was generated locally because it is
+a shared secret rather than a business decision; the stale-order endpoint went from 400
+"not configured" to 401 without a token and 200 with one. Every other value is BBTC's to
+supply.
+
+**The catalogue could not be published.** `setProductActiveAction`'s guard refuses MX-3:
+it has 72 variants but no HSN code, no GST rate and no images. All three are BBTC's to
+answer — the HSN and rate are a tax decision this codebase must not guess, and "no
+placeholder images" rules out inventing the third. Left unpublished rather than forced.
