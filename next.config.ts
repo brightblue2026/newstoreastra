@@ -92,6 +92,11 @@ const nextConfig: NextConfig = {
     authInterrupts: true,
   },
 
+  // The dev-only badge sits bottom-left and covers page content in the QA
+  // screenshots, which are taken against `next dev`. It has no effect on a
+  // production build either way.
+  devIndicators: false,
+
   images: {
     // Product imagery is served from Cloudinary.
     remotePatterns: [{ protocol: 'https', hostname: 'res.cloudinary.com' }],

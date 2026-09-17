@@ -64,3 +64,8 @@ next-env.d.ts
 
 # Generated sample invoices for review — not source.
 /tmp/
+
+# Claude Code: the skills live at .claude/skills/<name>/SKILL.md. The kit folder
+# and its zip are the redundant download they were extracted from.
+.claude/bbtc-claude-code-kit/
+.claude/bbtc-claude-code-kit.zip
