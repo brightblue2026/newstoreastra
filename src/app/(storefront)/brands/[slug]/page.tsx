@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import NotFoundView from '@/components/NotFoundView';
+import { notFound } from 'next/navigation';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid, { EmptyListing } from '@/components/ProductGrid';
 import FilterBar from '@/components/FilterBar';
@@ -52,12 +52,7 @@ export default async function BrandPage({
   const [{ slug }, query] = await Promise.all([params, searchParams]);
 
   const brand = await getBrandBySlug(slug);
-  if (!brand) return (
-      <NotFoundView
-        heading="We couldn't find that brand"
-        body="Bright Blue makes eight brands across cleaning, personal care, food and fragrance. The link may be out of date — every one of them is listed below."
-      />
-    );
+  if (!brand) notFound();
 
   const sortParam = firstValue(query.sort);
   const sort: ProductSort = isProductSort(sortParam) ? sortParam : 'featured';

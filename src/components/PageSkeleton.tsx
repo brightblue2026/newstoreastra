@@ -1,5 +1,5 @@
 /**
- * The storefront's loading state.
+ * The storefront's loading skeleton.
  *
  * Every storefront page reads the database on the server, and several of them
  * (shop, search, a brand with its whole variant list) do real work before the
@@ -11,8 +11,13 @@
  * real page is about to fill, so the content does not jump when it arrives.
  * The pulse is animation-only and the global `prefers-reduced-motion` rule in
  * `globals.css` flattens it, so nothing here needs its own guard.
+ *
+ * This lives in a component rather than in one group-level `loading.tsx`
+ * because a loading boundary forces the response to start streaming, which
+ * commits a 200 status before the page can call `notFound()`. Only the
+ * segments that can never 404 mount it — see the `loading.tsx` beside each.
  */
-export default function StorefrontLoading() {
+export default function PageSkeleton() {
   return (
     <div className="mx-auto max-w-(--container-page) px-6 py-24" aria-hidden="true">
       {/* Announced once, politely, for anyone who cannot see the skeleton. */}

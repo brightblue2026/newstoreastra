@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import NotFoundView from '@/components/NotFoundView';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ProductDetail from '@/components/ProductDetail';
 import { Reveal, RevealItem } from '@/components/Reveal';
@@ -117,12 +117,9 @@ export default async function ProductDetailPage({
   const { slug } = await params;
 
   const product = await getProductBySlug(slug);
-  if (!product) return (
-      <NotFoundView
-        heading="We couldn't find that product"
-        body="The link may be out of date, or the product may no longer be listed. Everything we make is still here — start from the catalogue, or search for it by name."
-      />
-    );
+  // The body lives in `not-found.tsx` beside this file, so the response
+  // carries a real 404 rather than a 200 with 404-shaped content on it.
+  if (!product) notFound();
 
   // Same brand, minus this product. A related rail is worth having only when
   // there is something to put in it.

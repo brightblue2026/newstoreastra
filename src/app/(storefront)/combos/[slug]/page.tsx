@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import NotFoundView from '@/components/NotFoundView';
+import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import AddToCartButton from '@/components/AddToCartButton';
@@ -50,12 +50,7 @@ export default async function ComboPage({
   const { slug } = await params;
 
   const combo = await getComboBySlug(slug);
-  if (!combo) return (
-      <NotFoundView
-        heading="We couldn't find that pack"
-        body="This bundle may have ended or been renamed. The individual products are still available in the catalogue."
-      />
-    );
+  if (!combo) notFound();
 
   const choiceSlots: ChoiceSlot[] = combo.items
     .filter((item) => item.isChoice)

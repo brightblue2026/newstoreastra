@@ -1354,3 +1354,25 @@ placeholder images" rules out inventing the third. Left unpublished rather than 
 - **Storefront pincode search: exact pincode first, then the same three-digit postal area**, and nothing beyond it — a shop in another postal area tells a customer nothing useful. A pincode takes precedence over a district; an unknown district is ignored.
 - Search is a **GET form** and the districts are **plain links**, so the locator works without JavaScript and from the keyboard.
 - `/stockists` is now **dynamic** (it reads `searchParams`), so its `revalidate = 60` no longer caches it. Stockist reads moved from `storefront.ts` to `src/lib/stockists.ts`.
+
+---
+
+## Soft 404s across the storefront · 17 September 2026
+
+- **A loading boundary commits the HTTP status.** `loading.tsx` starts streaming before the
+  page body runs, so a later `notFound()` cannot change a 200 that has already been sent.
+  The skeleton therefore lives only in segments that can never 404 — `/shop`, `/search`,
+  `/stockists`, `/story` — each a one-line `loading.tsx` re-exporting
+  `src/components/PageSkeleton.tsx`. The homepage and the product, brand, category, combo and
+  policy pages give up the skeleton to get a real 404. A correct status for crawlers beats a
+  skeleton on those routes; §12 Phase 8 has a 301 map riding on 404s meaning what they say.
+- **Tailored 404 wording lives in a per-segment `not-found.tsx`, not in the page.** Returning
+  `<NotFoundView>` from the page was a 200 with 404-shaped content on it. `notFound()` plus a
+  sibling `not-found.tsx` keeps "We couldn't find that pack" *and* the status. `NotFoundView`
+  is still the shared body, so the copy did not change.
+- **`/policies/*` now 404s until BBTC publishes the text.** That page was already doing the
+  right thing — it just said 200 while doing it.
+- **`fonts.ts` was left alone.** The eight `Request timed out after 3000ms / Retrying 1/3`
+  lines on a cold `next dev` are next/font fetching Instrument Serif and JetBrains Mono from
+  Google, retrying, and succeeding: 13 woff2 files land in `.next/static/media` and all four
+  font variables reach `<html>`. Not a fault, and not worth self-hosting two more faces over.

@@ -1061,15 +1061,21 @@ from the served HTML directly. Covered, among others:
 Every `ZZTEST` row and its audit entries were deleted afterwards, and the retailer and
 content counts were confirmed back to where they started.
 
-### Found, not fixed
+### Found and fixed
 
-- **Every storefront not-found page returns HTTP 200, not 404.** Not introduced here:
-  `(storefront)/loading.tsx` starts streaming before the page calls `notFound()`, so the
-  status is already sent. Affects `/products`, `/brands`, `/categories`, `/combos` and now
-  `/policies`. Next does emit `<meta name="robots" content="noindex">`, so the pages will not
-  be indexed, but crawlers still see soft 404s. The fix is to move the loading skeleton into
-  the segments that never 404 (`/shop`, `/search`), which gives up the skeleton on product and
-  brand navigations. That trade-off needs a decision rather than a quiet change.
+- **Every storefront not-found page returned HTTP 200, not 404 — fixed 17 September 2026.**
+  There were two causes, not the one originally recorded here. `/products`, `/brands`,
+  `/categories` and `/combos` never called `notFound()` at all: they returned a `NotFoundView`
+  body, which is a 200 by construction. `/policies` *did* call `notFound()`, but
+  `(storefront)/loading.tsx` starts streaming before the page resolves, so the 200 was already
+  committed. Fixed by giving each of those five segments its own `not-found.tsx` carrying the
+  tailored wording, converting the four pages to `notFound()`, and moving the skeleton out of
+  the route group into a `loading.tsx` beside `/shop`, `/search`, `/stockists` and `/story`
+  (`src/components/PageSkeleton.tsx`). Verified against a running dev server: all five return
+  404 with the branded body and full chrome, `/totally-unrouted-url` still hits the root 404,
+  and every real page still returns 200.
+  **The trade-off:** the homepage and the product, brand, category, combo and policy pages no
+  longer show a loading skeleton — a loading boundary is precisely what caused the soft 200.
 
 ### Not done
 
