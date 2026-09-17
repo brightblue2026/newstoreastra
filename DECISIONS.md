@@ -1323,3 +1323,34 @@ supply.
 it has 72 variants but no HSN code, no GST rate and no images. All three are BBTC's to
 answer — the HSN and rate are a tax decision this codebase must not guess, and "no
 placeholder images" rules out inventing the third. Left unpublished rather than forced.
+
+---
+
+## Phase 7 — Content admin and retailer locator · 14 September 2026
+
+### Content
+
+- Content shapes and defaults moved to **`src/lib/content-schema.ts`** (pure), so the admin editor, the storefront reader and the tests share one definition. `content.ts` stays the server-only reader.
+- Content is **MANAGER-editable**, guarded by `requireCatalogueAccess` — §6 lists content with the MANAGER capabilities.
+- Lists are edited **as plain text** — one announcement per line, paragraphs separated by a blank line — rather than add/remove row widgets. Trust badges get six fixed row slots. Simplest thing a non-technical editor can manage.
+- **`home_steps` has no editor.** It is photography-led and needs an image upload, not a URL box; it keeps its coded default and stays hidden on the homepage until that exists.
+- **The hero button link accepts only an on-site path or an `https://` address.** It lands in an `href` on every visitor's homepage, so `javascript:`, `//host` and `/\host` are refused. The rule is in the shared schema, so a stored row carrying such a link now falls back to the default rather than rendering.
+- **Policies (shipping, returns, privacy, terms) have no default text.** An unpublished policy has no page, no footer link and no sitemap entry. They are BBTC's legal statements; the codebase does not invent them. §14 Q17/Q18 are still open.
+- Policy text syntax is **blank-line paragraphs plus `#` headings**, nothing more — enough for a legal page, explainable in one hint, no Markdown dependency.
+- "Go back to the original wording" and "Unpublish" **deactivate the row, not delete it.** The edited version stays in the audit log; a policy draft stays in the editor to publish again.
+- A failed save **echoes the submitted fields back** — React 19 resets a form after its action runs, which would otherwise wipe everything typed on a single validation error. Retailer form does the same.
+- Trust-badge rows: **trailing empty rows are dropped, interior empty rows are kept**, so a validation error names the same row number the editor sees on screen.
+- "Featured" stays the existing checkbox on each product and combo. The content page lists what is featured and links to it, rather than becoming a second place to set the same flag.
+
+### Retailers
+
+- **A retailer is identified by name (case- and space-insensitive) plus pincode.** A distributor sheet has no natural id, and re-importing it must update rather than duplicate. The manual form refuses a duplicate; import updates it.
+- **CSV import is all or nothing.** One bad row and nothing imports; up to 25 problems are listed by spreadsheet row number. A partial import would leave the editor fixing a sheet whose first half is already live.
+- **Shops missing from a sheet are left untouched** — an import never hides or deletes. One district's file must not wipe every other district.
+- **A hidden shop that appears on a sheet is reactivated**: listing it is the statement that it stocks Bright Blue. A shop listed twice in one file: the lowest row wins, reported in the summary.
+- **Hand-written RFC 4180 parser, no dependency.** Handles quotes, doubled quotes, embedded newlines, CRLF and Excel's byte-order mark. `.csv` only; an `.xlsx` is refused with instructions to save as CSV.
+- **2,000 rows / 512 KB per file**, under Next's default 1 MB server-action body limit. The import transaction timeout is raised to 60 s; only changed rows are written, so re-importing the same sheet is zero writes.
+- **District names normalised** to one spelling per Kerala district, including old English names still on distributor sheets (Trichur, Calicut, Alleppey…). A district outside Kerala is kept, title-cased.
+- **Storefront pincode search: exact pincode first, then the same three-digit postal area**, and nothing beyond it — a shop in another postal area tells a customer nothing useful. A pincode takes precedence over a district; an unknown district is ignored.
+- Search is a **GET form** and the districts are **plain links**, so the locator works without JavaScript and from the keyboard.
+- `/stockists` is now **dynamic** (it reads `searchParams`), so its `revalidate = 60` no longer caches it. Stockist reads moved from `storefront.ts` to `src/lib/stockists.ts`.

@@ -1003,6 +1003,85 @@ screen alone.
 
 ---
 
+## Phase 7 — Content, reviews, polish · **in progress** · 14 September 2026
+
+All four gates pass: `pnpm lint`, `pnpm typecheck`, `pnpm test` (396 tests, up from 302),
+`pnpm build`. Two of the seven §12 Phase 7 items are built: the content admin and the
+retailer locator with CSV import. Judgement calls are in `DECISIONS.md`.
+
+### What was built
+
+**Content admin** (`/admin/content`, MANAGER+) — editors for the announcement bar, homepage
+hero, world record, trust badges and company story, each showing whether the site is on the
+original wording or an edited version, with a way back to the original. Shapes, defaults and
+form parsing live in `src/lib/content-schema.ts`, shared with the storefront reader. Every
+save and revert is audited, and revalidates the storefront layout so the change is live at
+once, ISR pages included.
+
+**Policy pages** — shipping, returns, privacy and terms, written and published from the same
+screen and served at `/policies/[slug]`. No default text: an unwritten or unpublished policy
+has no page, no footer link and no sitemap entry.
+
+**Featured on the homepage** — the content page lists the products and combos ticked
+Featured, flags any that are unpublished and so not shown, and links to each.
+
+**Retailer admin** (`/admin/retailers`, MANAGER+) — list with name/town/pincode search and a
+district filter, create, edit, hide/list, all audited. Duplicate shops (same name at the
+same pincode) are refused.
+
+**CSV import** (`/admin/retailers/import`) — `src/lib/retailer.ts`: an RFC 4180 parser,
+spreadsheet-style column names in any order, all-or-nothing validation with row-numbered
+errors, district normalisation, and an import plan that creates new shops, updates changed
+ones and leaves the rest alone. Re-importing the same sheet writes nothing.
+
+**Stockist locator** (`/stockists`) — search by pincode (exact matches, then the same postal
+area) or pick a district. No JavaScript required.
+
+### Verified
+
+Ran the production build under `next start` against the local Postgres and drove it with
+headless Chromium as a manager, a staff member and an anonymous visitor: 58 checks. 56
+passed in the browser. The other 2 — the "nothing listed near" message for a far pincode,
+and the bad-pincode error being wired to its input — failed only on the test script's
+text matching (React splits `{pincode}` out of the sentence), and were confirmed correct
+from the served HTML directly. Covered, among others:
+
+- a `javascript:` hero link refused, with typed text kept and nothing written
+- a hero edit showing on the ISR homepage immediately, then reverting cleanly
+- the announcement bar changing on a different page
+- a policy published (page, `#` heading, footer link, sitemap), then unpublished (page gone,
+  footer link gone, draft kept, audited)
+- a bad CSV importing nothing and naming row 3; a good CSV reporting 2 added, 1 updated,
+  1 in-file duplicate; the same CSV again reporting 3 already up to date with no new audit rows
+- a hidden retailer absent from the storefront; keyboard-only pincode search; no horizontal
+  scroll at 400px
+- STAFF refused both new areas with a 403; anonymous visitors sent to login; no browser
+  console errors
+
+Every `ZZTEST` row and its audit entries were deleted afterwards, and the retailer and
+content counts were confirmed back to where they started.
+
+### Found, not fixed
+
+- **Every storefront not-found page returns HTTP 200, not 404.** Not introduced here:
+  `(storefront)/loading.tsx` starts streaming before the page calls `notFound()`, so the
+  status is already sent. Affects `/products`, `/brands`, `/categories`, `/combos` and now
+  `/policies`. Next does emit `<meta name="robots" content="noindex">`, so the pages will not
+  be indexed, but crawlers still see soft 404s. The fix is to move the loading skeleton into
+  the segments that never 404 (`/shop`, `/search`), which gives up the skeleton on product and
+  brand navigations. That trade-off needs a decision rather than a quiet change.
+
+### Not done
+
+- **Reviews with moderation, reports, the account area, the WCAG 2.1 AA audit and the §9
+  empty/error-state pass** — the remaining Phase 7 items. The account area also needs
+  customer sign-in, which is still blocked on MSG91 and Upstash for phone OTP.
+- **No policy text and no retailers are loaded.** Both are BBTC's to supply: the policies
+  depend on §14 Q17 and Q18, and the retailer list is their distributor sheet.
+- **The homepage "how it's made" steps still have no editor** — they need an image upload.
+
+---
+
 ## Running it
 
 ```bash

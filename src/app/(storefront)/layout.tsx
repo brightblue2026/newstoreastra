@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Ticker from '@/components/Ticker';
 import StorefrontChrome from '@/components/StorefrontChrome';
-import { getContent } from '@/lib/content';
+import { getContent, getPublishedPolicies } from '@/lib/content';
 import { getBrands, getSellerEntity } from '@/lib/storefront';
 
 /*
@@ -26,10 +26,11 @@ export default async function StorefrontLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [announcement, brands, seller] = await Promise.all([
+  const [announcement, brands, seller, policies] = await Promise.all([
     getContent('announcement_bar'),
     getBrands(),
     getSellerEntity(),
+    getPublishedPolicies(),
   ]);
 
   return (
@@ -79,6 +80,22 @@ export default async function StorefrontLayout({
               </Link>
             </li>
           </ul>
+
+          {/* Only policies BBTC has published — an unwritten one has no page. */}
+          {policies.length > 0 && (
+            <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-3">
+              {policies.map((policy) => (
+                <li key={policy.slug}>
+                  <Link
+                    href={`/policies/${policy.slug}`}
+                    className="type-body text-ink-soft hover:text-ink"
+                  >
+                    {policy.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="mt-12 type-body text-ink-soft">
             {/* GSTIN prints only when exactly one seller entity is active —

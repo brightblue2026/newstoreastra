@@ -31,6 +31,17 @@ export default async function AdminHomePage() {
       locked: canManageCatalogue(user.role) ? undefined : 'Manager and above',
     },
     {
+      title: 'Content and stockists',
+      note: 'Homepage wording, policy pages, and the shops that stock Bright Blue.',
+      links: canManageCatalogue(user.role)
+        ? [
+            { href: '/admin/content', label: 'Content and policies' },
+            { href: '/admin/retailers', label: 'Retailers' },
+          ]
+        : [],
+      locked: canManageCatalogue(user.role) ? undefined : 'Manager and above',
+    },
+    {
       title: 'Users and settings',
       note: 'Seller of record, delivery rates, cash on delivery and payment setup.',
       links: canAdminister(user.role) ? [{ href: '/admin/settings', label: 'Settings' }] : [],

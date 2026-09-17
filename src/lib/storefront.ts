@@ -789,55 +789,7 @@ export async function getComboBySlug(slug: string): Promise<ComboPage | null> {
   }
 }
 
-export type Stockist = {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  district: string;
-  pincode: string;
-  phone: string | null;
-};
-
-/**
- * Where to buy offline, grouped by district.
- *
- * BBTC sells through retail across Kerala, so "where do I actually find this"
- * is a real question for a customer looking at a product with no published
- * price. Grouping is done here rather than in the page so the ordering is
- * decided once.
- */
-export async function getStockistsByDistrict(): Promise<
-  { district: string; stockists: Stockist[] }[]
-> {
-  try {
-    const retailers = await db.retailer.findMany({
-      where: { isActive: true },
-      orderBy: [{ district: 'asc' }, { city: 'asc' }, { name: 'asc' }],
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        city: true,
-        district: true,
-        pincode: true,
-        phone: true,
-      },
-    });
-
-    const groups = new Map<string, Stockist[]>();
-    for (const retailer of retailers) {
-      const existing = groups.get(retailer.district) ?? [];
-      existing.push(retailer);
-      groups.set(retailer.district, existing);
-    }
-
-    return [...groups.entries()].map(([district, stockists]) => ({ district, stockists }));
-  } catch (error) {
-    console.warn('[storefront] stockists unavailable:', error);
-    return [];
-  }
-}
+// Stockist reads live in `lib/stockists.ts`, beside the locator's search.
 
 /* --------------------------------------------------------------- sitemap -- */
 
