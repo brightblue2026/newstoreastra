@@ -212,6 +212,8 @@ export async function createProductAction(
     isActive: false,
   };
 
+  let createdProductId = '';
+
   try {
     // All-or-nothing: a duplicate SKU on row 5 of 20 must not leave rows 1-4 orphaned,
     // and must not leave a product with only half its declared catalogue. Every audit row
@@ -223,6 +225,7 @@ export async function createProductAction(
     // never desync from what actually got created.
     await db.$transaction(async (tx) => {
       const product = await tx.product.create({ data });
+      createdProductId = product.id;
       await tx.auditLog.create({
         data: { userId: user.id, action: 'create', entityType: 'Product', entityId: product.id, before: Prisma.JsonNull, after: product },
       });
@@ -259,6 +262,15 @@ export async function createProductAction(
   }
 
   revalidatePath('/admin/products');
+
+  // The guided screen (`quick-add/`) sends the user straight on to photos, because
+  // an image is the one publish requirement it cannot collect itself. This is a
+  // fixed destination keyed off a literal, never a caller-supplied path — a
+  // redirect target from the form body would be an open redirect.
+  if (formData.get('afterCreate') === 'images' && createdProductId) {
+    redirect(`/admin/products/${createdProductId}/images`);
+  }
+
   redirect('/admin/products');
 }
 

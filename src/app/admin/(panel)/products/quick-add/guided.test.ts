@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { parseClaims, parseSteps } from '../format';
 import {
+  EMPTY_GUIDED_ROW,
   claimsToFieldValue,
   publishChecklist,
+  resolveRowSkus,
+  segmentDefaults,
+  segmentNote,
   slugify,
   stepsToFieldValue,
+  suggestRowSku,
   suggestSku,
   type ChecklistInput,
+  type GuidedVariantRow,
 } from './guided';
 
 describe('slugify', () => {
@@ -125,5 +131,95 @@ describe('publishChecklist', () => {
 
     const food = publishChecklist({ ...complete, isFoodProduct: true, foodLabelComplete: false });
     expect(food.find((i) => i.label.includes('FSSAI'))?.done).toBe(false);
+  });
+});
+
+describe('suggestRowSku', () => {
+  it('separates two fragrances sharing one size', () => {
+    const lemon = suggestRowSku('MX-3', 'Dish Wash', 'Lemon', '500 ml');
+    const jasmin = suggestRowSku('MX-3', 'Dish Wash', 'Jasmin', '500 ml');
+    expect(lemon).not.toBe(jasmin);
+  });
+
+  it('falls back to size alone when there is no fragrance name', () => {
+    expect(suggestRowSku('MX-3', 'Dish Wash', '', '500 ml')).toBe(
+      suggestSku('MX-3', 'Dish Wash', '500 ml'),
+    );
+  });
+});
+
+describe('resolveRowSkus', () => {
+  function row(patch: Partial<GuidedVariantRow>): GuidedVariantRow {
+    return { ...EMPTY_GUIDED_ROW, ...patch };
+  }
+
+  it('generates a distinct code per row', () => {
+    const skus = resolveRowSkus(
+      [row({ size: '500 ml' }), row({ size: '900 ml' }), row({ size: '5 L' })],
+      'MX-3',
+      'Dish Wash',
+    );
+    expect(new Set(skus).size).toBe(3);
+    expect(skus.every((sku) => sku !== '')).toBe(true);
+  });
+
+  it('suffixes rather than repeating when two rows would generate the same code', () => {
+    const skus = resolveRowSkus([row({ size: '500 ml' }), row({ size: '500ml' })], 'MX-3', 'Dish');
+    expect(skus[1]).toBe(`${skus[0]}-2`);
+  });
+
+  it('leaves a code the user typed exactly as typed', () => {
+    const skus = resolveRowSkus([row({ size: '500 ml', skuOverride: ' MX3-LEMON ' })], 'MX-3', 'Dish');
+    expect(skus[0]).toBe('MX3-LEMON');
+  });
+
+  it('repeats a typed code rather than renaming it, leaving the server to object', () => {
+    const skus = resolveRowSkus(
+      [row({ size: '500 ml', skuOverride: 'SAME' }), row({ size: '900 ml', skuOverride: 'SAME' })],
+      'MX-3',
+      'Dish',
+    );
+    expect(skus).toEqual(['SAME', 'SAME']);
+  });
+
+  it('never lets a generated code collide with a typed one, whatever the row order', () => {
+    const typed = suggestRowSku('MX-3', 'Dish', '', '500 ml');
+    const skus = resolveRowSkus(
+      [row({ size: '500 ml' }), row({ size: '500 ml', skuOverride: typed })],
+      'MX-3',
+      'Dish',
+    );
+    expect(skus[0]).not.toBe(skus[1]);
+    expect(skus[1]).toBe(typed);
+  });
+
+  it('returns empty for a row with nothing to build a code from', () => {
+    expect(resolveRowSkus([row({})], '', '')).toEqual(['']);
+  });
+});
+
+describe('segmentDefaults', () => {
+  it('treats food and beverage brands as food products', () => {
+    expect(segmentDefaults('FOOD').isFoodProduct).toBe(true);
+    expect(segmentDefaults('BEVERAGE').isFoodProduct).toBe(true);
+  });
+
+  it('treats personal care as cosmetic', () => {
+    expect(segmentDefaults('PERSONAL_CARE')).toEqual({ isFoodProduct: false, isCosmetic: true });
+  });
+
+  it('assumes nothing for fragrance — the licence question is still open', () => {
+    expect(segmentDefaults('FRAGRANCE')).toEqual({ isFoodProduct: false, isCosmetic: false });
+    expect(segmentNote('FRAGRANCE')).not.toBe('');
+  });
+
+  it('assumes nothing when no brand is chosen yet', () => {
+    expect(segmentDefaults(null)).toEqual({ isFoodProduct: false, isCosmetic: false });
+    expect(segmentNote(null)).toBe('');
+  });
+
+  it('says nothing extra for a plain cleaning brand', () => {
+    expect(segmentDefaults('DISH_CARE')).toEqual({ isFoodProduct: false, isCosmetic: false });
+    expect(segmentNote('DISH_CARE')).toBe('');
   });
 });
