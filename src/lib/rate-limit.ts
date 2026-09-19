@@ -9,7 +9,7 @@ export { clientIpFrom };
  * Rate limiting over Upstash Redis — REST-based, so it works from any
  * serverless runtime without a persistent connection.
  *
- * Built the same way Cloudinary, Shiprocket, MSG91 and Resend were: against
+ * Built the same way Shiprocket, MSG91 and Resend were: against
  * documented behaviour, ahead of real credentials, gated by `isConfigured()`
  * so an unconfigured deployment degrades to "not limited" rather than
  * throwing. That degrade direction is deliberate here too, not just

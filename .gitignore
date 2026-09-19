@@ -69,3 +69,7 @@ next-env.d.ts
 # and its zip are the redundant download they were extracted from.
 .claude/bbtc-claude-code-kit/
 .claude/bbtc-claude-code-kit.zip
+
+# QA screenshot evidence: regenerate with `pnpm qa:shoot`. Six widths across
+# every route is a lot of PNGs, and they are build output, not source.
+qa/screenshots/

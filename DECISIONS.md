@@ -1376,3 +1376,291 @@ placeholder images" rules out inventing the third. Left unpublished rather than 
   lines on a cold `next dev` are next/font fetching Instrument Serif and JetBrains Mono from
   Google, retrying, and succeeding: 13 woff2 files land in `.next/static/media` and all four
   font variables reach `<html>`. Not a fault, and not worth self-hosting two more faces over.
+
+---
+
+## Phase 0 — housekeeping and the QA baseline · 17 September 2026
+
+- **The two project skills were undiscoverable and are now where Claude Code reads them.**
+  Both copies were mis-nested — `.claude/skills/.claude/skills/<name>/SKILL.md` (two levels
+  too deep) and `.claude/bbtc-claude-code-kit/.claude/skills/<name>/` (outside
+  `.claude/skills/`). Moved to `.claude/skills/<name>/SKILL.md`. The extracted kit folder
+  and its zip are the same two files a second and third time, so they are **ignored rather
+  than deleted** — they are BBTC's original download, not ours to throw away.
+- **`devIndicators: false`.** The dev badge sits bottom-left and covers page content in the
+  QA screenshots, which are taken against `next dev`. No effect on a production build.
+- **Playwright is a dev dependency, not a runtime one.** Required by the screenshot matrix
+  and the Phase 8 end-to-end flows. Nothing ships with it.
+- **`qa/screenshots/` is generated, not source.** Six widths across every route is ~40 PNGs
+  per pass and they are regenerable with `pnpm qa:shoot`. Ignored, so the repo does not
+  carry image churn in every UI commit.
+- **The screenshot script scrolls each page before it shoots.** Nearly every storefront
+  section renders at `opacity: 0` until `whileInView` fires, so a naive full-page shot
+  photographs an invisible page. It walks the page in viewport steps and returns to the top.
+  This is a workaround for the reveal defect, not a fix — the fix is in Phase 2.
+- **A route with nothing published is skipped, not photographed.** The only product is
+  inactive and there are no combos, so `/products/*` and `/combos/*` would shoot a 404 and
+  teach nothing about layout. The script reports what it skipped and why.
+- **The 360px overflow check reports element width, which is the wrong question.** Its
+  first run flagged `ul.flex.w-max.gap-12` at 2235px on all seven routes. That is the
+  announcement marquee (`Ticker.tsx:29`), which is deliberately double-width so it can
+  translate by exactly -50% and loop seamlessly — and its parent at line 18 is
+  `overflow-hidden`, so nothing scrolls. An element wider than the viewport is not the
+  same fault as a document that scrolls sideways. Phase 1 replaces the check with
+  `documentElement.scrollWidth > clientWidth`, then attributes the offender only when the
+  document really does overflow. Logged rather than quietly corrected because the first
+  baseline report carries the false positive.
+
+---
+
+## The guided "Add a product" screen, restored to main · 18 September 2026
+
+- **The screen existed and was not on `main`.** `quick-add/guided.ts` and its tests were on
+  `main`, imported by nothing; the two files that make them a screen — `page.tsx` and
+  `guided-form.tsx` — were only on `recovery/guided-add-product-2026-09-06`, whose merge
+  base is `d953503`. Restored the three missing pieces rather than rewriting them: that
+  branch's work was already driven against a real server and carries the fixes for two
+  defects (the `metaTitle`/`metaDesc` null submit, and P2002 blaming the slug for a
+  duplicate stock code) that would have been reintroduced by starting over.
+- **The branch's `actions.ts` was NOT taken.** It predates `main`'s `.nullable()` fix on the
+  seven food-label fields, without which every non-food product fails to save. Only the
+  `afterCreate` hunk was applied — `createdProductId` plus the redirect to the photo step,
+  keyed off the literal `'images'`, never a caller-supplied path.
+- **"Add a product" is now the primary action on `/admin/products`**, with the full form
+  demoted to a text link, and the empty state points at the guided screen. The full form
+  stays exactly as it was for whoever knows what a slug is.
+- **Verified against the running dev server and the real database**, as an admin: the
+  product saved as a draft, the slug came from the name, 18% stored as `1800`, two
+  fragrances sharing one size got distinct stock codes, ₹149.00 stored as `14900`, a blank
+  price stored as `NULL` and not `0`, and publishing was refused with
+  "Cannot publish: needs at least one variant, one image, an HSN code." Every `ZZTEST` row
+  and its audit entries were deleted afterwards.
+- **The food half of that run is unverified.** The dev server's stdout pipe died when the
+  harness reaped its shell for memory, after which it threw `uncaughtException: write EPIPE`
+  and 500'd the photo step; the run stalled on the second product and was stopped. The
+  driver is kept at `tmp/verify-quick-add.ts` (ignored) to re-run against a clean server.
+
+---
+
+## The admin shell and the stock screen · 18 September 2026
+
+- **`/admin/inventory` is new, and it is the first way to set stock at all.** The order
+  engine in `src/lib/orders.ts` has reserved, committed, released and restocked
+  `Inventory` rows since Phase 5, and the Razorpay webhook decrements on payment — but
+  nothing ever created a row. 11 locations were seeded and the table was empty, so every
+  checkout allocated against nothing. The screen is the missing input, not new machinery.
+- **`quantity` is the admin's, `reserved` is the engine's.** The per-location editor shows
+  `reserved` read-only. A manager who could type into it could oversell, and the number
+  would be stale a second later anyway.
+- **A location holding zero is "does not carry it", not "low".** The editor lists all 11
+  active locations and tells the user to leave the ones that do not stock an item at zero.
+  The first rule — `available <= lowStockAt` — then flagged a variant with 50 bottles at
+  the packing centre as "Low at" ten offices that were never meant to hold any. Caught by
+  driving the real screen, not by the unit tests, which had only ever been given rows that
+  carry stock. `carriesStock` now excludes empty locations from the low check, and a
+  variant empty *everywhere* is reported as "Out of stock" — a different sentence needing a
+  different action. The cost is that a single branch genuinely selling out is no longer
+  named on its own; the variant-level "out of stock" covers it, and it is the more useful
+  message.
+- **Blank is refused rather than read as zero**, matching the null-price rule: "I left it
+  empty" and "there are none" are different statements. The field says so — "Enter 0 if
+  there are none."
+- **A save that changes nothing writes nothing**, so re-submitting a stocktake leaves no
+  audit noise. Validation for every location happens before the first write, so a typo in
+  the ninth does not leave the first eight saved.
+- **The panel has a sidebar now** (`nav.ts`, `sidebar.tsx`) — a rail from 1024px, a drawer
+  below, built from one role-filtered list so a section cannot appear in one and not the
+  other. Hiding a link is not access control: every page still calls its own guard, and
+  STAFF hitting `/admin/inventory` directly gets a 403.
+- **The dashboard shows counts instead of a list of links** — orders to pack, unpaid
+  checkouts, live products, needs restocking, never counted. Each tile is a question with
+  a link to where it is answered.
+- **Verified by driving the real screens as admin and as staff: 42 checks, all passing** —
+  stock created and audited, `reserved` untouched, a non-number refused writing nothing, an
+  unchanged save writing no second audit row, the attention filter, the 403, the drawer,
+  and no sideways scroll at 390px. Every row created was deleted afterwards.
+- **Photos remain blocked on credentials, not code.** `.env` still carries the empty
+  `CLOUDINARY_*` placeholders from `.env.example`, so `isCloudinaryConfigured()` is false
+  and upload is disabled by design. The signed-upload path is built and the page degrades
+  with a clear message rather than failing. BBTC has to supply the account.
+
+---
+
+## Reports · 18 September 2026
+
+- **A sale is `CONFIRMED`, `PACKED`, `SHIPPED` or `DELIVERED`.** `PENDING_PAYMENT` is money
+  that never arrived; `CANCELLED`, `RETURNED` and `REFUNDED` are money that arrived and went
+  back. Counting either overstates revenue, which is the one direction a report must never
+  be wrong in. The same list filters the best-seller query, so the two can never disagree.
+- **Every figure comes from the order snapshots, never the live catalogue.** Best sellers
+  group on `skuSnapshot`, not `variantId` — `variantId` is nullable (a combo line carries a
+  `comboId`) and a variant deleted since the sale leaves it dangling. This is the snapshot
+  rule doing its job: last quarter's numbers do not move because someone renamed a product.
+- **Money stays in paise the whole way through.** Nothing divides by 100; `formatINR` is the
+  only thing that renders. The average order is `Math.round`ed to whole paise, because a
+  fractional paisa does not exist.
+- **Shares are basis points**, per the repo convention, rendered as one decimal place.
+- **An unreadable address is bucketed as "Unknown", not dropped**, so the state rows always
+  add up to the order count. `shippingAddress` is `Json`: an order written by an older
+  checkout or repaired by hand can be any shape.
+- **An automatic offer is labelled by its type, not "no code".** `code` is null for
+  non-coupon discounts, and "No code — ₹40,000" is not a useful line in a report.
+- **`requirePricingAccess`, not catalogue access.** Every figure is money and STAFF are kept
+  away from pricing; the sidebar link follows the same rule, and a STAFF member visiting the
+  URL directly gets a 403.
+- **Verified against seeded orders: 21 checks, all passing** — three countable orders and two
+  that must not count, with revenue ₹500.00 over 3 orders, the ₹9,999 unpaid and refunded
+  orders absent, units summed across orders, the COD share at 66.7%, both states listed, the
+  coupon named and totalled, the period in the URL, a junk period falling back to 30 days,
+  and the STAFF 403. All five test orders were deleted afterwards.
+
+---
+
+## The storefront rendered blank without JavaScript · 18 September 2026
+
+- **The scroll reveal was hiding content in the server HTML.** `Reveal`/`RevealItem`
+  passed Motion `initial="hidden"`, which Motion writes out as an inline
+  `opacity: 0; transform: translateY(24px)`. The homepage shipped **31** such elements,
+  `/story` 15, `/shop` and `/stockists` 3 each. With JavaScript blocked, broken or merely
+  slow to arrive, most of every page was invisible — and an inline style cannot be
+  overridden from a stylesheet, so there was no way to rescue those readers.
+  DECISIONS.md already recorded this as a defect the screenshot script works around; this
+  is the fix, not another workaround.
+- **The hidden state moved from Motion into CSS, behind a `.js` class** set by an inline
+  script in `<head>` that runs before first paint. No script, no class, nothing hidden.
+  `initial={false}` stops Motion writing anything into the server HTML, and it still
+  animates to `opacity: 1` inline on scroll, which beats the stylesheet — so the reveal
+  looks exactly as designed.
+- **Inline and in `<head>` on purpose.** A deferred or external script runs after first
+  paint, which would show every section and then hide it: a flash on every page load.
+  `script-src` already allows `'unsafe-inline'`.
+- **`prefers-reduced-motion` skips the hidden state entirely** rather than merely
+  shortening the transition. An element that starts invisible and is never animated back
+  is the one failure this must not have.
+- **Verified both halves against the running server: 17 checks, all passing.** With
+  JavaScript, below-fold sections still start hidden and every one is visible after
+  scrolling through — the animation genuinely runs, which is what `initial={false}` was
+  most likely to have silently killed. Without JavaScript, `/`, `/shop`, `/story` and
+  `/stockists` carry no hidden reveal target and all render readable content.
+- **The brand rail's hover detail still needs JavaScript**, and is left that way. Its
+  reveal is React state driving the neighbouring-panel accent bleed, which CSS hover
+  cannot reproduce. Brand name and segment — the content that matters — render without
+  script; only the tagline and count wait for hover. Degrading, not broken.
+
+---
+
+## Reviews, with moderation · 18 September 2026
+
+- **Built from nothing.** The `Review` model has been in the schema since Phase 1 with an
+  `isApproved` flag, and not one line of code read or wrote it. Storefront display, the
+  submission form, the rating summary and the admin queue are all new.
+- **No account needed to leave one.** Requiring sign-in to review a bottle of dishwash
+  would mean almost no reviews, and the account area does not exist yet. Moderation is
+  therefore the entire safety model: every review is written `isApproved: false` and is
+  invisible — absent from the list *and* from the average — until a manager approves it.
+  `getApprovedReviews` filters in the query rather than leaving it to the caller, because a
+  filter the caller has to remember is one that eventually gets forgotten.
+- **The average is `null`, never `0`, with no reviews** — the same reasoning as a null
+  price rendering "Price on request". A zero average would claim every customer hated it.
+- **`looksLikeSpam` sorts the queue; it never refuses a submission.** A genuine review that
+  quotes two links should not be silently binned, and a manager reads every one anyway.
+- **Unapproving is not deleting.** A review that turns out to be about the wrong product,
+  or that the writer asks to have taken down, stops being public with its text intact.
+  Delete exists too, for abuse, and writes the full row to the audit log first.
+- **Stars are real radio inputs**, not clickable glyphs, so the control is keyboard-operable
+  and announced as a group without any ARIA of its own.
+- **Verified end to end: 31 checks, all passing** — a review left by a stranger, stored
+  unapproved, invisible on the storefront, listed in the queue, approved, then appearing
+  with a 5.0 average and a count; unpublished and gone again; a two-word review refused
+  with nothing stored; STAFF given a 403 and no nav link. The catalogue has nothing
+  published, so the run temporarily publishes one product and restores it exactly.
+- **Two bugs the browser run caught that the unit tests could not.** The product page 500'd
+  because the test's stand-in image used a host `next/image` was not configured for — a
+  fixture fault, but it proved the page dies on an unconfigured image host rather than
+  degrading. And `suppressHydrationWarning` was missing on `<html>`: the inline `js`-class
+  script (see the reveal entry above) runs before React hydrates, so the server HTML and
+  the live DOM differed by that one class and React reported a mismatch on every page load.
+
+---
+
+## Product photos moved from Cloudinary to Supabase Storage · 19 September 2026
+
+Recorded late: the swap was written and left in the working tree with no entry here, so
+DECISIONS.md still said "Neon" in four places while the code had already moved. This is
+the record it should have had.
+
+- **Cloudinary is gone; `product-images` in Supabase Storage replaces it.** The catalogue
+  never used a single Cloudinary transformation — no `f_auto`, `q_auto`, `w_` or `c_fill`
+  anywhere — because every image is the stored URL rendered through `next/image`, which
+  does its own AVIF and WebP conversion. The one real reason to keep a media CDN was
+  therefore already absent, and this puts the database and the files with one provider.
+- **No SDK.** Four calls are needed — sign, publish a URL, stat, delete — and the working
+  agreement says to ask before adding a dependency. `@supabase/supabase-js` is ~200KB for
+  four `fetch` calls, so it did not earn it.
+- **The upload still never passes through this server.** The browser is handed a
+  short-lived signed URL and PUTs the file straight to Supabase, exactly as it used to POST
+  straight to Cloudinary. The destination path is chosen server-side when the upload is
+  signed, never by the caller — that is what stops a signed upload being aimed at another
+  object.
+- **`image-header.ts` exists because Supabase is a plain object store.** Cloudinary
+  returned authoritative `width`/`height` with every upload, which is what let the §9
+  "at least 2000px on the long edge" rule be checked against a number the client could not
+  forge. Supabase reports size and content type and nothing about pixels, so the server
+  fetches the first 64KB of the stored object with a `Range` header and parses the PNG,
+  JPEG, WebP and AVIF headers itself. Without it the rule would have to trust whatever the
+  browser claimed, which is not a check at all. Dependency-free for the same reason as
+  above, and far easier to test than a package.
+- **An unreadable header is refused, never waved through.** A renamed PDF, a truncated
+  file or an SVG parses as no format the uploader accepts, and that is exactly the case a
+  size rule would otherwise be trivially bypassed by. The object is deleted rather than
+  left orphaned and unlinked.
+- **`ProductImage.publicId` keeps its column name and now holds the storage path.** Same
+  role it always had — the handle the object is deleted by — so no migration was needed.
+- **The bucket is public-read, and that is deliberate.** `next/image` fetches photos as an
+  anonymous client; a private bucket would mean minting a signed URL per image per render.
+  The bucket holds nothing but catalogue photography already on the shop front.
+- **The bucket's MIME allowlist is the real enforcement, not the app's.**
+  `saveProductImageAction` re-checks the type, but by then the object is already stored.
+  The bucket refuses a disallowed type outright, which is what keeps a signed upload URL
+  from being used to park an executable or a script-carrying SVG.
+- **`pnpm storage:setup` provisions it** (`scripts/setup-storage.ts`), because the admin
+  panel cannot create its own bucket. It is the storage half of what
+  `prisma migrate deploy` is for the database: idempotent, reads the bucket back before
+  writing, corrects only what has drifted, and `--check` reports without changing. Its
+  limits come from `storage-shared.ts` — the same constants the uploader and the save
+  action enforce — so the bucket and the app cannot disagree about what a valid photo is.
+- **Dev Postgres stays local.** Only Storage is being taken from Supabase here;
+  `DATABASE_URL` still points at the `bbtc-postgres` Docker container. `.env.example`
+  documents a Supabase Postgres connection string as the deployment shape, which is a
+  separate choice from this one and is not yet made.
+
+### Storage connected and driven end to end · 19 September 2026
+
+- **A missing bucket is an HTTP 400, not a 404.** Storage answers
+  `GET /bucket/<id>` for a bucket that does not exist with **400** carrying
+  `{"statusCode":"404","code":"NoSuchBucket"}` in the body. `setup-storage.ts` keyed off
+  `response.status === 404` on its first run and so turned "not created yet" — the one
+  state it exists to fix — into a hard error, unable to ever create anything. It now reads
+  the body, and still accepts a real 404 in case that is tidied up later.
+- **The bucket's MIME allowlist was confirmed to do real work, not just be recorded.**
+  Signing an upload the way the app does and then PUTting `application/pdf` and
+  `image/svg+xml` straight at the signed URL — what a hostile or compromised client would
+  try — is refused with a 400 by Storage itself, before the app sees it. SVG is the one
+  that matters: it is an image, and it can carry script.
+- **Verified end to end in a real browser as a manager: 12 checks, all passing.** An 800px
+  photo refused client-side by the long-edge rule with the actual size named; a 2400px
+  photo signed, PUT straight to Storage, re-read from the stored object and saved; the row
+  carrying the storage path in `publicId` and the public URL in `url`; `next/image`
+  optimising it with a 200, which is what proves `remotePatterns` picked up the host; and
+  the object publicly readable. Then deleted through the admin UI, with the stored object
+  confirmed gone from the bucket rather than orphaned, and `create` + `deactivate` both
+  audited. Every ZZTEST row, its audit entries and the bucket object were removed
+  afterwards; images and image audits are back to zero.
+- **`storage-shared.ts` now has tests** (19), because `isOwnedPath` is the single gate that
+  `createSignedUpload`, `statObject`, `removeObject` and the save action's Zod schema all
+  rely on — one hole there is a hole in four places at once. Traversal at any position, a
+  leading slash, and the `products-backup/` near-miss are all covered, as is
+  `extensionForMimeType` refusing SVG.
+- **The dev server must be restarted after setting `SUPABASE_URL`**, not just reloaded:
+  `next.config.ts` computes `images.remotePatterns` from it at config load, so without a
+  restart every product photo 500s at the optimiser even though the upload itself works.

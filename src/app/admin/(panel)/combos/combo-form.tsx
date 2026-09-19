@@ -110,7 +110,7 @@ export function ComboForm({
       />
 
       <label htmlFor="imageUrl" className={`mt-6 ${labelClass}`}>
-        Image URL — Cloudinary upload arrives separately
+        Image URL — upload arrives separately
       </label>
       <input id="imageUrl" name="imageUrl" defaultValue={values.imageUrl} className={inputClass} />
 

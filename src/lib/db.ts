@@ -24,7 +24,7 @@ function createClient(): PrismaClient {
 
   if (!connectionString) {
     throw new Error(
-      'DATABASE_URL is not set. Copy .env.example to .env and add the Neon connection string.',
+      'DATABASE_URL is not set. Copy .env.example to .env and add the Supabase connection string.',
     );
   }
 

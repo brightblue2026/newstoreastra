@@ -22,6 +22,19 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    url: process.env.DATABASE_URL ?? '',
+    /**
+     * Migrations go over the DIRECT connection, never the pooler.
+     *
+     * Supabase's pooled port (6543) runs pgBouncer in transaction mode, which
+     * cannot carry the session-level state `prisma migrate` needs — advisory
+     * locks, prepared statements and DDL across statements. Pointing migrations
+     * at it produces hangs and "prepared statement already exists" rather than
+     * a clean error, so the direct port (5432) is preferred here while the app
+     * itself keeps using the pooled `DATABASE_URL` at runtime.
+     *
+     * Falls back to `DATABASE_URL` for a plain unpooled Postgres, which is
+     * what local development uses.
+     */
+    url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || '',
   },
 });
