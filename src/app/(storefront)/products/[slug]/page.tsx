@@ -4,11 +4,12 @@ import Link from 'next/link';
 import ProductDetail from '@/components/ProductDetail';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid from '@/components/ProductGrid';
-import { getProductBySlug, listProducts, type ProductPage } from '@/lib/storefront';
+import { getApprovedReviews, getProductBySlug, listProducts, type ProductPage } from '@/lib/storefront';
 import { isPurchasable } from '@/lib/money';
 import { absoluteUrl } from '@/lib/site';
 import { CONTACT } from '@/lib/contact';
 import { jsonLdString } from '@/lib/json-ld';
+import { Reviews } from '@/components/Reviews';
 
 export const revalidate = 60;
 
@@ -120,6 +121,9 @@ export default async function ProductDetailPage({
   // The body lives in `not-found.tsx` beside this file, so the response
   // carries a real 404 rather than a 200 with 404-shaped content on it.
   if (!product) notFound();
+
+  // Approved reviews only — `getApprovedReviews` filters, not the caller.
+  const reviews = await getApprovedReviews(product.id);
 
   // Same brand, minus this product. A related rail is worth having only when
   // there is something to put in it.
@@ -257,6 +261,8 @@ export default async function ProductDetailPage({
             </p>
           </Accordion>
         </div>
+
+        <Reviews productId={product.id} reviews={reviews} />
 
         {related.length > 0 && (
           <section className="mt-24 border-t border-line pt-24">
