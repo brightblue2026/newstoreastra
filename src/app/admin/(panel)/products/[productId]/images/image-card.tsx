@@ -9,7 +9,7 @@ import { deleteProductImageAction, moveProductImageAction } from './actions';
   deleting both need pending state — a no-JS `<form action={...}>` works, but
   gives no feedback while the advisory-locked swap round-trips, and a delete
   with no confirmation step is one misclick away from an irreversible
-  Cloudinary destroy (`safeDestroy` in actions.ts).
+  the stored object being removed (`safeRemove` in actions.ts).
 */
 export function ImageCard({
   productId,

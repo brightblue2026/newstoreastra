@@ -1,97 +1,83 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { recordAudit } from '@/lib/audit';
-import {
-  ALLOWED_IMAGE_FORMATS,
-  assertCloudinaryConfigured,
-  CLOUDINARY_FOLDER,
-  cloudinary,
-  isCloudinaryConfigured,
-  MIN_LONG_EDGE_PX,
-} from '@/lib/cloudinary';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
+import {
+  assertStorageConfigured,
+  createSignedUpload,
+  isStorageConfigured,
+  publicUrlFor,
+  removeObject,
+  statObject,
+} from '@/lib/storage';
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  MAX_UPLOAD_BYTES,
+  MIN_LONG_EDGE_PX,
+  buildImagePath,
+  extensionForMimeType,
+  isOwnedPath,
+} from '@/lib/storage-shared';
 
-/** 20 MB — comfortably above any real product photo, well below "someone parked a video here". */
-const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
-
-export interface UploadSignature {
-  cloudName: string;
-  apiKey: string;
-  folder: string;
-  timestamp: number;
-  signature: string;
-  allowedFormats: string;
+export interface UploadTicket {
+  /** Absolute URL the browser PUTs the file to. */
+  uploadUrl: string;
+  /** Where the object will live — handed back on save so the server can find it. */
+  path: string;
   maxFileSize: number;
 }
 
-export type SignResult = { ok: true; signature: UploadSignature } | { ok: false; error: string };
+export type SignResult = { ok: true; ticket: UploadTicket } | { ok: false; error: string };
 
 /**
- * Called directly from the uploader before it POSTs the file straight to
- * Cloudinary — the file itself never passes through this server. Every param
- * actually being signed (`timestamp`, `folder`, `allowed_formats`) must be
- * sent back unchanged with the upload, or Cloudinary's own signature check
- * fails; adding an unsigned param there would too.
+ * Hands the uploader a short-lived, single-object upload URL. The file goes
+ * straight from the browser to Supabase Storage and never passes through this
+ * server.
  *
- * `resource_type` is deliberately NOT signed — Cloudinary excludes it from the
- * string that gets signed regardless (it's chosen by the URL path, e.g.
- * `/image/upload` vs `/raw/upload`), so including it here would only produce
- * a signature that can never match. `allowed_formats` is what actually stops
- * a validly-signed request from being replayed against a different endpoint
- * to upload a non-image: Cloudinary rejects the format at its own layer no
- * matter which resource-type path the request is sent to — verified directly
- * against the real account before shipping this, not assumed from the docs.
- *
- * `max_file_size` is deliberately NOT signed or sent either, despite an
- * earlier version of this file doing both. Verified directly against the
- * real account: Cloudinary's own signature check excludes it from the string
- * it expects (a real upload's error names the exact string it computed, and
- * `max_file_size` was never in it) — signing it made every single upload fail
- * with "Invalid Signature", full stop. Sending it unsigned "works" in the
- * sense that Cloudinary accepts the request, but a follow-up test uploading a
- * 19KB file with `max_file_size=1000` still succeeded — it is not enforced at
- * all for a directly-signed upload like this one (it only does anything on an
- * unsigned upload through a dashboard-configured upload preset, which this
- * app does not use). The real size cap is `MAX_UPLOAD_BYTES` below, checked
- * against Cloudinary's own reported `bytes` once the file already exists,
- * exactly like the width/height check a few lines down — an oversized upload
- * is destroyed rather than prevented up front, because Cloudinary itself
- * gives this app no way to prevent it up front.
+ * The destination path is chosen here, not by the caller: the browser only
+ * says what kind of file it is. A caller-chosen path would let a signed
+ * upload be aimed at someone else's object.
  */
-export async function signProductImageUploadAction(): Promise<SignResult> {
+export async function signProductImageUploadAction(
+  productId: string,
+  mimeType: string,
+): Promise<SignResult> {
   await requireCatalogueAccess();
 
   try {
-    assertCloudinaryConfigured();
+    assertStorageConfigured();
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Cloudinary is not configured.' };
+    // The thrown message names the environment variables, which is the right
+    // detail for whoever runs the deployment and the wrong thing to put in
+    // front of a shop owner. It goes to the server log; the admin gets a
+    // sentence in their own language telling them who can fix it.
+    console.error('[images] upload refused:', error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      error:
+        'Photo uploads are not set up yet. Ask whoever manages the site to connect its Supabase storage.',
+    };
   }
 
-  const timestamp = Math.round(Date.now() / 1000);
-  const allowedFormats = ALLOWED_IMAGE_FORMATS.join(',');
-  const signature = cloudinary.utils.api_sign_request(
-    { timestamp, folder: CLOUDINARY_FOLDER, allowed_formats: allowedFormats },
-    process.env.CLOUDINARY_API_SECRET!,
-  );
+  const product = await db.product.findUnique({ where: { id: productId }, select: { id: true } });
+  if (!product) return { ok: false, error: 'That product no longer exists.' };
 
-  return {
-    ok: true,
-    signature: {
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME!,
-      apiKey: process.env.CLOUDINARY_API_KEY!,
-      folder: CLOUDINARY_FOLDER,
-      timestamp,
-      signature,
-      allowedFormats,
-      // Still handed to the client so its own pre-upload courtesy check and
-      // this action's post-upload enforcement read the same number — not
-      // signed or sent to Cloudinary, which does nothing with it here.
-      maxFileSize: MAX_UPLOAD_BYTES,
-    },
-  };
+  const extension = extensionForMimeType(mimeType);
+  if (!extension) return { ok: false, error: 'Unsupported format — use PNG, JPEG, WebP or AVIF.' };
+
+  try {
+    const { uploadUrl, path } = await createSignedUpload(
+      buildImagePath(product.id, extension, randomUUID()),
+    );
+    return { ok: true, ticket: { uploadUrl, path, maxFileSize: MAX_UPLOAD_BYTES } };
+  } catch (error) {
+    console.error('[images] could not sign upload:', error);
+    return { ok: false, error: 'Could not start the upload. Try again.' };
+  }
 }
 
 export interface SaveImageResult {
@@ -100,95 +86,87 @@ export interface SaveImageResult {
 }
 
 /**
- * Every asset this app ever legitimately creates lives under `CLOUDINARY_FOLDER`
- * — enforced here so a `publicId` naming something outside it (a brand logo,
- * anything else in the same Cloudinary account) is rejected before it ever
- * reaches a destroy call, rather than trusted because it merely looks
- * plausible.
+ * Only ever removes an object under this app's own image folder — a
+ * caller-supplied path naming something else is silently refused rather than
+ * trusted, since a MANAGER session should be able to affect this store's
+ * product images and nothing else in the bucket.
  */
-function isOwnedPublicId(publicId: string): boolean {
-  return publicId.startsWith(`${CLOUDINARY_FOLDER}/`);
+async function safeRemove(path: string): Promise<void> {
+  if (!isStorageConfigured() || !isOwnedPath(path)) return;
+  await removeObject(path);
 }
 
-const uploadResultSchema = z.object({
-  publicId: z.string().trim().min(1).refine(isOwnedPublicId, 'Not a recognised upload.'),
-  url: z.string().trim().url(),
-  format: z.string().trim().min(1),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  bytes: z.number().int().positive(),
+const saveSchema = z.object({
+  path: z.string().trim().min(1).refine(isOwnedPath, 'Not a recognised upload.'),
   alt: z.string().trim().min(1, 'Alt text is required.').max(200),
 });
 
 /**
- * Only ever destroys an asset under this app's own Cloudinary folder — a
- * caller-supplied `publicId` naming something else (a brand logo, anything
- * else in the same Cloudinary account) is silently refused rather than
- * trusted, since a MANAGER session should be able to affect this store's
- * product images and nothing else in the account.
- */
-async function safeDestroy(publicId: string): Promise<void> {
-  if (!isCloudinaryConfigured() || !isOwnedPublicId(publicId)) return;
-  try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch {
-    // Best-effort: an orphaned Cloudinary asset is not worse than failing
-    // the request the admin is already looking at.
-  }
-}
-
-/**
- * Called after the browser has already uploaded the file straight to
- * Cloudinary. Re-checks the photography rules server-side — the client check
- * is only ever a courtesy — and only then writes the `ProductImage` row.
- * A file that fails these checks is removed from Cloudinary rather than left
- * as an orphaned, never-linked asset.
+ * Called after the browser has already PUT the file straight to Supabase
+ * Storage. Writes the `ProductImage` row — but only after re-reading what
+ * actually landed in the bucket.
+ *
+ * Nothing about the file is taken from the caller any more. Cloudinary used to
+ * return authoritative width, height, bytes and format, and the old version of
+ * this action re-checked those. Supabase reports size and content type and
+ * nothing about pixels, so `statObject` re-reads all four from the stored
+ * object itself — size and type from the response headers, dimensions by
+ * parsing the first 64KB. The browser now sends only a path and alt text,
+ * neither of which it can lie about usefully: the path was chosen by the
+ * server when it signed the upload.
+ *
+ * A file that fails these checks is deleted rather than left as an orphaned,
+ * never-linked object.
  */
 export async function saveProductImageAction(
   productId: string,
-  upload: {
-    publicId: string;
-    url: string;
-    format: string;
-    width: number;
-    height: number;
-    bytes: number;
-    alt: string;
-  },
+  upload: { path: string; alt: string },
 ): Promise<SaveImageResult> {
   const user = await requireCatalogueAccess();
 
-  const parsed = uploadResultSchema.safeParse(upload);
+  const parsed = saveSchema.safeParse(upload);
   if (!parsed.success) {
-    if (upload.publicId) await safeDestroy(upload.publicId);
+    if (typeof upload?.path === 'string') await safeRemove(upload.path);
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid upload.' };
   }
 
   const product = await db.product.findUnique({ where: { id: productId } });
   if (!product) {
-    await safeDestroy(parsed.data.publicId);
+    await safeRemove(parsed.data.path);
     return { ok: false, error: 'That product no longer exists.' };
   }
 
-  // Cloudinary itself does not enforce a size cap on a directly-signed
-  // upload like this one — see the long comment on `signProductImageUploadAction`
-  // — so this is the only place a file over `MAX_UPLOAD_BYTES` is actually
-  // caught, after the fact, from Cloudinary's own reported `bytes`.
-  if (parsed.data.bytes > MAX_UPLOAD_BYTES) {
-    await safeDestroy(parsed.data.publicId);
+  const facts = await statObject(parsed.data.path);
+  if (!facts) {
+    return { ok: false, error: 'That upload did not arrive. Try again.' };
+  }
+
+  if (facts.bytes > MAX_UPLOAD_BYTES) {
+    await safeRemove(parsed.data.path);
     return { ok: false, error: `Image must be under ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.` };
   }
 
-  const longEdge = Math.max(parsed.data.width, parsed.data.height);
-  if (longEdge < MIN_LONG_EDGE_PX) {
-    await safeDestroy(parsed.data.publicId);
-    return { ok: false, error: `Image must be at least ${MIN_LONG_EDGE_PX}px on the long edge.` };
+  if (!(ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(facts.mimeType)) {
+    await safeRemove(parsed.data.path);
+    return { ok: false, error: 'Unsupported image format.' };
   }
 
-  const format = parsed.data.format.toLowerCase();
-  if (!(ALLOWED_IMAGE_FORMATS as readonly string[]).includes(format)) {
-    await safeDestroy(parsed.data.publicId);
-    return { ok: false, error: 'Unsupported image format.' };
+  // `null` here means the header did not parse as any format the uploader
+  // accepts — a renamed PDF, a truncated file, an SVG. Refused, never waved
+  // through: an unreadable header is exactly the case a size rule would
+  // otherwise be trivially bypassed by.
+  if (!facts.dimensions) {
+    await safeRemove(parsed.data.path);
+    return { ok: false, error: 'That file is not a readable image.' };
+  }
+
+  const longEdge = Math.max(facts.dimensions.width, facts.dimensions.height);
+  if (longEdge < MIN_LONG_EDGE_PX) {
+    await safeRemove(parsed.data.path);
+    return {
+      ok: false,
+      error: `Image must be at least ${MIN_LONG_EDGE_PX}px on the long edge (this one is ${longEdge}px).`,
+    };
   }
 
   const created = await db.$transaction(async (tx) => {
@@ -207,8 +185,10 @@ export async function saveProductImageAction(
     return tx.productImage.create({
       data: {
         productId,
-        url: parsed.data.url,
-        publicId: parsed.data.publicId,
+        url: publicUrlFor(parsed.data.path),
+        // `publicId` keeps its column name and now holds the storage path —
+        // the same role it always had: the handle the object is deleted by.
+        publicId: parsed.data.path,
         alt: parsed.data.alt,
         sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
       },
@@ -306,7 +286,7 @@ export async function deleteProductImageAction(productId: string, imageId: strin
   if (!existing || existing.productId !== productId) return;
 
   await db.productImage.delete({ where: { id: imageId } });
-  await safeDestroy(existing.publicId);
+  await safeRemove(existing.publicId);
 
   // No dedicated "delete" audit action exists yet (PROGRESS.md, "Known gaps
   // found during review") — `deactivate` with `after: null` is the same
