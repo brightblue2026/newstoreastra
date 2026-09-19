@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   },
   description: SITE_DESCRIPTION,
   // No `images` entry yet — there is no real brand/OG asset in `public/`
-  // (Cloudinary upload isn't built), and a broken image link in a social
+  // (image upload isn't built), and a broken image link in a social
   // preview is worse than no preview at all. Add one here once a real
   // og-image exists.
   openGraph: {
@@ -71,7 +71,33 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en-IN" className={fontVariables}>
+    // `suppressHydrationWarning` because the inline script below deliberately
+    // adds a `js` class to this element before React hydrates, so the server
+    // HTML and the live DOM differ by exactly that one class. Without it React
+    // reports a hydration mismatch on every page load. Scoped to `<html>`, so
+    // it silences that one class and nothing inside the page.
+    <html lang="en-IN" className={fontVariables} suppressHydrationWarning>
+      <head>
+        {/*
+          Marks the document as scripted, synchronously, before the first paint.
+
+          Every scroll reveal starts hidden — but only for readers who can run
+          the script that brings it back. The server HTML used to ship 31
+          elements at `opacity: 0` on the homepage alone, so with JavaScript
+          blocked, broken or merely slow, most of the page was invisible: bad
+          for readers, and bad for any crawler that does not execute scripts.
+          The hidden state now lives in CSS behind `.js` (see globals.css), so
+          no-JS renders the page in full and scripted browsers still animate.
+
+          Inline and in `<head>` on purpose: a deferred or external script runs
+          after first paint, which would show every section and then hide it —
+          a flash on every page load. `script-src` already allows
+          'unsafe-inline' (see next.config.ts).
+        */}
+        <script
+          dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }}
+        />
+      </head>
       <body>
         <script
           type="application/ld+json"

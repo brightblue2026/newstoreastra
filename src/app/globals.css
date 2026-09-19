@@ -241,3 +241,29 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+  Scroll reveals: hidden only for readers who can bring them back.
+
+  `Reveal`/`RevealItem` used to hand Motion an `initial="hidden"`, which Motion
+  writes into the server HTML as an inline `opacity: 0; transform:
+  translateY(24px)`. That is invisible to anyone whose JavaScript never runs —
+  and inline styles cannot be overridden from a stylesheet, so there was no way
+  to undo it for them. The homepage shipped 31 such elements.
+
+  The hidden state lives here instead, behind the `.js` class that the inline
+  script in `layout.tsx` sets synchronously before first paint. No script, no
+  class, no hiding — the page renders in full. With script, Motion animates to
+  `opacity: 1` inline, which beats these rules, and the reveal looks exactly as
+  it did before.
+
+  `prefers-reduced-motion` skips the hidden state entirely rather than merely
+  shortening it: an element that starts invisible and is never animated back is
+  the one failure this must not have.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  .js [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
