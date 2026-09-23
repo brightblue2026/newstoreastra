@@ -155,6 +155,49 @@ async function call<T>(
   }
 }
 
+// ---------- Pickup locations ----------
+
+export interface PickupLocation {
+  /** The exact name an order push must quote as `pickup_location`. */
+  name: string;
+  pincode: string;
+  city: string;
+  /** Shiprocket will not collect from an address whose phone is unverified. */
+  verified: boolean;
+}
+
+/**
+ * The pickup addresses on the Shiprocket account — what the admin chooses from
+ * in Settings, so the name an order push quotes is copied rather than retyped.
+ * A misspelt pickup name is the usual reason Shiprocket refuses an order.
+ *
+ * Null when Shiprocket could not be asked (unconfigured, bad login, down); an
+ * empty list when it answered and the account has none.
+ */
+export async function listPickupLocations(): Promise<PickupLocation[] | null> {
+  const body = await call<{
+    data?: {
+      shipping_address?: {
+        pickup_location?: string;
+        pin_code?: string | number;
+        city?: string;
+        phone_verified?: number | boolean;
+      }[];
+    };
+  }>('/settings/company/pickup', { method: 'GET' });
+
+  if (body === null) return null;
+
+  return (body.data?.shipping_address ?? [])
+    .filter((entry) => typeof entry.pickup_location === 'string' && entry.pickup_location.trim())
+    .map((entry) => ({
+      name: (entry.pickup_location as string).trim(),
+      pincode: String(entry.pin_code ?? '').trim(),
+      city: entry.city?.trim() ?? '',
+      verified: entry.phone_verified === 1 || entry.phone_verified === true,
+    }));
+}
+
 // ---------- Serviceability and rates ----------
 
 export interface RateRequest {
