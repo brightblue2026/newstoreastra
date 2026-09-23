@@ -1679,3 +1679,33 @@ the record it should have had.
   saves now only clean up objects no `ProductImage` row points at.
 - **CI runs lint, typecheck and unit tests** on pushes to main and on every PR. No build, no
   database, no secrets.
+- **Shiprocket settings now have an admin form** (pickup location, pickup pincode, live
+  rates). Until now they existed only in the schema, so no pickup location could be set and
+  every "Push to Shiprocket" would have failed. When Shiprocket is reachable the pickup is
+  chosen from the account's real list and its pincode is copied from it, since a mistyped
+  pickup name is the usual reason Shiprocket refuses an order.
+- **Saving delivery rates no longer blanks the Shiprocket fields.** Both forms write the
+  same `shipping_rates` row; each now merges with what is stored.
+- **The tracking webhook is also served at `/api/webhooks/courier-tracking`**, because
+  Shiprocket's dashboard refuses webhook URLs containing "shiprocket". The old path stays.
+
+### Full end-to-end pass before Shiprocket and Razorpay (23 September 2026)
+
+Driven in a real browser as guest, STAFF, MANAGER and ADMIN: every page, then buy → fulfil →
+cancel, catalogue CRUD, discounts, combos, reviews, retailers, policies, settings, phone width.
+Five defects found and fixed:
+
+- **No order could be placed.** `pg_advisory_xact_lock` returns `void`, which Prisma 7 cannot
+  deserialize through `$queryRaw`; order and invoice numbering both used it. Now `$executeRaw`,
+  as the image actions already did.
+- **Checkout sent an empty phone on the delivery address,** so the server refused every order
+  and bounced the customer to Delivery with no visible reason. The Contact number is now sent,
+  and a server error only moves the customer to a section that can display it.
+- **The cart drawer stayed open over /checkout,** blocking the form. It now closes on any
+  navigation.
+- **Admin forms wiped everything typed when a save was refused** (React 19 resets a form after
+  its action). `useFormActionKeepingInput` puts the submitted values back; used by every admin
+  form with inputs. Discount start date now defaults to "now" when left blank.
+- **"Pay online" was offered with no Razorpay keys,** creating an order and holding stock
+  before failing. It is now disabled until the keys exist, and the server refuses it before
+  writing anything.
