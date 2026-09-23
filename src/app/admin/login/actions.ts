@@ -49,3 +49,12 @@ export async function signInAction(
 
   return {};
 }
+
+/**
+ * Staff sign-in with GitHub. Takes no input — which account is used, and
+ * whether it matches a staff member, is decided on GitHub's side and then in
+ * `auth.ts`. A refusal comes back as /admin/login?error=AccessDenied.
+ */
+export async function signInWithGitHubAction(): Promise<void> {
+  await signIn('github', { redirectTo: '/admin' });
+}
