@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
+
 import { useFormStatus } from 'react-dom';
 import type { StockFormState } from './actions';
 
@@ -46,10 +47,10 @@ export function StockForm({
   action: (state: StockFormState, formData: FormData) => Promise<StockFormState>;
   rows: LocationRow[];
 }) {
-  const [state, formAction] = useActionState(action, {} as StockFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as StockFormState);
 
   return (
-    <form action={formAction} className="mt-8" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8" noValidate>
       {state.error && (
         <p
           role="alert"

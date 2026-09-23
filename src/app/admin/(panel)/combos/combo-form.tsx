@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
+
 import { useFormStatus } from 'react-dom';
 import type { ComboFormState } from './actions';
 
@@ -50,11 +51,11 @@ export function ComboForm({
   initialValues?: ComboFormValues;
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as ComboFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as ComboFormState);
   const values = initialValues ?? EMPTY_VALUES;
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"

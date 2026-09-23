@@ -97,10 +97,12 @@ const discountSchema = z
     perCustomerLimit: z.string().trim().max(10).optional().or(z.literal('')),
     stackable: z.coerce.boolean().optional(),
     priority: z.coerce.number().int().min(0).max(9999).default(0),
+    // Blank means "starts now" — almost always what the owner wants, and one
+    // fewer field between them and a working offer.
     startsAt: z
       .string()
       .trim()
-      .min(1, 'Start date is required.')
+      .transform((value) => value || new Date().toISOString())
       .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Enter a valid start date.' }),
     endsAt: z
       .string()

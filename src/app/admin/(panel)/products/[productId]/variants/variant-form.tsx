@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
+
 import { useFormStatus } from 'react-dom';
 import type { VariantFormState } from './actions';
 
@@ -56,11 +57,11 @@ export function VariantForm({
   initialValues?: VariantFormValues;
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as VariantFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as VariantFormState);
   const values = initialValues ?? EMPTY_VALUES;
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"

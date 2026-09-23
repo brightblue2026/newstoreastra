@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
 import { useFormStatus } from 'react-dom';
 import type { ComboItemFormState } from './actions';
 
@@ -52,7 +53,7 @@ export function ComboItemForm({
   variantOptions: VariantOption[];
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as ComboItemFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as ComboItemFormState);
   const values = initialValues ?? EMPTY_VALUES;
   const [variantId, setVariantId] = useState(values.variantId);
   const [isChoice, setIsChoice] = useState(values.isChoice);
@@ -63,7 +64,7 @@ export function ComboItemForm({
     : [];
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"

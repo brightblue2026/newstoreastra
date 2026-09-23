@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { useState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
 import { useFormStatus } from 'react-dom';
 import type { DiscountFormState, DiscountPreviewResult } from './actions';
 import { formatINR } from '@/lib/money';
@@ -102,11 +103,10 @@ export function DiscountForm({
   variantOptions: VariantOption[];
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as DiscountFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as DiscountFormState);
   const values = initialValues ?? EMPTY_VALUES;
   const [type, setType] = useState(values.type);
   const [scope, setScope] = useState(values.scope);
-  const formRef = useRef<HTMLFormElement>(null);
 
   const [sampleLines, setSampleLines] = useState<Array<{ variantId: string; quantity: number }>>(
     [],
@@ -424,13 +424,12 @@ export function DiscountForm({
         <div className="grid gap-6 sm:grid-cols-2">
           <div>
             <label htmlFor="startsAt" className={labelClass}>
-              Starts
+              Starts — blank means now
             </label>
             <input
               id="startsAt"
               name="startsAt"
               type="datetime-local"
-              required
               defaultValue={values.startsAt}
               className={inputClass}
             />
