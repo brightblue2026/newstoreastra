@@ -57,6 +57,22 @@ export function isOwnedPath(path: string): boolean {
   return path.startsWith(`${IMAGE_FOLDER}/`) && !path.includes('..');
 }
 
+const UPLOAD_FILENAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,5}$/;
+
+/**
+ * True only for a path `buildImagePath` could have produced for *this*
+ * product: its own folder, then a UUID filename, nothing else.
+ *
+ * `isOwnedPath` alone let a save for product A name an object under product
+ * B's folder — attaching B's photo to A, so that deleting it from A broke B's
+ * storefront image. Save and cleanup gate on this instead.
+ */
+export function isUploadPathFor(path: string, productId: string): boolean {
+  const prefix = `${IMAGE_FOLDER}/${productId}/`;
+  if (!productId || productId.includes('/') || !path.startsWith(prefix)) return false;
+  return UPLOAD_FILENAME.test(path.slice(prefix.length));
+}
+
 /** The file extension for a MIME type the uploader accepts. */
 export function extensionForMimeType(mimeType: string): string | null {
   switch (mimeType.toLowerCase()) {

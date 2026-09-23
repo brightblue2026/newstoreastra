@@ -21,7 +21,10 @@ import {
   buildImagePath,
   extensionForMimeType,
   isOwnedPath,
+  isUploadPathFor,
 } from '@/lib/storage-shared';
+
+const idSchema = z.string().trim().min(1).max(64);
 
 export interface UploadTicket {
   /** Absolute URL the browser PUTs the file to. */
@@ -48,6 +51,9 @@ export async function signProductImageUploadAction(
 ): Promise<SignResult> {
   await requireCatalogueAccess();
 
+  const parsedId = idSchema.safeParse(productId);
+  if (!parsedId.success) return { ok: false, error: 'That product no longer exists.' };
+
   try {
     assertStorageConfigured();
   } catch (error) {
@@ -63,7 +69,7 @@ export async function signProductImageUploadAction(
     };
   }
 
-  const product = await db.product.findUnique({ where: { id: productId }, select: { id: true } });
+  const product = await db.product.findUnique({ where: { id: parsedId.data }, select: { id: true } });
   if (!product) return { ok: false, error: 'That product no longer exists.' };
 
   const extension = extensionForMimeType(mimeType);
@@ -96,8 +102,21 @@ async function safeRemove(path: string): Promise<void> {
   await removeObject(path);
 }
 
+/**
+ * Cleanup for a rejected save. Stricter than `safeRemove`: the path must be
+ * one signed for this product, and no `ProductImage` row may point at it.
+ * Without both, a save with blank alt text naming a live photo's path deleted
+ * that photo from storage, with no audit entry and a broken image left behind.
+ */
+async function discardUnsavedUpload(path: string, productId: string): Promise<void> {
+  if (!isUploadPathFor(path, productId)) return;
+  const linked = await db.productImage.count({ where: { publicId: path } });
+  if (linked === 0) await safeRemove(path);
+}
+
 const saveSchema = z.object({
-  path: z.string().trim().min(1).refine(isOwnedPath, 'Not a recognised upload.'),
+  productId: idSchema,
+  path: z.string().trim().min(1),
   alt: z.string().trim().min(1, 'Alt text is required.').max(200),
 });
 
@@ -124,15 +143,27 @@ export async function saveProductImageAction(
 ): Promise<SaveImageResult> {
   const user = await requireCatalogueAccess();
 
-  const parsed = saveSchema.safeParse(upload);
+  const parsed = saveSchema.safeParse({ ...upload, productId });
   if (!parsed.success) {
-    if (typeof upload?.path === 'string') await safeRemove(upload.path);
+    if (typeof upload?.path === 'string' && typeof productId === 'string') {
+      await discardUnsavedUpload(upload.path, productId);
+    }
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid upload.' };
   }
 
-  const product = await db.product.findUnique({ where: { id: productId } });
+  // Only the path this product's signing step could have issued. Refused
+  // without deleting anything: it may well be another product's live photo.
+  if (!isUploadPathFor(parsed.data.path, parsed.data.productId)) {
+    return { ok: false, error: 'Not a recognised upload.' };
+  }
+  const alreadyLinked = await db.productImage.count({ where: { publicId: parsed.data.path } });
+  if (alreadyLinked > 0) return { ok: false, error: 'That photo is already saved.' };
+
+  const discard = () => discardUnsavedUpload(parsed.data.path, parsed.data.productId);
+
+  const product = await db.product.findUnique({ where: { id: parsed.data.productId } });
   if (!product) {
-    await safeRemove(parsed.data.path);
+    await discard();
     return { ok: false, error: 'That product no longer exists.' };
   }
 
@@ -142,12 +173,12 @@ export async function saveProductImageAction(
   }
 
   if (facts.bytes > MAX_UPLOAD_BYTES) {
-    await safeRemove(parsed.data.path);
+    await discard();
     return { ok: false, error: `Image must be under ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.` };
   }
 
   if (!(ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(facts.mimeType)) {
-    await safeRemove(parsed.data.path);
+    await discard();
     return { ok: false, error: 'Unsupported image format.' };
   }
 
@@ -156,13 +187,13 @@ export async function saveProductImageAction(
   // through: an unreadable header is exactly the case a size rule would
   // otherwise be trivially bypassed by.
   if (!facts.dimensions) {
-    await safeRemove(parsed.data.path);
+    await discard();
     return { ok: false, error: 'That file is not a readable image.' };
   }
 
   const longEdge = Math.max(facts.dimensions.width, facts.dimensions.height);
   if (longEdge < MIN_LONG_EDGE_PX) {
-    await safeRemove(parsed.data.path);
+    await discard();
     return {
       ok: false,
       error: `Image must be at least ${MIN_LONG_EDGE_PX}px on the long edge (this one is ${longEdge}px).`,
@@ -226,6 +257,7 @@ export async function moveProductImageAction(
   const user = await requireCatalogueAccess();
   const parsedDirection = moveDirectionSchema.safeParse(direction);
   if (!parsedDirection.success) return;
+  if (!idSchema.safeParse(productId).success || !idSchema.safeParse(imageId).success) return;
 
   const swapped = await db.$transaction(async (tx) => {
     // Same per-product lock as the upload path — two admins reordering the
@@ -281,6 +313,7 @@ export async function moveProductImageAction(
 
 export async function deleteProductImageAction(productId: string, imageId: string): Promise<void> {
   const user = await requireCatalogueAccess();
+  if (!idSchema.safeParse(productId).success || !idSchema.safeParse(imageId).success) return;
 
   const existing = await db.productImage.findUnique({ where: { id: imageId } });
   if (!existing || existing.productId !== productId) return;

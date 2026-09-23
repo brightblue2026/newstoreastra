@@ -7,6 +7,7 @@ import {
   buildImagePath,
   extensionForMimeType,
   isOwnedPath,
+  isUploadPathFor,
 } from './storage-shared';
 
 /*
@@ -75,6 +76,31 @@ describe('buildImagePath', () => {
 
   it('caps a long extension rather than carrying it through', () => {
     expect(buildImagePath('p', 'abcdefghij', 'r')).toBe(`${IMAGE_FOLDER}/p/r.abcde`);
+  });
+});
+
+describe('isUploadPathFor', () => {
+  const uuid = '3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0b';
+
+  it('accepts exactly what buildImagePath signs for that product', () => {
+    expect(isUploadPathFor(buildImagePath('prod_1', 'jpg', uuid), 'prod_1')).toBe(true);
+  });
+
+  it("refuses another product's object, even though it is owned", () => {
+    const other = buildImagePath('prod_2', 'jpg', uuid);
+    expect(isOwnedPath(other)).toBe(true);
+    expect(isUploadPathFor(other, 'prod_1')).toBe(false);
+  });
+
+  it('refuses a product id that is a prefix of another', () => {
+    expect(isUploadPathFor(buildImagePath('prod_10', 'jpg', uuid), 'prod_1')).toBe(false);
+  });
+
+  it('refuses nested folders, traversal and non-UUID names', () => {
+    expect(isUploadPathFor(`${IMAGE_FOLDER}/prod_1/x/${uuid}.jpg`, 'prod_1')).toBe(false);
+    expect(isUploadPathFor(`${IMAGE_FOLDER}/prod_1/../prod_2/${uuid}.jpg`, 'prod_1')).toBe(false);
+    expect(isUploadPathFor(`${IMAGE_FOLDER}/prod_1/photo.jpg`, 'prod_1')).toBe(false);
+    expect(isUploadPathFor(`${IMAGE_FOLDER}/prod_1/${uuid}.jpg`, '')).toBe(false);
   });
 });
 
