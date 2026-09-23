@@ -1664,3 +1664,18 @@ the record it should have had.
 - **The dev server must be restarted after setting `SUPABASE_URL`**, not just reloaded:
   `next.config.ts` computes `images.remotePatterns` from it at config load, so without a
   restart every product photo 500s at the optimiser even though the upload itself works.
+
+### GitHub sign-in, upload hardening, CI (23 September 2026)
+
+- **Staff can sign in with GitHub, as a second door to the same staff accounts.** No schema
+  change and no adapter: a GitHub account gets in only if exactly one of its *verified*
+  emails matches an active `User` with admin access, and the role comes from that row. It
+  never creates a user. Hidden unless `AUTH_GITHUB_ID`/`AUTH_GITHUB_SECRET` are set.
+- **Verified emails are re-fetched from GitHub**, because Auth.js's provider takes the primary
+  address without checking `verified` — matching on it would let anyone claim a staff email.
+- **Photo save now requires a path signed for *that* product** (`isUploadPathFor`). Before,
+  any `products/...` path passed, so product A could adopt product B's photo, and a save with
+  blank alt text naming a live photo deleted it from storage without an audit entry. Rejected
+  saves now only clean up objects no `ProductImage` row points at.
+- **CI runs lint, typecheck and unit tests** on pushes to main and on every PR. No build, no
+  database, no secrets.
