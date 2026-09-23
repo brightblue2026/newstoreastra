@@ -2,7 +2,9 @@
 
 import { headers } from 'next/headers';
 import { placeOrderInputSchema, quoteInputSchema } from '@/lib/cart-schema';
+import { CONTACT } from '@/lib/contact';
 import { orderAccessToken } from '@/lib/order-access';
+import { isRazorpayConfigured } from '@/lib/razorpay';
 import { notifyOrderEvent } from '@/lib/notifications';
 import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
@@ -100,6 +102,15 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
 
   const user = await currentUser();
   const data = parsed.data;
+
+  // Refused before anything is written: placing the order first would hold
+  // its stock and use up an order number for a payment that cannot start.
+  if (data.paymentMethod === 'RAZORPAY' && !isRazorpayConfigured()) {
+    return {
+      ok: false,
+      error: `Online payment is not available yet. Choose cash on delivery, or call ${CONTACT.tollFree}.`,
+    };
+  }
 
   let placed;
   try {

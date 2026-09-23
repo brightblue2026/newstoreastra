@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import CheckoutForm from '@/components/CheckoutForm';
+import { isRazorpayConfigured } from '@/lib/razorpay';
 
 export const metadata: Metadata = {
   title: 'Checkout',
@@ -26,7 +27,7 @@ export default function CheckoutPage() {
       </p>
 
       <div className="mt-16">
-        <CheckoutForm />
+        <CheckoutForm onlinePaymentAvailable={isRazorpayConfigured()} />
       </div>
     </div>
   );

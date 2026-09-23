@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import Nav, { type NavBrand } from '@/components/Nav';
 import CartDrawer from '@/components/CartDrawer';
 import CartContents from '@/components/CartContents';
@@ -26,6 +27,14 @@ export default function StorefrontChrome({ brands }: { brands: NavBrand[] }) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Any navigation closes the drawer. The store outlives the page, so without
+  // this "Checkout" (a link inside the drawer) opened /checkout with the cart
+  // still covering it and the form unreachable until someone found Close.
+  const pathname = usePathname();
+  useEffect(() => {
+    setCartOpen(false);
+  }, [pathname, setCartOpen]);
 
   const cartCount = mounted
     ? lines.reduce((total, line) => total + line.quantity, 0)

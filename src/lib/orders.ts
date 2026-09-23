@@ -211,7 +211,7 @@ export async function nextOrderNumber(
 ): Promise<string> {
   const fy = financialYearCode(now);
 
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`bbtc:order-number:${fy}`}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`bbtc:order-number:${fy}`}))`;
 
   const rows = await tx.$queryRaw<{ orderNumber: string }[]>`
     SELECT "orderNumber" FROM "Order"

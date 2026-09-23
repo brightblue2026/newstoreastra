@@ -74,7 +74,26 @@ const EMPTY_ADDRESS = {
 
 type AddressFields = typeof EMPTY_ADDRESS;
 
-export default function CheckoutForm() {
+/** Server field errors that the Contact and Delivery sections each display. */
+const CONTACT_ERROR_KEYS = new Set(['phone', 'email', 'shipping.phone']);
+const DELIVERY_ERROR_KEYS = new Set([
+  'shipping.fullName',
+  'shipping.pincode',
+  'shipping.line1',
+  'shipping.line2',
+  'shipping.city',
+  'shipping.state',
+]);
+
+/**
+ * `onlinePaymentAvailable` is false until Razorpay's keys are set. Offering the
+ * option anyway created an order, held its stock, and only then failed.
+ */
+export default function CheckoutForm({
+  onlinePaymentAvailable,
+}: {
+  onlinePaymentAvailable: boolean;
+}) {
   const router = useRouter();
   const lines = useCartStore((state) => state.lines);
   const discountCode = useCartStore((state) => state.discountCode);
@@ -87,7 +106,9 @@ export default function CheckoutForm() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState<AddressFields>(EMPTY_ADDRESS);
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'COD'>('RAZORPAY');
+  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'COD'>(
+    onlinePaymentAvailable ? 'RAZORPAY' : 'COD',
+  );
 
   const [cart, setCart] = useState<CartView | null>(null);
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
@@ -253,7 +274,10 @@ export default function CheckoutForm() {
         ...(email ? { email } : {}),
         phone,
         paymentMethod,
-        shipping: { ...address, pincode, line2: address.line2 || null },
+        // The mobile number is asked once, under Contact; the delivery address
+        // carries the same one. Sending `address.phone` (never filled in) made
+        // the server refuse every order.
+        shipping: { ...address, phone, pincode, line2: address.line2 || null },
         ...(notes ? { notes } : {}),
       });
 
@@ -261,8 +285,12 @@ export default function CheckoutForm() {
         setFormError(result.error);
         setFieldErrors(result.fieldErrors ?? {});
         setSubmitting(false);
-        // Send them back to the section that needs attention.
-        if (result.fieldErrors && Object.keys(result.fieldErrors).some((k) => k.startsWith('shipping'))) {
+        // Send them back to the section that shows the problem. An error with
+        // no field on screen stays on Payment, where the message is visible.
+        const errorKeys = Object.keys(result.fieldErrors ?? {});
+        if (errorKeys.some((key) => CONTACT_ERROR_KEYS.has(key))) {
+          setStep(1);
+        } else if (errorKeys.some((key) => DELIVERY_ERROR_KEYS.has(key))) {
           setStep(2);
         }
         return;
@@ -313,7 +341,7 @@ export default function CheckoutForm() {
             summary={contactComplete ? [phone, email].filter(Boolean).join(' · ') : undefined}
             onOpen={() => setStep(1)}
           >
-            <Field label="Mobile number" error={fieldErrors.phone} hint="For delivery updates on WhatsApp.">
+            <Field label="Mobile number" error={fieldErrors.phone ?? fieldErrors['shipping.phone']} hint="For delivery updates on WhatsApp.">
               <input
                 type="tel"
                 inputMode="numeric"
@@ -485,19 +513,26 @@ export default function CheckoutForm() {
             <fieldset className="space-y-3">
               <legend className="sr-only">Payment method</legend>
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-card border border-line p-4 has-[:checked]:border-ink">
+              <label
+                className={`flex items-start gap-3 rounded-card border border-line p-4 has-[:checked]:border-ink ${
+                  onlinePaymentAvailable ? 'cursor-pointer' : 'opacity-60'
+                }`}
+              >
                 <input
                   type="radio"
                   name="paymentMethod"
                   value="RAZORPAY"
                   checked={paymentMethod === 'RAZORPAY'}
                   onChange={() => setPaymentMethod('RAZORPAY')}
+                  disabled={!onlinePaymentAvailable}
                   className="mt-1"
                 />
                 <span>
                   <span className="block type-body">Pay online</span>
                   <span className="block type-caption text-ink-soft">
-                    UPI, card, netbanking or wallet, through Razorpay.
+                    {onlinePaymentAvailable
+                      ? 'UPI, card, netbanking or wallet, through Razorpay.'
+                      : `Not available yet. Choose cash on delivery, or call ${CONTACT.tollFree} to order.`}
                   </span>
                 </span>
               </label>
@@ -538,7 +573,14 @@ export default function CheckoutForm() {
 
             <button
               type="submit"
-              disabled={submitting || quoting || !contactComplete || !deliveryComplete}
+              disabled={
+                submitting ||
+                quoting ||
+                !contactComplete ||
+                !deliveryComplete ||
+                (paymentMethod === 'RAZORPAY' && !onlinePaymentAvailable) ||
+                (paymentMethod === 'COD' && !quote?.cod.available)
+              }
               className="mt-6 w-full rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift disabled:opacity-50"
             >
               {submitting
