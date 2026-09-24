@@ -65,39 +65,17 @@ const organizationJsonLd = {
 export const viewport: Viewport = {
   // BBTC's own declared theme colour, and the page background.
   themeColor: '#faf7f2',
+  // Draw edge to edge on notched phones; `globals.css` pads the body, and
+  // `pb-safe` / `safe-x` the fixed bars, so nothing lands under a notch or
+  // the home indicator.
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // `suppressHydrationWarning` because the inline script below deliberately
-    // adds a `js` class to this element before React hydrates, so the server
-    // HTML and the live DOM differ by exactly that one class. Without it React
-    // reports a hydration mismatch on every page load. Scoped to `<html>`, so
-    // it silences that one class and nothing inside the page.
-    <html lang="en-IN" className={fontVariables} suppressHydrationWarning>
-      <head>
-        {/*
-          Marks the document as scripted, synchronously, before the first paint.
-
-          Every scroll reveal starts hidden — but only for readers who can run
-          the script that brings it back. The server HTML used to ship 31
-          elements at `opacity: 0` on the homepage alone, so with JavaScript
-          blocked, broken or merely slow, most of the page was invisible: bad
-          for readers, and bad for any crawler that does not execute scripts.
-          The hidden state now lives in CSS behind `.js` (see globals.css), so
-          no-JS renders the page in full and scripted browsers still animate.
-
-          Inline and in `<head>` on purpose: a deferred or external script runs
-          after first paint, which would show every section and then hide it —
-          a flash on every page load. `script-src` already allows
-          'unsafe-inline' (see next.config.ts).
-        */}
-        <script
-          dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }}
-        />
-      </head>
+    <html lang="en-IN" className={fontVariables}>
       <body>
         <script
           type="application/ld+json"

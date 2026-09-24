@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 
 export type SpectrumBrand = {
@@ -51,7 +51,7 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
         const tintPct = isActive ? 16 : bleedPct;
 
         return (
-          <motion.div
+          <m.div
             key={brand.slug}
             initial={false}
             animate={{ flexGrow: isActive ? 3 : 1 }}
@@ -109,7 +109,7 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
                 </span>
               </span>
             </Link>
-          </motion.div>
+          </m.div>
         );
       })}
     </div>

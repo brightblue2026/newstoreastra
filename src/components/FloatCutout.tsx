@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import Image from 'next/image';
-import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
+import { m, useReducedMotion, useScroll, useTransform } from 'motion/react';
 
 /*
   Two nested layers, each owning its own `y` so they compose without fighting:
@@ -46,8 +46,8 @@ export default function FloatCutout({
   const y = useTransform(scrollYProgress, [0, 1], [depth, -depth]);
 
   return (
-    <motion.div ref={ref} style={reduced ? undefined : { y }} className={className}>
-      <motion.div
+    <m.div ref={ref} style={reduced ? undefined : { y }} className={className}>
+      <m.div
         animate={reduced ? undefined : { y: [0, -12, 0] }}
         transition={
           reduced
@@ -64,7 +64,7 @@ export default function FloatCutout({
           priority={priority}
           className="h-auto w-full drop-shadow-[0_24px_48px_rgb(11_31_58_/_0.18)]"
         />
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   );
 }

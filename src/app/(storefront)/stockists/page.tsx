@@ -216,7 +216,7 @@ function DistrictLink({
     <Link
       href={href}
       aria-current={current ? 'page' : undefined}
-      className={`block rounded-full border px-4 py-2 type-caption motion-accent ${
+      className={`tap-target rounded-full border px-4 py-2 type-caption motion-accent ${
         current ? 'border-ink bg-ink text-paper' : 'border-line hover:border-ink'
       }`}
     >
@@ -239,7 +239,7 @@ function StockistList({ stockists }: { stockists: Stockist[] }) {
           {stockist.phone && (
             <a
               href={`tel:${stockist.phone.replace(/[^\d+]/g, '')}`}
-              className="mt-3 inline-block type-body underline"
+              className="mt-1 inline-flex min-h-11 items-center type-body underline"
             >
               {stockist.phone}
             </a>

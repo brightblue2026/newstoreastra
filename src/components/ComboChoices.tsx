@@ -141,7 +141,7 @@ export default function ComboChoices({
             type="button"
             onClick={() => setQuantity((q) => Math.max(1, q - 1))}
             aria-label="Decrease quantity"
-            className="px-4 py-3 type-body text-ink-soft hover:text-ink"
+            className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
           >
             &minus;
           </button>
@@ -150,7 +150,7 @@ export default function ComboChoices({
             type="button"
             onClick={() => setQuantity((q) => Math.min(999, q + 1))}
             aria-label="Increase quantity"
-            className="px-4 py-3 type-body text-ink-soft hover:text-ink"
+            className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
           >
             +
           </button>

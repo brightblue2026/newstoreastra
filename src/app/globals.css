@@ -121,6 +121,14 @@
       there is no slack. Only one component guarded against this individually.
     */
     overflow-wrap: break-word;
+    /*
+      The viewport is `viewport-fit=cover` (root layout), so a phone turned
+      sideways draws the page under its notch and rounded corners. These keep
+      everything in the flow clear of them; both are 0 on every other screen.
+      Fixed bars sit outside the body's padding and use `safe-x` / `pb-safe`.
+    */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   /*
@@ -251,19 +259,66 @@
   and inline styles cannot be overridden from a stylesheet, so there was no way
   to undo it for them. The homepage shipped 31 such elements.
 
-  The hidden state lives here instead, behind the `.js` class that the inline
-  script in `layout.tsx` sets synchronously before first paint. No script, no
-  class, no hiding — the page renders in full. With script, Motion animates to
-  `opacity: 1` inline, which beats these rules, and the reveal looks exactly as
-  it did before.
+  The hidden state lives here instead, and is never in the server HTML at
+  all: `RevealItem` adds `data-reveal-pending` after hydration, and only to an
+  item that is below the fold at that moment. So the first screen paints in
+  full straight from the HTML — no script needed, nothing to wait for — and
+  what is further down is hidden while still off screen, then animated in as
+  it scrolls into view. Motion's inline `opacity: 1` on arrival beats these
+  rules.
+
+  It used to hide every revealing item before first paint (behind a `.js`
+  class set by an inline script) and wait for Motion to bring it back. On a
+  mid-range phone on 4G that held the homepage headline — the largest thing on
+  screen — invisible for about three seconds while the bundle downloaded and
+  ran.
 
   `prefers-reduced-motion` skips the hidden state entirely rather than merely
   shortening it: an element that starts invisible and is never animated back is
   the one failure this must not have.
 */
 @media (prefers-reduced-motion: no-preference) {
-  .js [data-reveal] {
+  [data-reveal-pending] {
     opacity: 0;
     transform: translateY(24px);
+  }
+}
+
+/* ---------- Safe areas: notches, rounded corners, the home indicator ---------- */
+
+/* A fixed bar along the bottom edge: clear of the iPhone home indicator. */
+@utility pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* A fixed, full-width element: clear of the notch in landscape. */
+@utility safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/*
+  A control a thumb can hit: at least 44 × 44 CSS px (WCAG 2.5.5, Apple HIG),
+  whatever its text. The visible label stays its size; the box around it grows.
+*/
+@utility tap-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+}
+
+/*
+  The product page's fixed "Add to cart" bar (below 768px) would otherwise sit
+  over the last 5rem of the page for good — the footer's seller name and GSTIN
+  could never be scrolled into view. `ProductDetail` sets the attribute while
+  the bar is mounted. Deliberately not `body:has(...)`: a `:has()` on the body
+  is re-checked after every DOM change on the page, and Motion changes inline
+  styles every animation frame — it measurably slowed the product page.
+*/
+@media (width < 48rem) {
+  body[data-sticky-buy-bar] {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 }

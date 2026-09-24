@@ -54,17 +54,20 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* 01 — brand pills */}
+      {/* 01 — brand pills. One swipeable row on a phone: nine pills wrapped
+          into five rows pushed the headline half a screen down, and a wrapped
+          row re-flowed — jolting everything below it — when the brand font
+          arrived a second or two after first paint. */}
       {brands.length > 0 && (
         <Reveal
-          className="mx-auto flex max-w-(--container-page) flex-wrap gap-3 px-6 pt-16"
+          className="mx-auto flex max-w-(--container-page) gap-3 overflow-x-auto px-6 pt-16 [scrollbar-width:none] *:shrink-0 sm:flex-wrap sm:overflow-visible"
           gap={0.04}
         >
           {brands.map((brand) => (
             <RevealItem key={brand.slug}>
               <Link
                 href={`/brands/${brand.slug}`}
-                className="flex items-center gap-2 rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink"
+                className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink"
               >
                 <span
                   aria-hidden="true"

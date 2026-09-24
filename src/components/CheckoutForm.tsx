@@ -211,15 +211,22 @@ export default function CheckoutForm({
   }, [mounted, refreshQuote]);
 
   // A payment method that stops being available — COD switched off, or a
-  // pincode outside its allowlist — must not stay selected.
+  // pincode outside its allowlist — must not stay selected, and when only one
+  // method works it is the one selected. Before a pincode is entered COD reads
+  // as unavailable, which used to flip the form to online payment even with
+  // online payment switched off — and nothing flipped it back, so the Pay
+  // button stayed greyed out until the customer found the COD option themselves.
   useEffect(() => {
-    if (paymentMethod === 'COD' && quote && !quote.cod.available) {
+    if (!quote) return;
+    if (paymentMethod === 'COD' && !quote.cod.available && onlinePaymentAvailable) {
       setPaymentMethod('RAZORPAY');
+    } else if (paymentMethod === 'RAZORPAY' && !onlinePaymentAvailable && quote.cod.available) {
+      setPaymentMethod('COD');
     }
-  }, [paymentMethod, quote]);
+  }, [paymentMethod, quote, onlinePaymentAvailable]);
 
   if (!mounted) {
-    return <p className="type-body text-ink-soft">Loading your cart…</p>;
+    return <CheckoutSkeleton />;
   }
 
   if (lines.length === 0) {
@@ -243,7 +250,12 @@ export default function CheckoutForm({
     });
   };
 
-  const openRazorpay = ({ payment, orderNumber, accessToken }: PendingPayment) => {
+  const openRazorpay = async ({ payment, orderNumber, accessToken }: PendingPayment) => {
+    // The script starts loading at step 2, so it is almost always here by
+    // now; on a slow connection it may still be arriving.
+    for (let waited = 0; !window.Razorpay && waited < 8000; waited += 200) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
     if (!window.Razorpay) {
       // The order exists and is payable; it just cannot be paid in this tab.
       router.push(`/order/${orderNumber}?t=${accessToken}`);
@@ -292,7 +304,7 @@ export default function CheckoutForm({
     setSubmitting(true);
 
     if (pendingPayment) {
-      openRazorpay(pendingPayment);
+      await openRazorpay(pendingPayment);
       return;
     }
 
@@ -326,7 +338,7 @@ export default function CheckoutForm({
       }
 
       if (result.payment) {
-        openRazorpay({
+        await openRazorpay({
           payment: result.payment,
           orderNumber: result.orderNumber,
           accessToken: result.accessToken,
@@ -360,8 +372,14 @@ export default function CheckoutForm({
   return (
     <>
       {/* Razorpay's own hosted script — it must be loaded from their origin,
-          not bundled, because it is versioned by them and handles card data. */}
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+          not bundled, because it is versioned by them and handles card data.
+          Only when online payment is on, and only once the customer is past
+          the contact step: with everything it pulls in it is about 2 MB, which
+          on a phone was the heaviest thing on the page and bought nothing for
+          anyone paying cash on delivery or still typing their number. */}
+      {onlinePaymentAvailable && step >= 2 && (
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+      )}
 
       <div className="grid gap-12 lg:grid-cols-[1fr_24rem] lg:gap-16">
         <form onSubmit={onSubmit} noValidate className="min-w-0">
@@ -740,6 +758,44 @@ export default function CheckoutForm({
 const inputClass =
   'w-full rounded-control border border-line bg-paper px-4 py-3 type-body focus-visible:border-ink';
 
+/**
+ * What checkout looks like before the cart has been read from localStorage —
+ * the same grid, the contact step open, the other two closed — so the real
+ * form replaces it in place instead of pushing everything below it down.
+ */
+function CheckoutSkeleton() {
+  return (
+    <>
+      <span className="sr-only" role="status" aria-live="polite">
+        Loading your cart
+      </span>
+      <div className="grid animate-pulse gap-12 lg:grid-cols-[1fr_24rem] lg:gap-16" aria-hidden="true">
+        <div className="min-w-0">
+          <div className="border-b border-line pb-8">
+            <div className="h-7 w-32 rounded-full bg-line" />
+            <div className="mt-6 space-y-6">
+              {[0, 1].map((field) => (
+                <div key={field}>
+                  <div className="h-4 w-32 rounded-full bg-line" />
+                  <div className="mt-2 h-13 rounded-control bg-line" />
+                  <div className="mt-1 h-4 w-56 max-w-full rounded-full bg-line" />
+                </div>
+              ))}
+              <div className="h-12 w-48 rounded-control bg-line" />
+            </div>
+          </div>
+          {[0, 1].map((step) => (
+            <div key={step} className="border-b border-line py-8">
+              <div className="h-7 w-32 rounded-full bg-line" />
+            </div>
+          ))}
+        </div>
+        <div className="h-72 rounded-card border border-line" />
+      </div>
+    </>
+  );
+}
+
 function Section({
   index,
   title,
@@ -765,7 +821,7 @@ function Section({
           {title}
         </h2>
         {!open && done && (
-          <button type="button" onClick={onOpen} className="type-caption underline">
+          <button type="button" onClick={onOpen} className="tap-target type-caption underline">
             Change
           </button>
         )}

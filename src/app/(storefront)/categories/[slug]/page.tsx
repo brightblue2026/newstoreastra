@@ -80,7 +80,7 @@ export default async function CategoryPage({
               <ol className="flex flex-wrap items-center gap-2 type-caption text-ink-soft">
                 {category.ancestors.map((ancestor) => (
                   <li key={ancestor.slug} className="flex items-center gap-2">
-                    <Link href={`/categories/${ancestor.slug}`} className="hover:text-ink">
+                    <Link href={`/categories/${ancestor.slug}`} className="inline-flex min-h-11 items-center hover:text-ink">
                       {ancestor.name}
                     </Link>
                     <span aria-hidden="true">/</span>

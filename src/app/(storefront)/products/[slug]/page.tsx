@@ -76,7 +76,7 @@ function productJsonLd(product: ProductPage) {
 function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <details className="group border-b border-line py-6">
-      <summary className="flex cursor-pointer list-none items-center justify-between type-subhead">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between type-subhead">
         {title}
         <span
           aria-hidden="true"
@@ -158,13 +158,13 @@ export default async function ProductDetailPage({
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-2 type-caption text-ink-soft">
             <li className="flex items-center gap-2">
-              <Link href="/shop" className="hover:text-ink">
+              <Link href="/shop" className="inline-flex min-h-11 items-center hover:text-ink">
                 Shop
               </Link>
               <span aria-hidden="true">/</span>
             </li>
             <li className="flex items-center gap-2">
-              <Link href={`/brands/${product.brand.slug}`} className="hover:text-ink">
+              <Link href={`/brands/${product.brand.slug}`} className="inline-flex min-h-11 items-center hover:text-ink">
                 {product.brand.name}
               </Link>
               <span aria-hidden="true">/</span>

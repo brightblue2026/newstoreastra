@@ -63,7 +63,7 @@ export function ReviewForm({ productId }: { productId: string }) {
         <legend className={labelClass}>Your rating</legend>
         <div className="mt-3 flex flex-wrap gap-4">
           {STARS.map((value) => (
-            <label key={value} className="flex items-center gap-2 type-body">
+            <label key={value} className="flex min-h-11 items-center gap-2 pr-2 type-body">
               <input
                 type="radio"
                 name="rating"

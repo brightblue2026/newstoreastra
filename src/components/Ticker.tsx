@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 
 /*
   The announcement bar. Content is duplicated once and the row translates by
@@ -25,7 +25,7 @@ export default function Ticker({ items }: { items: string[] }) {
           ))}
         </ul>
       ) : (
-        <motion.ul
+        <m.ul
           className="flex w-max gap-12"
           animate={{ x: ['0%', '-50%'] }}
           transition={{ duration: 28, ease: 'linear', repeat: Infinity }}
@@ -41,7 +41,7 @@ export default function Ticker({ items }: { items: string[] }) {
               {text}
             </li>
           ))}
-        </motion.ul>
+        </m.ul>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { motion } from 'motion/react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { m } from 'motion/react';
 import { fadeUp, inView, stagger } from '@/lib/motion';
 
 type RevealProps = {
@@ -27,11 +27,12 @@ type RevealProps = {
  * so there was no way to rescue them. `initial={false}` tells Motion to write
  * nothing and adopt whatever the element already computes to.
  *
- * The hidden state moved to `globals.css`, behind the `.js` class that
- * `layout.tsx` sets before first paint. So: no script, nothing hidden, the
- * whole page readable; script, hidden exactly as before and animated back the
- * moment it scrolls into view. `whileInView` still drives it, and Motion's
- * inline `opacity: 1` on arrival beats the stylesheet.
+ * The hidden state lives in `globals.css`, keyed on `data-reveal-pending`,
+ * which `RevealItem` sets only once hydrated and only while below the fold.
+ * So the server HTML is never hidden, the first screen never waits on a
+ * script, and everything further down still rises into view on scroll.
+ * `whileInView` still drives it, and Motion's inline `opacity: 1` on arrival
+ * beats the stylesheet.
  */
 export function Reveal({
   children,
@@ -40,17 +41,38 @@ export function Reveal({
   className,
 }: RevealProps) {
   return (
-    <motion.div variants={stagger(delay, gap)} {...inView} initial={false} className={className}>
+    <m.div variants={stagger(delay, gap)} {...inView} initial={false} className={className}>
       {children}
-    </motion.div>
+    </m.div>
   );
+}
+
+/*
+  Every RevealItem on the page measures itself in the same hydration commit.
+  Reading one position and then writing an attribute before the next read
+  would make the browser recompute styles once per item; so the reads happen
+  in each layout effect and the writes are queued and applied together in one
+  microtask — still before the first frame is painted.
+*/
+const pendingHide: Element[] = [];
+
+function hideWhenBatched(element: Element) {
+  if (pendingHide.length === 0) {
+    queueMicrotask(() => {
+      for (const item of pendingHide.splice(0)) item.setAttribute('data-reveal-pending', '');
+    });
+  }
+  pendingHide.push(element);
 }
 
 /**
  * A single staggered child: fade plus a 24px rise.
  *
- * `data-reveal` is what the stylesheet hides; see `Reveal` above for why the
- * hidden state cannot live in `initial`.
+ * Hidden only if it is off screen when the page hydrates — hiding something
+ * the reader cannot see yet cannot flash. Anything already on screen is left
+ * exactly as the server painted it: making the first screen wait for the
+ * JavaScript bundle is what held a phone's largest paint back by ~3 s. See
+ * `Reveal` above for why the hidden state cannot live in `initial`.
  */
 export function RevealItem({
   children,
@@ -59,9 +81,18 @@ export function RevealItem({
   children: ReactNode;
   className?: string;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const { top } = element.getBoundingClientRect();
+    if (top >= window.innerHeight) hideWhenBatched(element);
+  }, []);
+
   return (
-    <motion.div variants={fadeUp} initial={false} data-reveal className={className}>
+    <m.div ref={ref} variants={fadeUp} initial={false} className={className}>
       {children}
-    </motion.div>
+    </m.div>
   );
 }

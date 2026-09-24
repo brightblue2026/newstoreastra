@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import MotionProvider from '@/components/MotionProvider';
 import Ticker from '@/components/Ticker';
 import StorefrontChrome from '@/components/StorefrontChrome';
 import { getContent, getPublishedPolicies } from '@/lib/content';
@@ -15,7 +16,8 @@ import { getBrands, getSellerEntity } from '@/lib/storefront';
       the mega-menu is populated everywhere rather than only on the homepage;
     - every page below stays a server component. The only client boundary is
       `StorefrontChrome`, which owns the single piece of shared state (whether
-      the cart is open).
+      the cart is open). `MotionProvider` wraps it all only to hand the
+      animation engine down, loaded after first paint; it renders no markup.
 
   Both reads degrade to empty rather than throwing — a database hiccup should
   cost the menu and the GSTIN line, not every page on the site.
@@ -34,7 +36,7 @@ export default async function StorefrontLayout({
   ]);
 
   return (
-    <>
+    <MotionProvider>
       <Ticker items={announcement.items} />
 
       <StorefrontChrome brands={brands} />
@@ -106,6 +108,6 @@ export default async function StorefrontLayout({
           </div>
         </div>
       </footer>
-    </>
+    </MotionProvider>
   );
 }

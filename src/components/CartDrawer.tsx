@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 
 const FOCUSABLE = [
@@ -94,7 +94,7 @@ export default function CartDrawer({
     <AnimatePresence>
       {open && (
         <>
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -104,7 +104,7 @@ export default function CartDrawer({
             aria-hidden="true"
           />
 
-          <motion.div
+          <m.div
             ref={panel}
             role="dialog"
             aria-modal="true"
@@ -114,21 +114,21 @@ export default function CartDrawer({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: dur.drawer, ease }}
-            className="fixed inset-y-0 right-0 z-[70] flex h-dvh w-full max-w-md flex-col bg-paper"
+            className="fixed inset-y-0 right-0 z-[70] flex h-dvh w-full max-w-md flex-col bg-paper safe-x"
           >
             <header className="flex items-center justify-between border-b border-line px-6 py-4">
               <h2 className="type-heading">{title}</h2>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-control px-3 py-2 type-caption text-ink-soft hover:text-ink"
+                className="tap-target rounded-control px-3 py-2 type-caption text-ink-soft hover:text-ink"
               >
                 Close
               </button>
             </header>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
-          </motion.div>
+          </m.div>
         </>
       )}
     </AnimatePresence>
@@ -137,18 +137,22 @@ export default function CartDrawer({
 
 /**
  * Wrap each line item so removing one slides the rest up rather than snapping.
+ *
+ * The removed line collapses its own height as it leaves, rather than the
+ * others animating with `layout`: layout projection is the one Motion feature
+ * the storefront would otherwise need `domMax` for, and it is a third of the
+ * library shipped to every phone for this alone. See `MotionProvider`.
  */
 export function CartLine({ children }: { children: ReactNode }) {
   return (
-    <motion.div
-      layout
+    <m.div
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 40 }}
+      exit={{ opacity: 0, x: 40, height: 0, paddingTop: 0, paddingBottom: 0 }}
       transition={{ duration: dur.drawer, ease }}
-      className="border-b border-line py-4 last:border-b-0"
+      className="overflow-hidden border-b border-line py-4 last:border-b-0"
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }

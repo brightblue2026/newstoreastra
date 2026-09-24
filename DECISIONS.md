@@ -1747,3 +1747,30 @@ Five defects found and fixed:
 - **Razorpay Checkout times out at 15 minutes**, a quarter of the 60-minute stale-order expiry.
 - **Closing the payment window keeps the placed order payable.** "Pay" reopens it rather than
   placing a second one; any edit to the form forgets it and the next submit places afresh.
+- **Scroll reveals never hide what is on screen at load.** `RevealItem` hides itself only if it
+  is below the fold when it hydrates; the first screen paints straight from the HTML. The cost:
+  first-screen content no longer fades in on page load. Hiding it until hydration held a
+  phone's largest paint back ~2 s (3.1 s → 1.0 s on home under slow-4G emulation).
+- **The `.js` class and its inline `<head>` script are gone** — they existed only for the old
+  reveal rule.
+- **Motion runs with `domAnimation`, not the full engine.** Every component uses `m.*` inside
+  `LazyMotion strict`. The cart's `layout` slide was the only thing needing `domMax`; a removed
+  line now collapses its own height instead. A lazy `import()` of the features was tried and
+  deferred nothing (webpack bundles it through the same `motion/react` barrel), as was
+  `optimizePackageImports` (byte-identical output) — both reverted.
+- **Lenis only on a fine pointer.** Touch scrolling is native; the rAF loop cost battery for nothing.
+- **Razorpay's checkout.js loads only when online payment is on, from the delivery step.** It is
+  ~2 MB with what it pulls in; a COD-only checkout downloaded it for nothing.
+- **When only one payment method works, checkout selects it.** Online payment off used to leave
+  "Pay online" (disabled) selected and the Pay button greyed out until the customer found COD.
+- **Brand pills are one swipeable row below 640px.** Wrapped, nine pills took five rows above the
+  headline and re-flowed when the brand font arrived.
+- **Product and combo pages go two-column from 768px, not 1024px**, and the sticky buy bar is
+  phone-only. An iPad portrait showed a full-width photo before any price.
+- **`viewport-fit=cover` with safe-area padding** on the body and the fixed bars, so nothing sits
+  under a notch or the home indicator.
+- **44 × 44 minimum tap targets via one `tap-target` utility**, and every text input at 16px —
+  iOS Safari zooms the page into anything smaller.
+- **JetBrains Mono is not preloaded.** It is never the largest element; preloading it competed
+  with the photo and headline on a slow connection.
+- **The admin panel was left out of this pass**, per the owner. It stays desktop-first.

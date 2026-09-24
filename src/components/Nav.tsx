@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AnimatePresence,
-  motion,
+  m,
   useMotionValueEvent,
   useReducedMotion,
   useScroll,
@@ -104,7 +104,13 @@ export default function Nav({
   }, [mobileOpen]);
 
   return (
-    <motion.header
+    <m.header
+      // Server HTML has no inline styles from `animate`, so the resting 88px
+      // height is also a class; without it the bar rendered at its content
+      // height and grew after hydration, shoving the whole page down.
+      // `initial={false}` starts Motion at the current state instead of
+      // tweening into it on load.
+      initial={false}
       animate={{
         y: hidden && !reduced ? '-100%' : 0,
         height: solid ? 64 : 88,
@@ -117,14 +123,18 @@ export default function Nav({
       // Sticky, not fixed: the bar sits in flow beneath the announcement ticker
       // and only pins once the ticker has scrolled away. Fixed would park it
       // on top of the ticker at rest.
-      className="sticky top-0 z-50 backdrop-blur-md"
+      className="sticky top-0 z-50 h-22 backdrop-blur-md"
       onMouseLeave={() => setMenuOpen(false)}
     >
       <nav
         aria-label="Primary"
-        className="mx-auto flex h-full max-w-(--container-page) items-center gap-4 px-6 sm:gap-8"
+        className="mx-auto flex h-full max-w-(--container-page) items-center gap-2 px-6 sm:gap-8"
       >
-        <Link href="/" className="type-heading" onClick={() => setMobileOpen(false)}>
+        <Link
+          href="/"
+          className="tap-target shrink-0 whitespace-nowrap type-heading"
+          onClick={() => setMobileOpen(false)}
+        >
           Bright Blue
         </Link>
 
@@ -154,7 +164,7 @@ export default function Nav({
           <button
             type="button"
             onClick={onOpenCart}
-            className="rounded-control px-3 py-2 type-body text-ink-soft hover:text-ink"
+            className="tap-target whitespace-nowrap rounded-control px-2 py-2 type-body text-ink-soft hover:text-ink sm:px-3"
           >
             Cart
             {cartCount > 0 && (
@@ -171,7 +181,7 @@ export default function Nav({
             aria-expanded={mobileOpen}
             aria-controls="mobile-menu"
             onClick={() => setMobileOpen((v) => !v)}
-            className="rounded-control px-3 py-2 type-body text-ink-soft hover:text-ink md:hidden"
+            className="tap-target rounded-control px-2 py-2 type-body text-ink-soft hover:text-ink sm:px-3 md:hidden"
           >
             {mobileOpen ? 'Close' : 'Menu'}
           </button>
@@ -180,7 +190,7 @@ export default function Nav({
 
       <AnimatePresence>
         {menuOpen && brands.length > 0 && (
-          <motion.div
+          <m.div
             ref={menuRef}
             id="brand-menu"
             initial={{ opacity: 0, y: -8 }}
@@ -217,13 +227,13 @@ export default function Nav({
                 </li>
               ))}
             </ul>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
+          <m.div
             id="mobile-menu"
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -277,9 +287,9 @@ export default function Nav({
                 </>
               )}
             </nav>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </motion.header>
+    </m.header>
   );
 }

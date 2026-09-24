@@ -145,7 +145,7 @@ export default function CartContents() {
                         type="button"
                         onClick={() => setQuantity(line.key, line.quantity - 1)}
                         aria-label={`Decrease quantity of ${line.name}`}
-                        className="px-3 py-1 type-body text-ink-soft hover:text-ink"
+                        className="tap-target px-3 py-1 type-body text-ink-soft hover:text-ink"
                       >
                         &minus;
                       </button>
@@ -156,7 +156,7 @@ export default function CartContents() {
                         type="button"
                         onClick={() => setQuantity(line.key, line.quantity + 1)}
                         aria-label={`Increase quantity of ${line.name}`}
-                        className="px-3 py-1 type-body text-ink-soft hover:text-ink"
+                        className="tap-target px-3 py-1 type-body text-ink-soft hover:text-ink"
                       >
                         +
                       </button>
@@ -165,7 +165,7 @@ export default function CartContents() {
                     <button
                       type="button"
                       onClick={() => removeLine(line.key)}
-                      className="type-caption text-ink-soft hover:text-ink"
+                      className="tap-target type-caption text-ink-soft hover:text-ink"
                     >
                       Remove
                     </button>
@@ -210,7 +210,7 @@ export default function CartContents() {
         )}
       </div>
 
-      <div className="sticky bottom-0 mt-4 border-t border-line bg-paper pt-4">
+      <div className="sticky bottom-0 mt-4 border-t border-line bg-paper pt-4 pb-safe">
         {view.freeShippingProgress && view.freeShippingProgress.remainingPaise > 0 && (
           <div className="mb-4">
             <p className="type-caption text-ink-soft">
@@ -267,7 +267,7 @@ export default function CartContents() {
                   setDiscountCode(null);
                   setCodeDraft('');
                 }}
-                className="type-caption underline"
+                className="tap-target type-caption underline"
               >
                 Remove
               </button>
@@ -293,12 +293,12 @@ export default function CartContents() {
                 autoComplete="off"
                 autoCapitalize="characters"
                 spellCheck={false}
-                className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 type-caption uppercase placeholder:normal-case placeholder:text-ink-soft"
+                className="min-h-11 min-w-0 flex-1 rounded-control border border-line px-3 py-2 type-body uppercase placeholder:normal-case placeholder:text-ink-soft"
               />
               <button
                 type="submit"
                 disabled={codeDraft.trim().length === 0}
-                className="rounded-control border border-ink px-4 py-2 type-caption disabled:opacity-40"
+                className="tap-target rounded-control border border-ink px-4 py-2 type-caption disabled:opacity-40"
               >
                 Apply
               </button>

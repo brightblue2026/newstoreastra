@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 import { formatPrice, isPurchasable } from '@/lib/money';
 import DeliveryCheck from '@/components/DeliveryCheck';
@@ -49,6 +49,14 @@ function axisOptions(variants: ProductVariantView[], axis: Axis): string[] {
 export default function ProductDetail({ product }: { product: ProductPage }) {
   const { variants } = product;
   const reduced = useReducedMotion();
+  // The fade is for switching photos, never for the first one: Motion writes
+  // `initial` into the server HTML, so fading the first photo in shipped the
+  // page's largest element at opacity 0 until the bundle had hydrated — about
+  // three seconds on a phone on 4G.
+  const photoSwitched = useRef(false);
+  useEffect(() => {
+    photoSwitched.current = true;
+  }, []);
 
   const addLine = useCartStore((state) => state.addLine);
   const openCart = useCartDrawer((state) => state.setOpen);
@@ -138,6 +146,15 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
   const active = gallery[Math.min(imageIndex, gallery.length - 1)] ?? null;
 
   const purchasable = selected !== null && isPurchasable(selected.pricePaise);
+
+  // Reserves room at the end of the page for the fixed buy bar below, so it
+  // never covers the footer for good — see `body[data-sticky-buy-bar]` in
+  // globals.css. Set after hydration; the padding lands below the fold.
+  useEffect(() => {
+    if (!purchasable) return;
+    document.body.setAttribute('data-sticky-buy-bar', '');
+    return () => document.body.removeAttribute('data-sticky-buy-bar');
+  }, [purchasable]);
   const showMrp =
     purchasable &&
     selected.mrpPaise !== null &&
@@ -181,7 +198,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
 
   return (
     <div
-      className="grid gap-16 lg:grid-cols-2"
+      // `grid-cols-1` is `minmax(0, 1fr)`: without it the single mobile column
+      // took the thumbnail strip's full width as its minimum — four thumbnails
+      // are wider than a 360px phone — and the whole page scrolled sideways.
+      className="grid grid-cols-1 gap-16 md:grid-cols-2 md:gap-10 lg:gap-16"
       style={{ ['--bb-accent' as string]: accent }}
     >
       {/* ---------------------------------------------------------- gallery */}
@@ -193,10 +213,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
           }}
         >
           {active ? (
-            <motion.div
+            <m.div
               key={active.url}
               className="absolute inset-0"
-              initial={reduced ? false : { opacity: 0 }}
+              initial={reduced || !photoSwitched.current ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: dur.accent, ease }}
             >
@@ -205,10 +225,11 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 alt={active.alt}
                 fill
                 priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
+                // Minus the page gutters and this box's own p-12 on a phone.
+                sizes="(max-width: 767px) calc(100vw - 9rem), 50vw"
                 className="object-contain p-12"
               />
-            </motion.div>
+            </m.div>
           ) : (
             // No stock photography, no placeholder art — an empty accent field.
             <span className="sr-only">No photograph available</span>
@@ -314,7 +335,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('size', size)}
                     aria-pressed={isSelected}
-                    className={`rounded-control border px-4 py-2 type-body motion-accent ${
+                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent ${
                       isSelected
                         ? 'border-ink bg-ink text-paper'
                         : 'border-line text-ink-soft hover:border-ink hover:text-ink'
@@ -341,7 +362,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('format', format)}
                     aria-pressed={isSelected}
-                    className={`rounded-control border px-4 py-2 type-body motion-accent ${
+                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent ${
                       isSelected
                         ? 'border-ink bg-ink text-paper'
                         : 'border-line text-ink-soft hover:border-ink hover:text-ink'
@@ -363,7 +384,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 aria-label="Decrease quantity"
-                className="px-4 py-3 type-body text-ink-soft hover:text-ink"
+                className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
               >
                 &minus;
               </button>
@@ -372,7 +393,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.min(999, q + 1))}
                 aria-label="Increase quantity"
-                className="px-4 py-3 type-body text-ink-soft hover:text-ink"
+                className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
               >
                 +
               </button>
@@ -412,8 +433,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
         mid-scroll shifts what is under the thumb.
       */}
       {purchasable && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 px-6 py-3 backdrop-blur-md lg:hidden">
-          <div className="flex items-center gap-4">
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 pb-safe safe-x backdrop-blur-md md:hidden"
+        >
+          <div className="flex items-center gap-4 px-6 pt-3">
             <div className="min-w-0">
               <p className="truncate type-caption text-ink-soft">
                 {selected?.variantName ? `${selected.variantName} · ` : ''}

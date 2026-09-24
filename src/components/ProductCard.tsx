@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 import { formatPrice, isPurchasable } from '@/lib/money';
 
@@ -65,7 +65,7 @@ export default function ProductCard({
   const field = `color-mix(in oklab, ${accentHex} 12%, var(--color-paper))`;
 
   return (
-    <motion.article
+    <m.article
       onHoverStart={() => setHover(true)}
       onHoverEnd={() => setHover(false)}
       whileHover={reduced ? undefined : { y: -2 }}
@@ -79,7 +79,7 @@ export default function ProductCard({
       >
         {imageUrl ? (
           <>
-            <motion.div
+            <m.div
               className="absolute inset-0"
               animate={{ scale: hover && !reduced ? 1.06 : 1 }}
               transition={{ duration: dur.accent, ease }}
@@ -91,10 +91,10 @@ export default function ProductCard({
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className="object-contain p-6"
               />
-            </motion.div>
+            </m.div>
 
             {hoverImageUrl && (
-              <motion.div
+              <m.div
                 className="absolute inset-0"
                 initial={false}
                 animate={{ opacity: hover ? 1 : 0 }}
@@ -108,7 +108,7 @@ export default function ProductCard({
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-contain p-6"
                 />
-              </motion.div>
+              </m.div>
             )}
           </>
         ) : (
@@ -118,7 +118,7 @@ export default function ProductCard({
         )}
 
         {purchasable && onQuickAdd && (
-          <motion.button
+          <m.button
             type="button"
             onClick={() => onQuickAdd(slug)}
             initial={false}
@@ -134,7 +134,7 @@ export default function ProductCard({
             className="absolute inset-x-3 bottom-3 rounded-control bg-signal py-3 font-medium text-paper"
           >
             Quick add
-          </motion.button>
+          </m.button>
         )}
       </div>
 
@@ -161,6 +161,6 @@ export default function ProductCard({
           <span className="text-ink-soft">{formatPrice(null)}</span>
         )}
       </p>
-    </motion.article>
+    </m.article>
   );
 }
