@@ -42,6 +42,19 @@ const STATES = Object.values(STATE_CODES).sort((a, b) => a.localeCompare(b));
 
 type Step = 1 | 2 | 3;
 
+/**
+ * Checkout closes itself after this long. Well inside `STALE_ORDER_MINUTES`
+ * (60) in `lib/orders.ts`, so a customer is not still paying when the cron
+ * releases the order's stock — the webhook flags that case if it happens anyway.
+ */
+const RAZORPAY_TIMEOUT_SECONDS = 15 * 60;
+
+interface PendingPayment {
+  payment: { razorpayOrderId: string; keyId: string; amountPaise: number };
+  orderNumber: string;
+  accessToken: string;
+}
+
 interface RazorpayCheckoutOptions {
   key: string;
   amount: number;
@@ -52,6 +65,8 @@ interface RazorpayCheckoutOptions {
   prefill: { name: string; email?: string; contact: string };
   notes: Record<string, string>;
   theme: { color: string };
+  /** Seconds before Checkout closes itself. */
+  timeout: number;
   handler: (response: { razorpay_payment_id: string; razorpay_order_id: string }) => void;
   modal: { ondismiss: () => void };
 }
@@ -116,6 +131,17 @@ export default function CheckoutForm({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  /*
+    An order placed whose payment window was closed. Paying again reopens the
+    same Razorpay order rather than placing a second one — which used to hold
+    the stock twice and leave a duplicate "awaiting payment" order behind.
+    Any edit to what was ordered, or where it goes, forgets it: the placed
+    order no longer matches the form, so the next submit places a fresh one.
+  */
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+  useEffect(() => {
+    setPendingPayment(null);
+  }, [lines, discountCode, email, phone, address, notes, paymentMethod]);
 
   // The cart lives in localStorage, so the first server pass cannot know it.
   useEffect(() => setMounted(true), []);
@@ -217,11 +243,7 @@ export default function CheckoutForm({
     });
   };
 
-  const openRazorpay = (
-    payment: { razorpayOrderId: string; keyId: string; amountPaise: number },
-    orderNumber: string,
-    accessToken: string,
-  ) => {
+  const openRazorpay = ({ payment, orderNumber, accessToken }: PendingPayment) => {
     if (!window.Razorpay) {
       // The order exists and is payable; it just cannot be paid in this tab.
       router.push(`/order/${orderNumber}?t=${accessToken}`);
@@ -242,6 +264,7 @@ export default function CheckoutForm({
       },
       notes: { orderNumber },
       theme: { color: '#0f9cd6' },
+      timeout: RAZORPAY_TIMEOUT_SECONDS,
       handler: () => {
         // Deliberately does not mark anything paid — §10. The confirmation
         // page reads the order's real status, which the webhook owns.
@@ -251,8 +274,9 @@ export default function CheckoutForm({
       modal: {
         ondismiss: () => {
           setSubmitting(false);
+          setPendingPayment({ payment, orderNumber, accessToken });
           setFormError(
-            `Payment was not completed, so order ${orderNumber} is still awaiting payment. Call ${CONTACT.tollFree} if you need help.`,
+            `Payment was not completed, so order ${orderNumber} is still awaiting payment. Pay again below, or call ${CONTACT.tollFree} if you need help.`,
           );
         },
       },
@@ -266,6 +290,11 @@ export default function CheckoutForm({
     setFormError(null);
     setFieldErrors({});
     setSubmitting(true);
+
+    if (pendingPayment) {
+      openRazorpay(pendingPayment);
+      return;
+    }
 
     try {
       const result = await submitOrder({
@@ -297,7 +326,11 @@ export default function CheckoutForm({
       }
 
       if (result.payment) {
-        openRazorpay(result.payment, result.orderNumber, result.accessToken);
+        openRazorpay({
+          payment: result.payment,
+          orderNumber: result.orderNumber,
+          accessToken: result.accessToken,
+        });
         return;
       }
 
@@ -585,7 +618,9 @@ export default function CheckoutForm({
             >
               {submitting
                 ? 'Placing your order…'
-                : paymentMethod === 'COD'
+                : pendingPayment
+                  ? `Pay ${formatINR(pendingPayment.payment.amountPaise)} for order ${pendingPayment.orderNumber}`
+                  : paymentMethod === 'COD'
                   ? `Place order · ${quote ? formatINR(quote.totalPaise) : '—'}`
                   : `Pay ${quote ? formatINR(quote.totalPaise) : ''}`}
             </button>

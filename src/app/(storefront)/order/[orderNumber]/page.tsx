@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import PaymentStatusRefresh from '@/components/PaymentStatusRefresh';
 import ShipmentTracking from '@/components/ShipmentTracking';
 import { CONTACT } from '@/lib/contact';
 import { formatINR } from '@/lib/money';
@@ -92,11 +93,12 @@ export default async function OrderPage({
         {awaitingPayment
           ? payment === 'submitted'
             ? 'Thank you. We are confirming the payment with the bank — this page updates once it clears, usually within a minute.'
-            : 'This order is waiting for payment. Nothing has been charged yet.'
+            : 'This order is waiting for payment. If you have already paid, it will update here within a few minutes.'
           : `Thank you. We have your order and will send updates to ${
               order.shippingAddress?.phone ?? 'your mobile'
             } on WhatsApp.`}
       </p>
+      {awaitingPayment && payment === 'submitted' && <PaymentStatusRefresh />}
 
       <dl className="mt-12 grid gap-6 sm:grid-cols-3">
         <Fact label="Order number" value={order.orderNumber} mono />

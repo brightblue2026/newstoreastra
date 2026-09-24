@@ -19,7 +19,8 @@
     "invoice:sample": "tsx --tsconfig tsconfig.scripts.json scripts/sample-invoice.ts",
     "user:create": "tsx scripts/create-staff-user.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
-    "qa:shoot": "tsx scripts/shoot.ts"
+    "qa:shoot": "tsx scripts/shoot.ts",
+    "e2e:razorpay": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-razorpay.ts"
   },
   "dependencies": {
     "@auth/core": "0.41.3",

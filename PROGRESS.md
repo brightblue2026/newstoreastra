@@ -1106,6 +1106,40 @@ set `SHIPROCKET_API_EMAIL` / `_PASSWORD` / `SHIPROCKET_WEBHOOK_TOKEN` in Vercel,
 pickup in Settings, place one real COD order, press Ship, check the label, then cancel it in
 Shiprocket. Check the pickup, manifest and tracking field names against apidocs.shiprocket.in.
 
+## Razorpay readiness pass · 24 September 2026
+
+Tested and bug-hunted the whole prepaid path before real keys go in. Five bugs fixed:
+
+- **The CSP blocked Razorpay's own script.** `checkout.js` loads a risk-detection bundle off
+  `cdn.razorpay.com`, which `script-src` did not allow. Found by opening the real modal in a
+  browser; `cdn.razorpay.com` added. The modal now opens with no CSP errors.
+- **A payment after auto-cancellation vanished.** If the stale-order cron cancelled an order
+  while the customer was still in their UPI app, the capture was answered "already handled"
+  and nothing recorded that money had arrived. It is now saved as paid on the cancelled order
+  with a note to refund it, so the order list shows "cancelled · paid". Checkout also closes
+  itself after 15 minutes, well inside the 60-minute expiry, to make this rarer.
+- **`payment.authorized` confirmed orders.** Authorised is not captured money; on manual
+  capture it is refunded after a few days. Only `payment.captured` / `order.paid` confirm
+  now. The webhook also refuses a payment whose amount or currency does not match the order.
+- **Closing the payment window and paying again placed a second order**, holding the stock
+  twice. "Pay" now reopens the same Razorpay order until the customer edits the form.
+- **The order page said it would update when payment cleared and never did.** It now
+  refreshes itself every 4 s for about three minutes while a submitted payment is pending,
+  and no longer says "nothing has been charged" to someone who may just have paid.
+
+**Verified.** `pnpm e2e:razorpay` (new, local database only) places real prepaid orders and
+posts signed webhooks at the dev server — 25 checks: forged/missing signatures, authorised
+only, underpayment, failure then success, capture (confirmed, paid, invoice raised, stock
+committed), replay and concurrent redelivery (no double decrement, same invoice), payment on
+a cancelled order, a real 401 from api.razorpay.com (order auto-cancelled, hold released),
+and an unknown order. A COD order placed through the browser end to end. Typecheck, lint,
+tests, production build.
+
+**Needs real test keys to finish.** Put `rzp_test_` keys and a webhook secret in `.env` (and
+Vercel), register the webhook on a public URL (Razorpay cannot reach localhost — use the
+Vercel preview or a tunnel), pay ₹1-level test orders with Razorpay's test card/UPI, and check
+the order turns Confirmed on its own. Set `CRON_SECRET` too, or pending orders never expire.
+
 ---
 
 ## Running it

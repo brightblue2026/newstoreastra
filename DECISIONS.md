@@ -1738,3 +1738,12 @@ Five defects found and fixed:
   location/pincode env vars are a fallback only; the Settings form wins.
 - **Field names for pickup, manifest and tracking are from Shiprocket's public API docs and are
   unverified against a live account** — same caveat as the webhook payload.
+- **Only `payment.captured` and `order.paid` confirm an order**, not `payment.authorized` —
+  authorised money can still be refunded to the customer if never captured. The store expects
+  auto-capture.
+- **A payment landing on a cancelled order is recorded as paid and flagged, not confirmed.**
+  Its stock hold is gone, so staff refund it (or call the customer); silently ignoring it lost
+  the fact that money arrived.
+- **Razorpay Checkout times out at 15 minutes**, a quarter of the 60-minute stale-order expiry.
+- **Closing the payment window keeps the placed order payable.** "Pay" reopens it rather than
+  placing a second one; any edit to the form forgets it and the next submit places afresh.

@@ -28,7 +28,9 @@ import type { NextConfig } from 'next';
  * failure is invisible until someone actually clicks Pay, which is why it is
  * spelled out here rather than left as a hostname in a list:
  *
- *   - `script-src`  — checkout.razorpay.com serves checkout.js itself.
+ *   - `script-src`  — checkout.razorpay.com serves checkout.js itself, which
+ *                     then loads its risk-detection bundle off cdn.razorpay.com
+ *                     (found blocked in a browser run, 24 September 2026).
  *   - `frame-src`   — the modal, and the bank/3-D Secure pages inside it.
  *   - `connect-src` — checkout.js calls api.razorpay.com and posts telemetry to
  *                     lumberjack.razorpay.com.
@@ -40,6 +42,7 @@ import type { NextConfig } from 'next';
  */
 const RAZORPAY_CHECKOUT = 'https://checkout.razorpay.com';
 const RAZORPAY_API = 'https://api.razorpay.com';
+const RAZORPAY_CDN = 'https://cdn.razorpay.com';
 /** Covers cdn., lumberjack. and the regional hosts Checkout picks at runtime. */
 const RAZORPAY_ANY = 'https://*.razorpay.com';
 
@@ -62,7 +65,7 @@ function supabaseHostname(): string | null {
 
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT} ${RAZORPAY_CDN}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: ${SUPABASE_ANY} ${RAZORPAY_ANY}`,
   "font-src 'self' data:",
