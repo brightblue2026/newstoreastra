@@ -1709,3 +1709,32 @@ Five defects found and fixed:
 - **"Pay online" was offered with no Razorpay keys,** creating an order and holding stock
   before failing. It is now disabled until the keys exist, and the server refuses it before
   writing anything.
+
+### Shiprocket, end to end (24 September 2026)
+
+- **Orders go to Shiprocket automatically on confirmation** — from the Razorpay webhook for
+  prepaid, on placement for COD, never from the thank-you page. Inside `after()`, never
+  failing the webhook. On by default (a Settings toggle), because creating a Shiprocket order
+  costs nothing; only an AWB does. A failed push is stored on `Order.shiprocketError` and shown
+  on the order page.
+- **One "Ship" button** runs create → AWB → pickup + manifest → label, resuming from the step
+  that failed. Reversed the Phase 6 "three buttons" call: the steps are idempotent and cached
+  on the order, so one button loses nothing, and the error names the step. A retry after the
+  AWB never re-notifies the customer.
+- **"Cancel in Shiprocket" forgets the shipment but leaves the order's status alone.** It
+  exists for test orders (no sandbox); cancelling the sale itself is a separate decision.
+- **The Shiprocket token is cached in the `Setting` table** (`shiprocket_token`), keyed to the
+  API email, so Vercel cold starts do not log in again. Postgres rather than Upstash: the token
+  is not a rate-limit counter, and the DB is always there.
+- **COD is switched off per pincode when no Shiprocket courier collects cash there.** It can
+  only remove COD, never grant it past the admin's allowlist.
+- **Box size is whole centimetres on variants, optional on combos.** The order's box stacks
+  the measured boxes on the widest footprint (`parcel.ts`); anything unmeasured counts as the
+  old 20 × 15 × 15 carton, so nothing changes until someone measures. A combo's own packed
+  weight is spread across its units, rounded up, because combo lines are stored per component.
+- **Box fields are on the single-variant form only**, not the bulk and guided add screens —
+  those stay short; boxes are measured once, later.
+- **Env names follow `SHIPROCKET_API_*`; the old `SHIPROCKET_*` still work.** Pickup
+  location/pincode env vars are a fallback only; the Settings form wins.
+- **Field names for pickup, manifest and tracking are from Shiprocket's public API docs and are
+  unverified against a live account** — same caveat as the webhook payload.

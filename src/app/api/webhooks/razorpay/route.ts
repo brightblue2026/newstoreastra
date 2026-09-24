@@ -4,6 +4,7 @@ import { OrderStatus, PaymentStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
 import { transitionOrder } from '@/lib/orders';
 import { notifyOrderEvent } from '@/lib/notifications';
+import { autoPushOrder } from '@/lib/shiprocket-fulfilment';
 import { verifyWebhookSignature } from '@/lib/razorpay';
 import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 
@@ -196,6 +197,9 @@ export async function POST(request: Request) {
       being killed when the serverless function freezes.
     */
     after(() => notifyOrderEvent({ orderId: order.id, event: 'CONFIRMED' }));
+    // Paid, so it can go to the courier. Here — never on the thank-you page,
+    // which a customer can close before it loads. Never throws.
+    after(() => autoPushOrder(order.id));
 
     console.info('[razorpay] confirmed', order.orderNumber);
     return NextResponse.json({ received: true, order: order.orderNumber, status: 'confirmed' });

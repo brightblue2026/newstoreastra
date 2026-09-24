@@ -21,6 +21,7 @@ const SETTINGS: ShippingSettings = {
   originPincode: '',
   shiprocketPickupLocation: '',
   preferLiveRates: false,
+  autoPushOrders: false,
 };
 
 describe('rateShipping', () => {

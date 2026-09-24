@@ -316,11 +316,13 @@ export function ShiprocketSettingsForm({
   pickupLocation,
   originPincode,
   preferLiveRates,
+  autoPushOrders,
 }: {
   locations: PickupOption[] | null;
   pickupLocation: string;
   originPincode: string;
   preferLiveRates: boolean;
+  autoPushOrders: boolean;
 }) {
   const [state, action, , formRef] = useFormActionKeepingInput<SettingsFormState>(
     saveShiprocketSettingsAction,
@@ -384,6 +386,23 @@ export function ShiprocketSettingsForm({
             Off: customers pay the slab table above. On: they pay the cheapest courier&rsquo;s
             rate, and the slab table is used whenever Shiprocket does not answer. Compare the
             two on a few real orders before switching this on.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          name="autoPushOrders"
+          defaultChecked={autoPushOrders}
+          className="mt-1"
+        />
+        <span>
+          <span className="block type-body">Send confirmed orders to Shiprocket automatically</span>
+          <span className="mt-1 block type-caption text-ink-soft">
+            Each order appears in Shiprocket as soon as it is paid, or placed as cash on delivery.
+            Nothing is charged until you press Ship on the order. Shiprocket has no test mode, so
+            cancel any test order in Shiprocket straight away.
           </span>
         </span>
       </label>

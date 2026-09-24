@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { motion, useReducedMotion } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 import { formatPrice, isPurchasable } from '@/lib/money';
+import DeliveryCheck from '@/components/DeliveryCheck';
 import { enquiryHref } from '@/lib/contact';
 import { useCartDrawer, useCartStore } from '@/lib/cart-store';
 import type { ProductPage, ProductVariantView } from '@/lib/storefront';
@@ -387,6 +388,8 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
             </button>
           </div>
         )}
+
+        {purchasable && <DeliveryCheck variantId={selected.id} />}
 
         <p aria-live="polite" className="sr-only">
           {added && selected ? `${product.name} added to your cart.` : ''}

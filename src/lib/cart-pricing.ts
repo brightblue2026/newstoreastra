@@ -184,6 +184,7 @@ export async function resolveCartLines(
             imageUrl: true,
             pricePaise: true,
             isActive: true,
+            weightGrams: true,
             items: {
               // Same order the combo page picked in, so the labels in the
               // drawer line up with the pickers that produced them.
@@ -302,6 +303,15 @@ export async function resolveCartLines(
     const weights = resolved.units.map((unit) => (unit.variant.pricePaise ?? 0) * unit.units);
     const shares = distributeProportionally(packageTotal, weights);
 
+    // A combo with its own packed weight spreads it across its units, rounded
+    // up, so every weight sum downstream — the rate here, the Shiprocket
+    // declaration later — sees the carton rather than the loose items.
+    const unitsPerPackage = resolved.units.reduce((sum, unit) => sum + unit.units, 0);
+    const comboUnitGrams =
+      combo.weightGrams !== null && unitsPerPackage > 0
+        ? Math.ceil(combo.weightGrams / unitsPerPackage)
+        : null;
+
     resolved.units.forEach((unit, index) => {
       // No `share <= 0` early return: a component with a null/zero price (a
       // free sachet, say) gets a zero-paise line rather than vanishing from
@@ -335,9 +345,9 @@ export async function resolveCartLines(
         quantity: physical,
         hsnCode: variant.product.hsnCode!,
         gstRate: variant.product.gstRate ?? 0,
-        weightGrams: variant.weightGrams,
+        weightGrams: comboUnitGrams ?? variant.weightGrams,
       });
-      addWeight(variant.weightGrams, physical);
+      addWeight(comboUnitGrams ?? variant.weightGrams, physical);
     });
   }
 

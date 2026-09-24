@@ -9,11 +9,12 @@ import { db } from '@/lib/db';
 import { MoneyError, parseRupeesToPaise } from '@/lib/money';
 import { requireCatalogueAccess } from '@/lib/session';
 import { variantFieldsSchema } from '../../variant-fields';
+import { parseBoxSize } from '../../../box-size';
 
 export interface VariantFormState {
   error?: string;
   fieldErrors?: Partial<
-    Record<'sku' | 'size' | 'variantHex' | 'mrpRupees' | 'priceRupees' | 'wholesaleRupees' | 'weightGrams', string>
+    Record<'sku' | 'size' | 'variantHex' | 'mrpRupees' | 'priceRupees' | 'wholesaleRupees' | 'weightGrams' | 'box', string>
   >;
 }
 
@@ -109,6 +110,11 @@ export async function createVariantAction(
     weightGrams = value;
   }
 
+  const box = parseBoxSize(formData);
+  if (!box.ok) {
+    return { error: 'Check the highlighted fields.', fieldErrors: { box: box.error } };
+  }
+
   const data = {
     productId,
     sku: parsed.data.sku,
@@ -120,6 +126,7 @@ export async function createVariantAction(
     pricePaise,
     wholesalePaise,
     weightGrams,
+    ...box.box,
     barcode: parsed.data.barcode || null,
   };
 
@@ -188,6 +195,11 @@ export async function updateVariantAction(
     weightGrams = value;
   }
 
+  const box = parseBoxSize(formData);
+  if (!box.ok) {
+    return { error: 'Check the highlighted fields.', fieldErrors: { box: box.error } };
+  }
+
   const data = {
     sku: parsed.data.sku,
     variantName: parsed.data.variantName || null,
@@ -198,6 +210,7 @@ export async function updateVariantAction(
     pricePaise,
     wholesalePaise,
     weightGrams,
+    ...box.box,
     barcode: parsed.data.barcode || null,
   };
 

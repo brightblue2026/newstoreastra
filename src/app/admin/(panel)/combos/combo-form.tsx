@@ -4,6 +4,7 @@ import { useFormActionKeepingInput } from '@/lib/use-form-action';
 
 import { useFormStatus } from 'react-dom';
 import type { ComboFormState } from './actions';
+import BoxSizeFields from '../box-size-fields';
 
 export interface ComboFormValues {
   name: string;
@@ -13,6 +14,10 @@ export interface ComboFormValues {
   imageUrl: string;
   priceRupees: string;
   isFeatured: boolean;
+  weightGrams: string;
+  lengthCm: string;
+  breadthCm: string;
+  heightCm: string;
 }
 
 const EMPTY_VALUES: ComboFormValues = {
@@ -23,6 +28,10 @@ const EMPTY_VALUES: ComboFormValues = {
   imageUrl: '',
   priceRupees: '',
   isFeatured: false,
+  weightGrams: '',
+  lengthCm: '',
+  breadthCm: '',
+  heightCm: '',
 };
 
 function SubmitButton({ label }: { label: string }) {
@@ -134,6 +143,35 @@ export function ComboForm({
         <input type="checkbox" name="isFeatured" defaultChecked={values.isFeatured} />
         Featured
       </label>
+
+      <h3 className="mt-10 type-subhead">Shipping</h3>
+      <p className="mt-1 type-caption text-ink-soft">
+        Only if this combo ships in its own carton. Left empty, the weights and boxes of the
+        products inside it are used.
+      </p>
+
+      <label htmlFor="weightGrams" className="mt-6 block type-caption text-ink-soft">
+        Packed weight (grams)
+      </label>
+      <input
+        id="weightGrams"
+        name="weightGrams"
+        inputMode="numeric"
+        defaultValue={values.weightGrams}
+        className={inputClass}
+      />
+      {state.fieldErrors?.weightGrams && (
+        <p className={fieldErrorClass}>{state.fieldErrors.weightGrams}</p>
+      )}
+
+      <BoxSizeFields
+        values={values}
+        error={state.fieldErrors?.box}
+        hint="Couriers charge by size as well as weight."
+        labelClass={labelClass}
+        inputClass={inputClass}
+        errorClass={fieldErrorClass}
+      />
 
       <div className="mt-8">
         <SubmitButton label={submitLabel} />

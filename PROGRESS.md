@@ -1088,6 +1088,26 @@ content counts were confirmed back to where they started.
 
 ---
 
+## Shiprocket, end to end · 24 September 2026
+
+**Built.** Automatic push to Shiprocket on confirmation (Razorpay webhook, COD placement);
+a single Ship button on the admin order page (create → AWB → pickup + manifest → label,
+resumable), plus Book pickup, Print manifest and Cancel in Shiprocket; "Check delivery" by
+pincode on the product page (rate, days, COD); live scan history on the customer's order page
+(`trackByAwb`); COD switched off per pincode from Shiprocket's courier coverage; the login
+token cached in Postgres; packed box size on variants and combos, and packed weight on
+combos, feeding a real box into every order push. Migration `20260924100000_shiprocket_parcels`.
+
+**Verified.** Typecheck, lint, 541 tests (new: `parcel.test.ts`), production build; migration
+applied locally with no schema drift.
+
+**Not verified.** Nothing has called Shiprocket — no credentials here. Before going live:
+set `SHIPROCKET_API_EMAIL` / `_PASSWORD` / `SHIPROCKET_WEBHOOK_TOKEN` in Vercel, choose the
+pickup in Settings, place one real COD order, press Ship, check the label, then cancel it in
+Shiprocket. Check the pickup, manifest and tracking field names against apidocs.shiprocket.in.
+
+---
+
 ## Running it
 
 ```bash

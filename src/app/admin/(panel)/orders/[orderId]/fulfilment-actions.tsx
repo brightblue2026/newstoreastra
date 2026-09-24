@@ -3,17 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  assignAwbAndShip,
+  bookPickup,
+  cancelInShiprocket,
   fetchLabel,
   pushToShiprocket,
   recordManualAwb,
+  shipWithShiprocket,
 } from '@/server/actions/fulfilment';
 
 /**
- * The three Shiprocket buttons plus the manual-AWB fallback — none of this
- * existed as a UI before now; the server actions were built in Phase 6 but
- * never wired to anything (`PROGRESS.md`, "no admin UI for the fulfilment
- * actions"). Each action already takes a single object rather than
+ * Shiprocket on the order page: one Ship button that runs every remaining
+ * step (create shipment → AWB → pickup and manifest → label) and resumes from
+ * whichever one failed, the single-step retries, a cancel for test orders, and
+ * the manual-AWB fallback. Each action takes a single object rather than
  * `(prevState, formData)`, matching how `discount-form.tsx`'s preview action
  * is called directly rather than through `useActionState` — so this follows
  * the same pattern: manual `useState` for the pending/result of each button,
@@ -33,6 +35,10 @@ export default function FulfilmentActions({
   courierName,
   trackingUrl,
   labelUrl,
+  manifestUrl,
+  pickupRequested,
+  shiprocketError,
+  delivered,
 }: {
   orderId: string;
   shiprocketShipmentId: string | null;
@@ -40,6 +46,10 @@ export default function FulfilmentActions({
   courierName: string | null;
   trackingUrl: string | null;
   labelUrl: string | null;
+  manifestUrl: string | null;
+  pickupRequested: boolean;
+  shiprocketError: string | null;
+  delivered: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
@@ -47,6 +57,9 @@ export default function FulfilmentActions({
   const [manualAwb, setManualAwb] = useState('');
   const [manualCourier, setManualCourier] = useState('');
   const [labelHref, setLabelHref] = useState(labelUrl);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  // Everything done: shipped, pickup booked, manifest and label in hand.
+  const complete = Boolean(awbNumber && pickupRequested && manifestUrl && labelHref);
 
   async function run(name: string, action: () => Promise<{ ok: boolean; error?: string; message?: string }>) {
     setPending(name);
@@ -55,6 +68,24 @@ export default function FulfilmentActions({
       const result = await action();
       setMessage({ text: result.ok ? (result.message ?? 'Done.') : (result.error ?? 'Something went wrong.'), error: !result.ok });
       if (result.ok) router.refresh();
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function handleShip() {
+    setPending('ship');
+    setMessage(null);
+    try {
+      const result = await shipWithShiprocket({ orderId });
+      if (result.ok) {
+        if (result.labelUrl) setLabelHref(result.labelUrl);
+        setMessage({ text: result.message, error: false });
+      } else {
+        setMessage({ text: result.error, error: true });
+      }
+      // Earlier steps may have succeeded even when a later one failed.
+      router.refresh();
     } finally {
       setPending(null);
     }
@@ -82,12 +113,21 @@ export default function FulfilmentActions({
     <div className="mt-6 rounded-card border border-line p-6">
       <h3 className="type-subhead">Shiprocket</h3>
 
+      {shiprocketError && !shiprocketShipmentId && (
+        <p role="alert" className="mt-3 type-caption text-warning">
+          Not yet in Shiprocket. {shiprocketError}
+        </p>
+      )}
+
       <dl className="mt-3 grid gap-2 type-caption text-ink-soft">
-        <div>Shipment: {shiprocketShipmentId ?? 'Not pushed yet'}</div>
+        <div>Shipment: {shiprocketShipmentId ?? 'Not in Shiprocket yet'}</div>
         <div>
           AWB: {awbNumber ?? 'Not assigned'}
           {courierName ? ` · ${courierName}` : ''}
         </div>
+        {awbNumber && shiprocketShipmentId && (
+          <div>Pickup: {pickupRequested ? 'Booked' : 'Not booked'}</div>
+        )}
         {trackingUrl && (
           <div>
             <a href={trackingUrl} target="_blank" rel="noreferrer" className="underline">
@@ -98,25 +138,37 @@ export default function FulfilmentActions({
       </dl>
 
       <div className="mt-4 flex flex-wrap gap-3">
-        {!shiprocketShipmentId && (
+        {/* A hand-entered AWB (no shipment) has nothing left for Shiprocket to do. */}
+        {!complete && !delivered && (!awbNumber || shiprocketShipmentId) && (
+          <button
+            type="button"
+            disabled={pending !== null}
+            onClick={handleShip}
+            className={primaryButtonClass}
+          >
+            {pending === 'ship' ? 'Shipping…' : awbNumber ? 'Finish shipping' : 'Ship'}
+          </button>
+        )}
+
+        {!shiprocketShipmentId && !awbNumber && (
           <button
             type="button"
             disabled={pending !== null}
             onClick={() => run('push', () => pushToShiprocket({ orderId }))}
-            className={primaryButtonClass}
+            className={buttonClass}
           >
-            {pending === 'push' ? 'Pushing…' : 'Push to Shiprocket'}
+            {pending === 'push' ? 'Sending…' : 'Only create in Shiprocket'}
           </button>
         )}
 
-        {shiprocketShipmentId && !awbNumber && (
+        {shiprocketShipmentId && awbNumber && !pickupRequested && (
           <button
             type="button"
             disabled={pending !== null}
-            onClick={() => run('awb', () => assignAwbAndShip({ orderId }))}
-            className={primaryButtonClass}
+            onClick={() => run('pickup', () => bookPickup({ orderId }))}
+            className={buttonClass}
           >
-            {pending === 'awb' ? 'Assigning…' : 'Assign AWB & ship'}
+            {pending === 'pickup' ? 'Booking…' : 'Book pickup'}
           </button>
         )}
 
@@ -128,10 +180,63 @@ export default function FulfilmentActions({
 
         {labelHref && (
           <a href={labelHref} target="_blank" rel="noreferrer" className={buttonClass}>
-            Open label
+            Print label
+          </a>
+        )}
+
+        {manifestUrl && (
+          <a href={manifestUrl} target="_blank" rel="noreferrer" className={buttonClass}>
+            Print manifest
           </a>
         )}
       </div>
+
+      {!awbNumber && (
+        <p className="mt-3 type-caption text-ink-soft">
+          Ship assigns a courier, which charges the Shiprocket wallet, and sends the customer
+          their tracking number.
+        </p>
+      )}
+
+      {shiprocketShipmentId && !delivered && (
+        <div className="mt-4">
+          {confirmCancel ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="type-caption">
+                Cancel shipment {shiprocketShipmentId} in Shiprocket? The courier will not collect
+                it. The order itself stays as it is.
+              </span>
+              <button
+                type="button"
+                disabled={pending !== null}
+                onClick={() => {
+                  setConfirmCancel(false);
+                  void run('cancel', () => cancelInShiprocket({ orderId }));
+                }}
+                className={buttonClass}
+              >
+                {pending === 'cancel' ? 'Cancelling…' : 'Yes, cancel in Shiprocket'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(false)}
+                className="type-caption underline"
+              >
+                Keep it
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={pending !== null}
+              onClick={() => setConfirmCancel(true)}
+              className="type-caption text-ink-soft underline"
+            >
+              Cancel in Shiprocket
+            </button>
+          )}
+        </div>
+      )}
 
       {!awbNumber && (
         <div className="mt-6 border-t border-line pt-4">

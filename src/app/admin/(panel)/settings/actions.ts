@@ -209,6 +209,7 @@ const shiprocketFormSchema = z.object({
   shiprocketPickupLocation: z.string().trim().max(120),
   originPincode: z.union([z.string().trim().regex(/^[1-9][0-9]{5}$/), z.literal('')]),
   preferLiveRates: z.boolean(),
+  autoPushOrders: z.boolean(),
 });
 
 /**
@@ -229,6 +230,7 @@ export async function saveShiprocketSettingsAction(
     shiprocketPickupLocation: formData.get('shiprocketPickupLocation') ?? '',
     originPincode: formData.get('originPincode') ?? '',
     preferLiveRates: formData.get('preferLiveRates') === 'on',
+    autoPushOrders: formData.get('autoPushOrders') === 'on',
   });
   if (!parsed.success) {
     return { error: 'Enter the full six-digit pincode parcels ship from, like 682030.' };
@@ -257,6 +259,7 @@ export async function saveShiprocketSettingsAction(
     shiprocketPickupLocation,
     originPincode,
     preferLiveRates: parsed.data.preferLiveRates,
+    autoPushOrders: parsed.data.autoPushOrders,
   });
   if (!validated.success) {
     return { error: validated.error.issues[0]?.message ?? 'Check the values and try again.' };

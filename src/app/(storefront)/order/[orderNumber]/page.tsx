@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Suspense } from 'react';
+import ShipmentTracking from '@/components/ShipmentTracking';
 import { CONTACT } from '@/lib/contact';
 import { formatINR } from '@/lib/money';
 import { formatRate } from '@/lib/gst';
@@ -188,6 +190,11 @@ export default async function OrderPage({
                 </>
               )}
             </p>
+          )}
+          {order.awbNumber && order.status === OrderStatus.SHIPPED && (
+            <Suspense fallback={null}>
+              <ShipmentTracking awbNumber={order.awbNumber} />
+            </Suspense>
           )}
         </section>
 

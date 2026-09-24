@@ -47,6 +47,11 @@ export interface DeliveryQuote extends ShippingQuote {
   estimatedDays: number | null;
   /** False only when a source that actually knows says so — never on a failure. */
   serviceable: boolean;
+  /**
+   * Whether a courier collects cash there, when Shiprocket was asked. Null for
+   * a slab-table quote — then the admin's COD allowlist is the only answer.
+   */
+  codServiceable: boolean | null;
   /** Why the slab table answered, when it did. For the admin, not the customer. */
   fallbackReason: string | null;
 }
@@ -71,6 +76,7 @@ function fromSlabTable(
     courierId: null,
     estimatedDays: null,
     serviceable: isServiceablePincode(input.settings, input.deliveryPincode),
+    codServiceable: null,
     fallbackReason,
   };
 }
@@ -119,6 +125,7 @@ export async function quoteDelivery(input: DeliveryQuoteInput): Promise<Delivery
       courierId: null,
       estimatedDays: null,
       serviceable: false,
+      codServiceable: false,
       fallbackReason: null,
     };
   }
@@ -136,6 +143,7 @@ export async function quoteDelivery(input: DeliveryQuoteInput): Promise<Delivery
     courierId: best.courierId,
     estimatedDays: best.estimatedDays,
     serviceable: true,
+    codServiceable: live.codServiceable,
     fallbackReason: null,
   };
 }

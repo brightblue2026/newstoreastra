@@ -8,10 +8,11 @@ import { recordAudit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { MoneyError, parseRupeesToPaise } from '@/lib/money';
 import { requireCatalogueAccess } from '@/lib/session';
+import { parseBoxSize } from '../box-size';
 
 export interface ComboFormState {
   error?: string;
-  fieldErrors?: Partial<Record<'name' | 'slug' | 'shortDesc' | 'pricePaise', string>>;
+  fieldErrors?: Partial<Record<'name' | 'slug' | 'shortDesc' | 'pricePaise' | 'weightGrams' | 'box', string>>;
 }
 
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -53,6 +54,40 @@ function fieldErrorsFrom(error: z.ZodError): ComboFormState['fieldErrors'] {
   return out;
 }
 
+/**
+ * Optional shipping overrides: a combo that ships in its own carton declares
+ * that carton; left empty, its components' weights and boxes are used.
+ */
+function parseComboShipping(
+  formData: FormData,
+):
+  | {
+      ok: true;
+      data: {
+        weightGrams: number | null;
+        lengthCm: number | null;
+        breadthCm: number | null;
+        heightCm: number | null;
+      };
+    }
+  | { ok: false; fieldErrors: NonNullable<ComboFormState['fieldErrors']> } {
+  const rawWeight = formData.get('weightGrams');
+  const weightText = typeof rawWeight === 'string' ? rawWeight.trim() : '';
+  let weightGrams: number | null = null;
+  if (weightText) {
+    const value = Number(weightText);
+    if (!Number.isInteger(value) || value < 1 || value > 100_000) {
+      return { ok: false, fieldErrors: { weightGrams: 'Enter a whole number of grams.' } };
+    }
+    weightGrams = value;
+  }
+
+  const box = parseBoxSize(formData);
+  if (!box.ok) return { ok: false, fieldErrors: { box: box.error } };
+
+  return { ok: true, data: { weightGrams, ...box.box } };
+}
+
 export async function createComboAction(
   _previous: ComboFormState,
   formData: FormData,
@@ -72,6 +107,11 @@ export async function createComboAction(
     return { error: message, fieldErrors: { pricePaise: message } };
   }
 
+  const shipping = parseComboShipping(formData);
+  if (!shipping.ok) {
+    return { error: 'Check the highlighted fields.', fieldErrors: shipping.fieldErrors };
+  }
+
   const data = {
     name: parsed.data.name,
     slug: parsed.data.slug,
@@ -80,6 +120,7 @@ export async function createComboAction(
     imageUrl: parsed.data.imageUrl || null,
     pricePaise,
     isFeatured: Boolean(parsed.data.isFeatured),
+    ...shipping.data,
     // Starts as a draft — a combo with no items is meaningless. Publish once
     // items are added, same as products.
     isActive: false,
@@ -133,6 +174,11 @@ export async function updateComboAction(
     return { error: message, fieldErrors: { pricePaise: message } };
   }
 
+  const shipping = parseComboShipping(formData);
+  if (!shipping.ok) {
+    return { error: 'Check the highlighted fields.', fieldErrors: shipping.fieldErrors };
+  }
+
   const data = {
     name: parsed.data.name,
     slug: parsed.data.slug,
@@ -141,6 +187,7 @@ export async function updateComboAction(
     imageUrl: parsed.data.imageUrl || null,
     pricePaise,
     isFeatured: Boolean(parsed.data.isFeatured),
+    ...shipping.data,
   };
 
   let updated;

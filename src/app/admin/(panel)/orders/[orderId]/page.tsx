@@ -82,6 +82,10 @@ export default async function OrderDetailPage({
             courierName={order.courierName}
             trackingUrl={order.trackingUrl}
             labelUrl={order.labelUrl}
+            manifestUrl={order.manifestUrl}
+            pickupRequested={order.pickupRequestedAt !== null}
+            shiprocketError={order.shiprocketError}
+            delivered={status === OrderStatus.DELIVERED}
           />
         )}
       </section>

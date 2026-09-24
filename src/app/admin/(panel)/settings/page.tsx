@@ -150,8 +150,8 @@ export default async function SettingsPage() {
           <p className="mb-8 max-w-prose type-body text-ink-soft">
             To connect: in the Shiprocket dashboard go to Settings → API → Configure and create an
             API user (a separate login from your own). Put its email and password in the
-            environment as SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD, restart the site, and come
-            back here to choose a pickup location.
+            environment as SHIPROCKET_API_EMAIL and SHIPROCKET_API_PASSWORD, restart the site, and
+            come back here to choose a pickup location.
           </p>
         )}
         <ShiprocketSettingsForm
@@ -159,6 +159,7 @@ export default async function SettingsPage() {
           pickupLocation={settings.shipping.shiprocketPickupLocation}
           originPincode={settings.shipping.originPincode}
           preferLiveRates={settings.shipping.preferLiveRates}
+          autoPushOrders={settings.shipping.autoPushOrders}
         />
         <div className="mt-10 max-w-prose">
           <h3 className="type-caption text-ink-soft">Tracking updates</h3>

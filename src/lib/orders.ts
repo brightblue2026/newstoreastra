@@ -323,9 +323,14 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   });
 
   if (!deliveryQuote.serviceable) {
+    // Asked with cod=1, "nobody goes there" can mean "nobody collects cash
+    // there" — which online payment would still reach.
     return {
       ok: false,
-      error: 'We do not deliver to that pincode yet. Call 1800 123 0621 and we will help.',
+      error:
+        input.paymentMethod === 'COD' && deliveryQuote.source === 'shiprocket'
+          ? 'Cash on delivery is not available at that pincode. Pay online instead, or call 1800 123 0621.'
+          : 'We do not deliver to that pincode yet. Call 1800 123 0621 and we will help.',
     };
   }
 
@@ -706,7 +711,10 @@ export async function quoteOrder(input: {
   const codCheck = pincode
     ? checkCodEligibility(settings.cod, { subtotalPaise: resolved.subtotalPaise, pincode })
     : { eligible: false, reason: null, feePaise: 0 };
-  const codAvailable = settings.cod.enabled && codCheck.eligible;
+  // Shiprocket's courier coverage can switch COD off for a pincode the
+  // allowlist would accept; it can never switch it on.
+  const codAvailable =
+    settings.cod.enabled && codCheck.eligible && shippingQuote?.codServiceable !== false;
   const codFeePaise = input.paymentMethod === 'COD' && codAvailable ? codCheck.feePaise : 0;
 
   // Same call `placeOrder` makes before pricing — without it, a signed-in
@@ -749,7 +757,12 @@ export async function quoteOrder(input: {
     serviceabilityError,
     cod: {
       available: codAvailable,
-      reason: settings.cod.enabled ? (codCheck.reason ?? null) : null,
+      reason: settings.cod.enabled
+        ? (codCheck.reason ??
+          (shippingQuote?.codServiceable === false
+            ? 'Cash on delivery is not available at this pincode.'
+            : null))
+        : null,
       feePaise: codAvailable ? settings.cod.feePaise : 0,
     },
     shippingUnconfigured: settings.shippingUnconfigured,
