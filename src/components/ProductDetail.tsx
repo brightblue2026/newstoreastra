@@ -187,7 +187,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
           </p>
           <a
             href={enquiryHref(product.name, selected?.sku)}
-            className="mt-2 inline-block type-body underline"
+            className="mt-2 inline-block type-body underline decoration-line underline-offset-4 motion-accent hover:decoration-ink"
           >
             Enquire about this product
           </a>
@@ -245,8 +245,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                   onClick={() => setImageIndex(index)}
                   aria-label={`Show image ${index + 1} of ${gallery.length}`}
                   aria-current={index === imageIndex ? 'true' : undefined}
-                  className={`relative size-20 shrink-0 overflow-hidden rounded-control border ${
-                    index === imageIndex ? 'border-ink' : 'border-line'
+                  className={`relative size-20 shrink-0 overflow-hidden rounded-control border motion-accent ${
+                    index === imageIndex
+                      ? 'border-ink'
+                      : 'border-line opacity-70 hover:border-ink hover:opacity-100'
                   }`}
                 >
                   <Image
@@ -297,20 +299,24 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('fragrance', fragrance)}
                     aria-pressed={isSelected}
-                    className="group flex flex-col items-center gap-2"
+                    className="group flex flex-col items-center gap-2 rounded-control py-1"
                   >
+                    {/* A paper gap between the swatch and its ring, so the
+                        selection reads on dark and light fragrances alike. */}
                     <span
                       aria-hidden="true"
-                      className={`size-10 rounded-full border-2 motion-accent ${
-                        isSelected ? 'border-ink' : 'border-transparent group-hover:border-line'
+                      className={`size-10 rounded-full border-2 border-paper transition-[transform,box-shadow] duration-(--bb-duration-accent) ease-(--bb-ease-out) group-active:scale-95 ${
+                        isSelected
+                          ? 'scale-110 shadow-[0_0_0_2px_var(--color-ink)]'
+                          : 'shadow-[0_0_0_1px_var(--color-line)] group-hover:scale-110 group-hover:shadow-[0_0_0_2px_var(--color-line)]'
                       }`}
                       style={{
                         backgroundColor: swatch?.variantHex ?? 'var(--color-line)',
                       }}
                     />
                     <span
-                      className={`text-center type-caption ${
-                        isSelected ? 'text-ink' : 'text-ink-soft'
+                      className={`text-center type-caption motion-accent ${
+                        isSelected ? 'text-ink' : 'text-ink-soft group-hover:text-ink'
                       }`}
                     >
                       {fragrance}
@@ -335,7 +341,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('size', size)}
                     aria-pressed={isSelected}
-                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent ${
+                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent active:scale-95 ${
                       isSelected
                         ? 'border-ink bg-ink text-paper'
                         : 'border-line text-ink-soft hover:border-ink hover:text-ink'
@@ -362,7 +368,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('format', format)}
                     aria-pressed={isSelected}
-                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent ${
+                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent active:scale-95 ${
                       isSelected
                         ? 'border-ink bg-ink text-paper'
                         : 'border-line text-ink-soft hover:border-ink hover:text-ink'
@@ -384,7 +390,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 aria-label="Decrease quantity"
-                className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
+                className="min-w-11 px-4 py-3 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
               >
                 &minus;
               </button>
@@ -393,7 +399,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.min(999, q + 1))}
                 aria-label="Increase quantity"
-                className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
+                className="min-w-11 px-4 py-3 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
               >
                 +
               </button>
@@ -403,7 +409,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
             <button
               type="button"
               onClick={handleAdd}
-              className="flex-1 rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift"
+              className="flex-1 btn btn-primary px-8 py-4"
             >
               Add to cart
             </button>
@@ -434,7 +440,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
       */}
       {purchasable && (
         <div
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 pb-safe safe-x backdrop-blur-md md:hidden"
+          className="fixed inset-x-0 bottom-0 z-(--z-sticky) border-t border-line bg-paper/95 pb-safe safe-x backdrop-blur-md md:hidden"
         >
           <div className="flex items-center gap-4 px-6 pt-3">
             <div className="min-w-0">
@@ -449,7 +455,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
             <button
               type="button"
               onClick={handleAdd}
-              className="ml-auto rounded-control bg-signal px-6 py-3 type-body font-medium text-paper"
+              className="ml-auto btn btn-primary"
             >
               Add to cart
             </button>

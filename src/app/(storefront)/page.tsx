@@ -67,11 +67,11 @@ export default async function HomePage() {
             <RevealItem key={brand.slug}>
               <Link
                 href={`/brands/${brand.slug}`}
-                className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink"
+                className="group flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink hover:bg-ink hover:text-paper"
               >
                 <span
                   aria-hidden="true"
-                  className="size-2 rounded-full"
+                  className="size-2 rounded-full transition-transform duration-(--bb-duration-accent) ease-(--bb-ease-out) group-hover:scale-150"
                   style={{ backgroundColor: brand.accentHex }}
                 />
                 {brand.name}
@@ -198,17 +198,22 @@ export default async function HomePage() {
             </RevealItem>
             <ul className="mt-16 flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4">
               {combos.map((combo) => (
-                <li
-                  key={combo.slug}
-                  className="w-72 shrink-0 snap-start rounded-card border border-line p-6"
-                >
-                  <Link href={`/combos/${combo.slug}`}>
+                <li key={combo.slug} className="flex w-72 shrink-0 snap-start pt-1">
+                  <Link
+                    href={`/combos/${combo.slug}`}
+                    className="group card-lift flex w-full flex-col rounded-card border border-line bg-paper p-6"
+                  >
                     <span className="block type-subhead">{combo.name}</span>
                     <span className="mt-2 block type-body text-ink-soft">
                       {combo.shortDesc}
                     </span>
-                    <span className="mt-4 block type-body font-medium" data-price>
-                      {formatPrice(combo.pricePaise)}
+                    <span className="mt-auto flex items-baseline justify-between gap-4 pt-4">
+                      <span className="type-body font-medium" data-price>
+                        {formatPrice(combo.pricePaise)}
+                      </span>
+                      <span className="type-caption text-ink-soft">
+                        View <span aria-hidden="true" className="arrow-nudge">&rarr;</span>
+                      </span>
                     </span>
                   </Link>
                 </li>

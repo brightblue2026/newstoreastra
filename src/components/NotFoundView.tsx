@@ -22,19 +22,19 @@ export default function NotFoundView({
       <div className="mt-10 flex flex-wrap gap-4">
         <Link
           href="/shop"
-          className="rounded-control bg-signal px-6 py-3 type-body font-medium text-paper"
+          className="btn btn-primary"
         >
           Browse the catalogue
         </Link>
         <Link
           href="/search"
-          className="rounded-control border border-line px-6 py-3 type-body font-medium"
+          className="btn btn-secondary"
         >
           Search by name
         </Link>
         <Link
           href="/"
-          className="rounded-control border border-line px-6 py-3 type-body font-medium"
+          className="btn btn-secondary"
         >
           Go to the homepage
         </Link>

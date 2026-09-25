@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { m, useReducedMotion } from 'motion/react';
-import { dur, ease } from '@/lib/motion';
 
 export type SpectrumBrand = {
   name: string;
@@ -17,29 +15,28 @@ export type SpectrumBrand = {
 /*
   Eight houses, one spectrum band.
 
-  At rest the row divides evenly — one panel per brand, sharing width via
-  `flexGrow` rather than a fixed fraction, so the layout holds whether one
-  brand exists or eight. Hovering or focusing a panel widens it (flexGrow is
-  animated, not width, so the transition stays a cheap composited property)
-  and reveals its tagline and product count. Panels within two positions of
+  A grid of panels, two across on a tablet and four on a desktop. It used to
+  be one flex row of eight, but the page container tops out at 1280px, which
+  leaves each panel ~106px of text width: less than "Kenzaniya" at heading
+  size, so the row pushed the page 22px wider than the viewport. Hovering or
+  focusing a panel reveals its tagline and product count. Panels within two positions of
   the active one borrow a sliver of its accent as a background tint — a
   literal rendering of the section's claim: eight houses, one family of
   colour, one factory.
 
   Every panel is a real `<Link>`. Hover and focus drive the same state, so
-  the widen-and-reveal reads identically for a mouse and a keyboard, and the
+  the reveal reads identically for a mouse and a keyboard, and the
   revealed detail is always present in the DOM for assistive tech — only its
   opacity changes, never its presence.
 */
 export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
-  const reduced = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   if (brands.length === 0) return null;
 
   return (
     <div
-      className="flex flex-col divide-y divide-line border border-line sm:flex-row sm:divide-x sm:divide-y-0"
+      className="grid grid-cols-1 overflow-hidden rounded-card border-t border-l border-line sm:grid-cols-2 lg:grid-cols-4"
       onMouseLeave={() => setActiveIndex(null)}
     >
       {brands.map((brand, index) => {
@@ -51,12 +48,11 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
         const tintPct = isActive ? 16 : bleedPct;
 
         return (
-          <m.div
+          <div
             key={brand.slug}
-            initial={false}
-            animate={{ flexGrow: isActive ? 3 : 1 }}
-            transition={{ duration: reduced ? 0 : dur.accent, ease }}
-            className="basis-0"
+            // Each panel draws its own right and bottom hairline, so a short
+            // last row ends in a clean step instead of an empty grey cell.
+            className="min-w-0 shadow-[inset_-1px_-1px_0_var(--color-line)]"
             style={{
               backgroundColor:
                 tintPct > 0
@@ -72,7 +68,7 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
               onMouseEnter={() => setActiveIndex(index)}
               onFocus={() => setActiveIndex(index)}
               onBlur={() => setActiveIndex(null)}
-              className="flex h-full min-h-24 flex-col justify-between gap-6 p-6"
+              className="flex h-full min-h-24 flex-col gap-6 p-6"
             >
               {/* Accent reaches this rule, the tint above, and nowhere else —
                   the name and copy stay ink, per the one-accent-at-a-time rule. */}
@@ -109,7 +105,7 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
                 </span>
               </span>
             </Link>
-          </m.div>
+          </div>
         );
       })}
     </div>

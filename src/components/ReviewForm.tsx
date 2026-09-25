@@ -17,7 +17,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-8 rounded-control bg-signal px-6 py-3 type-body font-medium text-white disabled:opacity-60"
+      className="mt-8 btn btn-primary"
     >
       {pending ? 'Sending' : 'Send review'}
     </button>

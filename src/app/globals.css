@@ -222,7 +222,7 @@
 /* ---------- Motion ---------- */
 
 @utility motion-accent {
-  transition-property: background-color, color;
+  transition-property: background-color, color, border-color;
   transition-duration: var(--bb-duration-accent);
   transition-timing-function: var(--bb-ease-out);
 }
@@ -237,6 +237,196 @@
   transition-property: transform, box-shadow;
   transition-duration: var(--bb-duration-lift);
   transition-timing-function: var(--bb-ease-out);
+}
+
+/*
+  ---------- Buttons — §9: two styles, no third ----------
+  Primary is solid signal and turns ink under the pointer; secondary is a 1px
+  ink outline that fills. Both rise 2px on hover and settle back when pressed,
+  on the lift duration. Transform and colour only — nothing that reflows.
+*/
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border-radius: var(--radius-control);
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.6;
+  text-align: center;
+  cursor: pointer;
+  transition-property: transform, background-color, color, border-color, box-shadow;
+  transition-duration: var(--bb-duration-lift), var(--bb-duration-accent),
+    var(--bb-duration-accent), var(--bb-duration-accent), var(--bb-duration-lift);
+  transition-timing-function: var(--bb-ease-out);
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([aria-disabled='true']) {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-bb);
+    }
+  }
+  &:active:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(0) scale(0.98);
+    box-shadow: none;
+  }
+  &:disabled,
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+@utility btn-primary {
+  background-color: var(--color-signal);
+  color: var(--color-paper);
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--color-ink);
+    }
+  }
+}
+
+@utility btn-secondary {
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+  background-color: transparent;
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--color-ink);
+      color: var(--color-paper);
+    }
+  }
+}
+
+/* A quiet text link whose underline draws in from the left. */
+@utility link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition:
+    background-size var(--bb-duration-accent) var(--bb-ease-out),
+    color var(--bb-duration-accent) var(--bb-ease-out);
+
+  &:hover,
+  &:focus-visible,
+  &[aria-current='page'] {
+    background-size: 100% 1px;
+  }
+}
+
+/* An arrow that nudges 4px along when its parent `group` is hovered. */
+@utility arrow-nudge {
+  display: inline-block;
+  transition: transform var(--bb-duration-lift) var(--bb-ease-out);
+
+  :where(.group):hover &,
+  :where(.group):focus-visible & {
+    transform: translateX(4px);
+  }
+}
+
+/*
+  A card that lifts 2px and darkens its hairline on hover or keyboard focus.
+  The CSS twin of ProductCard's pointer lift, for server-rendered cards.
+*/
+@utility card-lift {
+  transition-property: transform, border-color, box-shadow;
+  transition-duration: var(--bb-duration-lift), var(--bb-duration-accent),
+    var(--bb-duration-lift);
+  transition-timing-function: var(--bb-ease-out);
+
+  &:hover,
+  &:focus-within {
+    transform: translateY(-2px);
+    border-color: var(--color-ink);
+    box-shadow: var(--shadow-bb);
+  }
+}
+
+/* Skeleton shimmer: a soft highlight sweeping across the placeholder. */
+@utility skeleton {
+  background-color: var(--color-line);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--color-paper) 70%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: bb-shimmer 1.4s var(--bb-ease-out) infinite;
+}
+
+@keyframes bb-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* The cart count bumps when it goes up. */
+@keyframes bb-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@utility animate-pop {
+  animation: bb-pop 360ms var(--bb-ease-out);
+}
+
+/* A confirmation check that draws itself. */
+@keyframes bb-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@utility animate-draw {
+  stroke-dasharray: 24;
+  animation: bb-draw var(--bb-duration-accent) var(--bb-ease-out) both;
+}
+
+/* A panel that has just opened settles into place: 8px rise and fade. */
+@keyframes bb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-rise {
+  animation: bb-rise var(--bb-duration-accent) var(--bb-ease-out) backwards;
+}
+
+/* ---------- Stacking — one scale, named by role ---------- */
+:root {
+  --z-sticky: 40;
+  --z-header: 50;
+  --z-overlay: 60;
+  --z-drawer: 70;
 }
 
 @media (prefers-reduced-motion: reduce) {

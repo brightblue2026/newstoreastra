@@ -1774,3 +1774,23 @@ Five defects found and fixed:
 - **JetBrains Mono is not preloaded.** It is never the largest element; preloading it competed
   with the photo and headline on a slow connection.
 - **The admin panel was left out of this pass**, per the owner. It stays desktop-first.
+
+## Storefront interaction polish (25 September 2026)
+
+- **Buttons are two CSS utilities, `btn btn-primary` and `btn btn-secondary`** (§9: no third
+  style). They replace about 14 copy-pasted `bg-signal` class strings, none of which had a hover state.
+  Hover rises 2px on the lift duration and turns primary ink; press settles back at 98%.
+- **Secondary buttons are now ink-outlined, per §9**, not `border-line`.
+- **No toast system.** Every add-to-cart already opens the drawer, so a toast would repeat it.
+  The feedback is the drawer plus a cart count that pops when it changes.
+- **The product page's sticky mobile buy bar still shows all the time.** Making it slide in was
+  reconsidered and dropped, per the existing note in `ProductDetail`: a bar that appears
+  mid-scroll moves what is under the thumb.
+- **Fragrance swatches are still not grouped by family.** No family data exists; grouping it
+  would need a schema change, and this pass was UI only.
+- **HouseSpectrum is a 2/4-column grid, no longer one flex row of eight.** The 1280px container
+  leaves each panel about 106px, narrower than "Kenzaniya" at heading size. It pushed the
+  homepage 22px wider than the viewport at every desktop width.
+- **Skeletons shimmer instead of pulsing** (`skeleton` utility), and the cart shows skeleton lines
+  while it prices instead of a line of text.
+- **z-index has named tokens**: `--z-sticky`, `--z-header`, `--z-overlay`, `--z-drawer`.

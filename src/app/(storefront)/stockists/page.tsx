@@ -110,7 +110,7 @@ export default async function StockistsPage({ searchParams }: Props) {
             </div>
             <button
               type="submit"
-              className="rounded-control bg-signal px-6 py-3 type-body font-medium text-white"
+              className="btn btn-primary"
             >
               Find stockists
             </button>

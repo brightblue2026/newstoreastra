@@ -51,7 +51,7 @@ export default async function StorefrontLayout({
                 <li key={brand.slug}>
                   <Link
                     href={`/brands/${brand.slug}`}
-                    className="type-body text-ink-soft hover:text-ink"
+                    className="link-underline type-body text-ink-soft motion-accent hover:text-ink"
                   >
                     {brand.name}
                   </Link>
@@ -62,22 +62,22 @@ export default async function StorefrontLayout({
 
           <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-3">
             <li>
-              <Link href="/shop" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/shop" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Shop all
               </Link>
             </li>
             <li>
-              <Link href="/search" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/search" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Search
               </Link>
             </li>
             <li>
-              <Link href="/story" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/story" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Our story
               </Link>
             </li>
             <li>
-              <Link href="/stockists" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/stockists" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Stockists
               </Link>
             </li>
@@ -90,7 +90,7 @@ export default async function StorefrontLayout({
                 <li key={policy.slug}>
                   <Link
                     href={`/policies/${policy.slug}`}
-                    className="type-body text-ink-soft hover:text-ink"
+                    className="link-underline type-body text-ink-soft motion-accent hover:text-ink"
                   >
                     {policy.title}
                   </Link>

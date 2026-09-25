@@ -9,7 +9,7 @@
  *
  * A shape-matched skeleton rather than a spinner: it occupies the layout the
  * real page is about to fill, so the content does not jump when it arrives.
- * The pulse is animation-only and the global `prefers-reduced-motion` rule in
+ * The shimmer is animation-only and the global `prefers-reduced-motion` rule in
  * `globals.css` flattens it, so nothing here needs its own guard.
  *
  * This lives in a component rather than in one group-level `loading.tsx`
@@ -25,17 +25,17 @@ export default function PageSkeleton() {
         Loading
       </span>
 
-      <div className="animate-pulse">
-        <div className="h-3 w-24 rounded-full bg-line" />
-        <div className="mt-6 h-10 w-2/3 max-w-lg rounded-control bg-line" />
-        <div className="mt-4 h-4 w-1/2 max-w-md rounded-full bg-line" />
+      <div>
+        <div className="h-3 w-24 rounded-full skeleton" />
+        <div className="mt-6 h-10 w-2/3 max-w-lg rounded-control skeleton" />
+        <div className="mt-4 h-4 w-1/2 max-w-md rounded-full skeleton" />
 
         <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 8 }, (_, index) => (
             <div key={index} className="rounded-card border border-line p-4">
-              <div className="aspect-square rounded-card bg-line" />
-              <div className="mt-4 h-4 w-3/4 rounded-full bg-line" />
-              <div className="mt-2 h-3 w-1/2 rounded-full bg-line" />
+              <div className="aspect-square rounded-card skeleton" />
+              <div className="mt-4 h-4 w-3/4 rounded-full skeleton" />
+              <div className="mt-2 h-3 w-1/2 rounded-full skeleton" />
             </div>
           ))}
         </div>

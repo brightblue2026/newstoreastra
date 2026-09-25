@@ -63,7 +63,7 @@ export default function MagneticButton({
       onPointerLeave={release}
       onBlur={release}
       style={{ x: springX, y: springY }}
-      className={`inline-flex items-center justify-center rounded-control bg-signal px-8 py-4 font-medium text-paper transition-colors hover:bg-ink ${className}`}
+      className={`btn btn-primary px-8 py-4 ${className}`}
     >
       {children}
     </m.a>
@@ -86,7 +86,7 @@ export function SignalLink({
   return (
     <Link
       href={href}
-      className={`inline-flex items-center justify-center rounded-control bg-signal px-8 py-4 font-medium text-paper transition-colors hover:bg-ink ${className}`}
+      className={`btn btn-primary px-8 py-4 ${className}`}
     >
       {children}
     </Link>

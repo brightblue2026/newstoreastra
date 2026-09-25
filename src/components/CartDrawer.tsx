@@ -100,7 +100,7 @@ export default function CartDrawer({
             exit={{ opacity: 0 }}
             transition={{ duration: dur.drawer, ease }}
             onClick={onClose}
-            className="fixed inset-0 z-[60] bg-ink/35 backdrop-blur-sm"
+            className="fixed inset-0 z-(--z-overlay) bg-ink/35 backdrop-blur-sm"
             aria-hidden="true"
           />
 
@@ -114,14 +114,14 @@ export default function CartDrawer({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: dur.drawer, ease }}
-            className="fixed inset-y-0 right-0 z-[70] flex h-dvh w-full max-w-md flex-col bg-paper safe-x"
+            className="fixed inset-y-0 right-0 z-(--z-drawer) flex h-dvh w-full max-w-md flex-col bg-paper safe-x"
           >
             <header className="flex items-center justify-between border-b border-line px-6 py-4">
               <h2 className="type-heading">{title}</h2>
               <button
                 type="button"
                 onClick={onClose}
-                className="tap-target rounded-control px-3 py-2 type-caption text-ink-soft hover:text-ink"
+                className="tap-target rounded-control px-3 py-2 type-caption text-ink-soft motion-accent hover:bg-sky hover:text-ink"
               >
                 Close
               </button>

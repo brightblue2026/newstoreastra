@@ -68,7 +68,7 @@ export default async function SearchPage({
               />
               <button
                 type="submit"
-                className="rounded-control bg-signal px-6 py-3 type-body font-medium text-paper"
+                className="btn btn-primary"
               >
                 Search
               </button>

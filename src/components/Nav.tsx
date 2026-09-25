@@ -123,7 +123,7 @@ export default function Nav({
       // Sticky, not fixed: the bar sits in flow beneath the announcement ticker
       // and only pins once the ticker has scrolled away. Fixed would park it
       // on top of the ticker at rest.
-      className="sticky top-0 z-50 h-22 backdrop-blur-md"
+      className="sticky top-0 z-(--z-header) h-22 backdrop-blur-md"
       onMouseLeave={() => setMenuOpen(false)}
     >
       <nav
@@ -145,7 +145,7 @@ export default function Nav({
             aria-controls="brand-menu"
             onClick={() => setMenuOpen((v) => !v)}
             onMouseEnter={() => setMenuOpen(true)}
-            className="type-body text-ink-soft hover:text-ink"
+            className="link-underline type-body text-ink-soft motion-accent hover:text-ink aria-expanded:text-ink"
           >
             Brands
           </button>
@@ -153,7 +153,7 @@ export default function Nav({
             <Link
               key={link.href}
               href={link.href}
-              className="type-body text-ink-soft hover:text-ink"
+              className="link-underline type-body text-ink-soft motion-accent hover:text-ink"
             >
               {link.label}
             </Link>
@@ -164,12 +164,17 @@ export default function Nav({
           <button
             type="button"
             onClick={onOpenCart}
-            className="tap-target whitespace-nowrap rounded-control px-2 py-2 type-body text-ink-soft hover:text-ink sm:px-3"
+            className="tap-target gap-2 whitespace-nowrap rounded-control px-2 py-2 type-body text-ink-soft motion-accent hover:text-ink sm:px-3"
           >
             Cart
             {cartCount > 0 && (
-              <span className="ml-2 tabular-nums" aria-label={`${cartCount} items`}>
-                ({cartCount})
+              // Keyed on the count so the bump replays every time it changes.
+              <span
+                key={cartCount}
+                className="animate-pop inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-ink px-2 type-caption tabular-nums text-paper"
+                aria-label={`${cartCount} items`}
+              >
+                {cartCount}
               </span>
             )}
           </button>
@@ -181,7 +186,7 @@ export default function Nav({
             aria-expanded={mobileOpen}
             aria-controls="mobile-menu"
             onClick={() => setMobileOpen((v) => !v)}
-            className="tap-target rounded-control px-2 py-2 type-body text-ink-soft hover:text-ink sm:px-3 md:hidden"
+            className="tap-target rounded-control px-2 py-2 type-body text-ink-soft motion-accent hover:text-ink sm:px-3 md:hidden"
           >
             {mobileOpen ? 'Close' : 'Menu'}
           </button>
@@ -215,7 +220,12 @@ export default function Nav({
                       className="block h-0.5 w-8 motion-accent group-hover:w-full"
                       style={{ backgroundColor: brand.accentHex }}
                     />
-                    <span className="mt-3 block type-subhead">{brand.name}</span>
+                    <span className="mt-3 block type-subhead">
+                      {brand.name}{' '}
+                      <span aria-hidden="true" className="arrow-nudge text-ink-soft">
+                        &rarr;
+                      </span>
+                    </span>
                     <span className="mt-1 block type-body text-ink-soft">
                       {brand.segmentLabel}
                     </span>
@@ -252,9 +262,12 @@ export default function Nav({
                       onClick={() => setMobileOpen(false)}
                       // Generous vertical padding: these are thumb targets, not
                       // pointer targets.
-                      className="block border-b border-line py-4 type-subhead text-ink"
+                      className="group flex items-center justify-between border-b border-line py-4 type-subhead text-ink"
                     >
                       {link.label}
+                      <span aria-hidden="true" className="arrow-nudge text-ink-soft">
+                        &rarr;
+                      </span>
                     </Link>
                   </li>
                 ))}

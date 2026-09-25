@@ -34,7 +34,7 @@ export default function AddToCartButton({
           type="button"
           onClick={() => setQuantity((q) => Math.max(1, q - 1))}
           aria-label="Decrease quantity"
-          className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
+          className="min-w-11 px-4 py-3 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
         >
           &minus;
         </button>
@@ -43,7 +43,7 @@ export default function AddToCartButton({
           type="button"
           onClick={() => setQuantity((q) => Math.min(999, q + 1))}
           aria-label="Increase quantity"
-          className="min-w-11 px-4 py-3 type-body text-ink-soft hover:text-ink"
+          className="min-w-11 px-4 py-3 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
         >
           +
         </button>
@@ -56,7 +56,7 @@ export default function AddToCartButton({
           setAdded(true);
           openCart(true);
         }}
-        className="flex-1 rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift"
+        className="flex-1 btn btn-primary px-8 py-4"
       >
         {label}
       </button>

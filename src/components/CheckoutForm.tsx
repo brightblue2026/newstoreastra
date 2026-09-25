@@ -231,9 +231,12 @@ export default function CheckoutForm({
 
   if (lines.length === 0) {
     return (
-      <div>
-        <p className="type-body text-ink-soft">Your cart is empty.</p>
-        <Link href="/shop" className="mt-4 inline-block type-body underline">
+      <div className="rounded-card border border-dashed border-line bg-sky/30 px-6 py-16 text-center">
+        <p className="type-heading">Your cart is empty</p>
+        <p className="mx-auto mt-3 max-w-md type-body text-ink-soft">
+          Add something from the catalogue and it will be waiting here.
+        </p>
+        <Link href="/shop" className="mt-8 btn btn-primary">
           Browse the catalogue
         </Link>
       </div>
@@ -565,7 +568,7 @@ export default function CheckoutForm({
               <legend className="sr-only">Payment method</legend>
 
               <label
-                className={`flex items-start gap-3 rounded-card border border-line p-4 has-[:checked]:border-ink ${
+                className={`flex items-start gap-3 rounded-card border border-line p-4 motion-accent hover:border-ink-soft has-[:checked]:border-ink has-[:checked]:bg-sky/40 ${
                   onlinePaymentAvailable ? 'cursor-pointer' : 'opacity-60'
                 }`}
               >
@@ -589,7 +592,7 @@ export default function CheckoutForm({
               </label>
 
               <label
-                className={`flex items-start gap-3 rounded-card border border-line p-4 has-[:checked]:border-ink ${
+                className={`flex items-start gap-3 rounded-card border border-line p-4 motion-accent hover:border-ink-soft has-[:checked]:border-ink has-[:checked]:bg-sky/40 ${
                   quote?.cod.available ? 'cursor-pointer' : 'opacity-60'
                 }`}
               >
@@ -632,7 +635,7 @@ export default function CheckoutForm({
                 (paymentMethod === 'RAZORPAY' && !onlinePaymentAvailable) ||
                 (paymentMethod === 'COD' && !quote?.cod.available)
               }
-              className="mt-6 w-full rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift disabled:opacity-50"
+              className="mt-6 w-full btn btn-primary px-8 py-4"
             >
               {submitting
                 ? 'Placing your order…'
@@ -756,7 +759,7 @@ export default function CheckoutForm({
 }
 
 const inputClass =
-  'w-full rounded-control border border-line bg-paper px-4 py-3 type-body focus-visible:border-ink';
+  'w-full rounded-control border border-line bg-paper px-4 py-3 type-body motion-accent hover:border-ink-soft focus-visible:border-ink';
 
 /**
  * What checkout looks like before the cart has been read from localStorage —
@@ -769,24 +772,24 @@ function CheckoutSkeleton() {
       <span className="sr-only" role="status" aria-live="polite">
         Loading your cart
       </span>
-      <div className="grid animate-pulse gap-12 lg:grid-cols-[1fr_24rem] lg:gap-16" aria-hidden="true">
+      <div className="grid gap-12 lg:grid-cols-[1fr_24rem] lg:gap-16" aria-hidden="true">
         <div className="min-w-0">
           <div className="border-b border-line pb-8">
-            <div className="h-7 w-32 rounded-full bg-line" />
+            <div className="h-7 w-32 rounded-full skeleton" />
             <div className="mt-6 space-y-6">
               {[0, 1].map((field) => (
                 <div key={field}>
-                  <div className="h-4 w-32 rounded-full bg-line" />
-                  <div className="mt-2 h-13 rounded-control bg-line" />
-                  <div className="mt-1 h-4 w-56 max-w-full rounded-full bg-line" />
+                  <div className="h-4 w-32 rounded-full skeleton" />
+                  <div className="mt-2 h-13 rounded-control skeleton" />
+                  <div className="mt-1 h-4 w-56 max-w-full rounded-full skeleton" />
                 </div>
               ))}
-              <div className="h-12 w-48 rounded-control bg-line" />
+              <div className="h-12 w-48 rounded-control skeleton" />
             </div>
           </div>
           {[0, 1].map((step) => (
             <div key={step} className="border-b border-line py-8">
-              <div className="h-7 w-32 rounded-full bg-line" />
+              <div className="h-7 w-32 rounded-full skeleton" />
             </div>
           ))}
         </div>
@@ -816,20 +819,50 @@ function Section({
   return (
     <section className="border-b border-line py-8 first:pt-0">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="type-subhead">
-          <span className="mr-3 type-mono text-ink-soft">{index}</span>
+        <h2 className="flex items-center gap-3 type-subhead">
+          {/* Step marker: outlined while waiting, ink while open, a check once done. */}
+          <span
+            aria-hidden="true"
+            className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full border type-mono motion-accent ${
+              open
+                ? 'border-ink bg-ink text-paper'
+                : done
+                  ? 'border-success bg-success text-paper'
+                  : 'border-line text-ink-soft'
+            }`}
+          >
+            {!open && done ? (
+              <svg viewBox="0 0 16 16" className="size-4" fill="none">
+                <path
+                  d="M3.5 8.5l3 3 6-7"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="animate-draw"
+                />
+              </svg>
+            ) : (
+              index
+            )}
+          </span>
+          <span className="sr-only">Step {index}: </span>
           {title}
         </h2>
         {!open && done && (
-          <button type="button" onClick={onOpen} className="tap-target type-caption underline">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="tap-target link-underline type-caption text-ink-soft motion-accent hover:text-ink"
+          >
             Change
           </button>
         )}
       </div>
 
-      {!open && summary && <p className="mt-2 type-caption text-ink-soft">{summary}</p>}
+      {!open && summary && <p className="mt-2 pl-11 type-caption text-ink-soft">{summary}</p>}
 
-      {open && <div className="mt-6 space-y-6">{children}</div>}
+      {open && <div className="mt-6 animate-rise space-y-6">{children}</div>}
     </section>
   );
 }

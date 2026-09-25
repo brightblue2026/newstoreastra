@@ -326,7 +326,7 @@ function Unlock({ orderNumber, denied }: { orderNumber: string; denied: boolean 
 
         <button
           type="submit"
-          className="rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift"
+          className="btn btn-primary px-8 py-4"
         >
           Show my order
         </button>
