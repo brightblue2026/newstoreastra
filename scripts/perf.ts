@@ -23,6 +23,7 @@ import path from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { chromium, devices } from '@playwright/test';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { pgPoolConfig } from '../src/lib/pg-config';
 import { PrismaClient } from '../src/generated/prisma/client';
 
 try {
@@ -52,7 +53,7 @@ const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floo
 
 async function main(): Promise<void> {
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL ?? '' }),
+    adapter: new PrismaPg(pgPoolConfig(process.env.DATABASE_URL ?? '')),
   });
   const [product, variant] = await Promise.all([
     prisma.product.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),

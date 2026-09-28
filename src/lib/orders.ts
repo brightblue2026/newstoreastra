@@ -224,12 +224,29 @@ export async function nextOrderNumber(
   return formatOrderNumber((highest?.sequence ?? 0) + 1, now);
 }
 
-/** Inventory rows for a set of variants, keyed by variant id. */
+/**
+ * Inventory rows for a set of variants, keyed by variant id — locked for the
+ * rest of the transaction.
+ *
+ * The lock is what makes the stock check true. Without it, two checkouts
+ * read the same "20 available", both plan against it, and both apply their
+ * delta: 12 simultaneous orders of 2 against 20 units all went through and
+ * left a row at −4 (found against Supabase, 28 September 2026). With it, the
+ * second checkout waits here until the first commits, then reads what is
+ * actually left. Rows are locked in id order so two carts sharing variants
+ * cannot deadlock.
+ */
 async function inventoryFor(
   tx: Prisma.TransactionClient,
   variantIds: string[],
 ): Promise<Map<string, InventoryRow[]>> {
   if (variantIds.length === 0) return new Map();
+  await tx.$queryRaw`
+    SELECT id FROM "Inventory"
+    WHERE "variantId" IN (${Prisma.join(variantIds)})
+    ORDER BY id
+    FOR UPDATE
+  `;
   const rows = await tx.inventory.findMany({
     where: { variantId: { in: variantIds }, location: { isActive: true } },
     select: { id: true, variantId: true, quantity: true, reserved: true },

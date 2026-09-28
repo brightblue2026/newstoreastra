@@ -46,6 +46,7 @@ import {
   type Page,
 } from '@playwright/test';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { pgPoolConfig } from '../src/lib/pg-config';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { orderAccessToken } from '../src/lib/order-access';
 
@@ -386,7 +387,7 @@ async function main(): Promise<void> {
     throw new Error('DATABASE_URL is not set. Copy .env.example to .env first.');
   }
 
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  const prisma = new PrismaClient({ adapter: new PrismaPg(pgPoolConfig(connectionString)) });
   const { routes: dynamic, skipped, cartVariantId } = await dynamicRoutes(prisma);
   await prisma.$disconnect();
 

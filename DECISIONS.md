@@ -1794,3 +1794,16 @@ Five defects found and fixed:
 - **Skeletons shimmer instead of pulsing** (`skeleton` utility), and the cart shows skeleton lines
   while it prices instead of a line of text.
 - **z-index has named tokens**: `--z-sticky`, `--z-header`, `--z-overlay`, `--z-drawer`.
+
+## Hosting on Vercel + Supabase, pre-launch backend pass (28 September 2026)
+
+- **Hosting is Vercel Pro for the whole app, Supabase for Postgres and photos.** Cloudflare Workers was rejected: scrypt at N=2^17 needs ~128 MB, the Workers isolate limit, so staff login would fail; and D1 (SQLite) cannot hold the interactive transactions and row locks orders depend on. Vercel Hobby was rejected too: it forbids commercial use and allows only a daily cron.
+- **The database moved to a new Supabase project in ap-south-1 (Mumbai), `mjbebzlknjowvwhmzzzd`.** The first project was in ap-southeast-2 (Sydney) and still empty, so moving cost nothing. `vercel.json` pins functions to `bom1` beside it.
+- **Postgres TLS is verified against Supabase's own root CA, in `src/lib/pg-config.ts`.** Dashboard connection strings connect unencrypted, and `sslmode=require` fails with SELF_SIGNED_CERT_IN_CHAIN because pg treats it as verify-full against public CAs. The CA is embedded, since it is a public cert, and any sslmode in the URL is stripped because pg lets it override the `ssl` object. Every connection (app, seeds, scripts) goes through the helper.
+- **The pool is capped at 5 per instance**, so a burst of Vercel instances cannot exhaust Supavisor.
+- **Every table has RLS on and no policies; anon/authenticated privileges are revoked** (migration `lock_down_data_api`). Prisma leaves `public` open to Supabase's REST API, and the anon key read `User`, `Order` and `Address` with 200. The app never uses that API and Prisma connects as the owner, so nothing in the app changed. `rls-migrations.test.ts` fails if a new model ships without RLS.
+- **Checkout oversold under concurrency, fixed.** `inventoryFor` read stock without a lock, so 12 simultaneous orders of 2 against 20 units all succeeded and left a row at −4. It now takes `FOR UPDATE` on the variant's inventory rows in id order before reading. `pnpm e2e:stock-race` is the regression check.
+- **The seed skips dev users on a Supabase host.** A known password on an ADMIN account is a way in; real staff come from `pnpm user:create`.
+- **The e2e scripts accept `E2E_ALLOW_DB_HOST`**, an exact host, to run once against the empty pre-launch database. The default still refuses anything non-local.
+- **MX-3 stays a draft on Supabase.** Publishing needs an HSN code, which no document has confirmed yet. The pass set 3402/18% temporarily and reverted it.
+- **A product with no GST rate was sold at 0%, fixed.** `cart-pricing` fell back with `gstRate ?? 0`, and the publish guard checked HSN but not the rate, so a detergent published before its rate was entered went out untaxed with a matching invoice. Null now makes the line unavailable, as a missing HSN already did, and publishing requires a rate. Nil-rated goods save an explicit 0, which still sells.

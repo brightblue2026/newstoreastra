@@ -84,8 +84,14 @@ const read = (id: string) =>
 
 async function main() {
   const dbHost = new URL(process.env.DATABASE_URL ?? 'postgres://unset').hostname;
-  if (!['localhost', '127.0.0.1', '::1'].includes(dbHost)) {
-    throw new Error(`Refusing to run: DATABASE_URL points at ${dbHost}, not a local database.`);
+  // A hosted database is allowed only when named exactly, for the pre-launch
+  // pass against Supabase — never by accident, and never once real orders exist.
+  const allowedRemote = process.env.E2E_ALLOW_DB_HOST?.trim();
+  if (!['localhost', '127.0.0.1', '::1'].includes(dbHost) && dbHost !== allowedRemote) {
+    throw new Error(
+      `Refusing to run: DATABASE_URL points at ${dbHost}, not a local database. ` +
+        'Set E2E_ALLOW_DB_HOST to that exact host only for a pre-launch database with no real orders.',
+    );
   }
   if (!SECRET) {
     throw new Error('Set RAZORPAY_WEBHOOK_SECRET, to the same value the dev server was started with.');

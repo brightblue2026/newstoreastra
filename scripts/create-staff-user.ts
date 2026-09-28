@@ -19,6 +19,7 @@
 import path from 'node:path';
 import readline from 'node:readline';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { pgPoolConfig } from '../src/lib/pg-config';
 import { PrismaClient, Prisma, UserRole } from '../src/generated/prisma/client';
 import { hashPassword } from '../src/lib/password';
 
@@ -33,7 +34,7 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is not set. Copy .env.example to .env first.');
 }
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pgPoolConfig(connectionString)) });
 
 /** Long enough to be worth having; everything shorter is a false sense of security. */
 const MIN_PASSWORD_LENGTH = 12;

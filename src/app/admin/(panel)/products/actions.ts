@@ -365,10 +365,12 @@ export async function setProductActiveAction(productId: string, isActive: boolea
     const hasVariant = existing.variants.length > 0;
     const hasImage = existing.images.length > 0 || existing.variants.some((v) => v.images.length > 0);
     const hasHsn = Boolean(existing.hsnCode);
+    // Null is "not entered", not 0%: nil-rated goods save an explicit 0.
+    const hasGstRate = existing.gstRate !== null;
     const foodOk =
       !existing.isFoodProduct || !foodLabelIncomplete(readFoodLabel(existing.foodLabel));
 
-    if (!hasVariant || !hasImage || !hasHsn || !foodOk) {
+    if (!hasVariant || !hasImage || !hasHsn || !hasGstRate || !foodOk) {
       // Redirected with the reason rather than thrown: a thrown Error from a
       // server action has its message redacted in a production build (Next
       // replaces it with an opaque digest), so the admin clicking "Publish"
@@ -377,7 +379,7 @@ export async function setProductActiveAction(productId: string, isActive: boolea
       // never throws at all.
       const reason =
         'Cannot publish: needs at least one variant, one image, an HSN code' +
-        (existing.isFoodProduct ? ', and a complete food label.' : '.');
+        (existing.isFoodProduct ? ', a GST rate, and a complete food label.' : ' and a GST rate.');
       revalidatePath('/admin/products');
       redirect(`/admin/products?publishError=${encodeURIComponent(reason)}`);
     }

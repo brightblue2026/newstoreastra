@@ -223,7 +223,10 @@ export async function resolveCartLines(
         !variant.isActive ||
         !variant.product.isActive ||
         variant.pricePaise === null ||
-        !variant.product.hsnCode
+        !variant.product.hsnCode ||
+        // Unset is not 0%: nil-rated goods carry an explicit 0, and a missing
+        // rate used to fall through as 0 — an 18% detergent sold untaxed.
+        variant.product.gstRate === null
       ) {
         unavailable.push(cartLine);
         continue;
@@ -243,7 +246,7 @@ export async function resolveCartLines(
         categoryId: variant.product.categoryId,
         productId: variant.productId,
         hsnCode: variant.product.hsnCode,
-        gstRate: variant.product.gstRate ?? 0,
+        gstRate: variant.product.gstRate!,
       });
       lineKeys.push(key);
       snapshots.push({
@@ -255,7 +258,7 @@ export async function resolveCartLines(
         choiceSnapshot: null,
         quantity: cartLine.quantity,
         hsnCode: variant.product.hsnCode,
-        gstRate: variant.product.gstRate ?? 0,
+        gstRate: variant.product.gstRate!,
         weightGrams: variant.weightGrams,
       });
       addWeight(variant.weightGrams, cartLine.quantity);
@@ -285,7 +288,11 @@ export async function resolveCartLines(
     // if the missing component was never part of the combo at all. Matches
     // the VARIANT branch above: one untaxable item makes the whole line
     // unavailable, not just that item.
-    if (resolved.units.some((unit) => !unit.variant.product.hsnCode)) {
+    if (
+      resolved.units.some(
+        (unit) => !unit.variant.product.hsnCode || unit.variant.product.gstRate === null,
+      )
+    ) {
       unavailable.push(cartLine);
       continue;
     }
@@ -332,7 +339,7 @@ export async function resolveCartLines(
         categoryId: variant.product.categoryId,
         productId: variant.productId,
         hsnCode: variant.product.hsnCode!,
-        gstRate: variant.product.gstRate ?? 0,
+        gstRate: variant.product.gstRate!,
       });
       lineKeys.push(key);
       snapshots.push({
@@ -344,7 +351,7 @@ export async function resolveCartLines(
         choiceSnapshot,
         quantity: physical,
         hsnCode: variant.product.hsnCode!,
-        gstRate: variant.product.gstRate ?? 0,
+        gstRate: variant.product.gstRate!,
         weightGrams: comboUnitGrams ?? variant.weightGrams,
       });
       addWeight(comboUnitGrams ?? variant.weightGrams, physical);
