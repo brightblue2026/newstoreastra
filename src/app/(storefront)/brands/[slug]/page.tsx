@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid, { EmptyListing } from '@/components/ProductGrid';
 import FilterBar from '@/components/FilterBar';
 import { firstValue } from '@/lib/query';
+import { brandLine, brandLogoSrc } from '@/lib/brand-art';
 import {
   getBrandBySlug,
   isProductSort,
@@ -60,6 +62,8 @@ export default async function BrandPage({
   const products = await listProducts({ brandSlug: brand.slug, sort });
 
   const pathname = `/brands/${brand.slug}`;
+  const logo = brandLogoSrc(brand.slug, brand.logoUrl);
+  const line = brandLine(brand.slug, brand.tagline);
   const current = { sort: sort === 'featured' ? undefined : sort };
 
   return (
@@ -70,7 +74,8 @@ export default async function BrandPage({
           backgroundColor: `color-mix(in oklab, ${brand.accentHex} 8%, var(--color-paper))`,
         }}
       >
-        <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
+        <div className="mx-auto grid max-w-(--container-page) items-center gap-12 px-6 py-24 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Reveal>
           <RevealItem>
             <p className="type-caption text-ink-soft">{brand.segmentLabel}</p>
           </RevealItem>
@@ -85,9 +90,9 @@ export default async function BrandPage({
           <RevealItem>
             <h1 className="mt-6 type-display-lg">{brand.name}</h1>
           </RevealItem>
-          {brand.tagline && (
+          {line && (
             <RevealItem>
-              <p className="mt-6 max-w-2xl type-body-lg text-ink-soft">{brand.tagline}</p>
+              <p className="mt-6 max-w-2xl type-body-lg text-ink-soft">{line}</p>
             </RevealItem>
           )}
           <RevealItem>
@@ -97,6 +102,21 @@ export default async function BrandPage({
             </p>
           </RevealItem>
         </Reveal>
+        {/* The logo on a paper card, so every mark sits on the neutral it
+            was drawn for rather than on the accent tint. */}
+        {logo && (
+          <div className="relative mx-auto aspect-video w-full max-w-md rounded-card border border-line bg-paper">
+            <Image
+              src={logo}
+              alt={`${brand.name} logo`}
+              fill
+              priority
+              sizes="(min-width: 768px) 448px, 90vw"
+              className="object-contain p-10"
+            />
+          </div>
+        )}
+        </div>
       </section>
 
       {brand.story && (

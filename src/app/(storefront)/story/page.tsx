@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import CountUp from '@/components/CountUp';
+import RecordSeal from '@/components/art/RecordSeal';
+import StoryScene from '@/components/art/StoryScene';
+import { brandLine, brandLogoSrc } from '@/lib/brand-art';
 import { getContent } from '@/lib/content';
 import { getBrands } from '@/lib/storefront';
 
@@ -32,7 +36,8 @@ export default async function StoryPage() {
 
   return (
     <>
-      <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
+      <div className="mx-auto grid max-w-(--container-page) items-end gap-12 px-6 py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Reveal>
         <RevealItem>
           <p className="type-caption text-ink-soft">Since 2019 · Ernakulam, Kerala</p>
         </RevealItem>
@@ -47,9 +52,12 @@ export default async function StoryPage() {
           ))}
         </div>
       </Reveal>
+      <StoryScene className="w-full max-w-xl" />
+      </div>
 
       <section className="border-y border-line bg-sky">
-        <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
+        <div className="mx-auto grid max-w-(--container-page) items-center gap-12 px-6 py-24 md:grid-cols-[minmax(0,1fr)_auto]">
+        <Reveal>
           <RevealItem>
             <p className="type-display-lg">
               <CountUp to={record.count} />{' '}
@@ -60,6 +68,8 @@ export default async function StoryPage() {
             <p className="mt-8 max-w-2xl type-body-lg text-ink-soft">{record.body}</p>
           </RevealItem>
         </Reveal>
+        <RecordSeal className="mx-auto w-40 md:w-52" />
+        </div>
       </section>
 
       {brands.length > 0 && (
@@ -68,27 +78,40 @@ export default async function StoryPage() {
             <h2 className="type-display-sm">The houses</h2>
           </RevealItem>
           <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {brands.map((brand) => (
-              <RevealItem key={brand.slug}>
-                <Link
-                  href={`/brands/${brand.slug}`}
-                  className="group block rounded-card border border-line p-6 motion-accent hover:border-ink"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="block h-1 w-10 rounded-full motion-accent group-hover:w-20"
-                    style={{ backgroundColor: brand.accentHex }}
-                  />
-                  <span className="mt-6 block type-heading">{brand.name}</span>
-                  <span className="mt-1 block type-body text-ink-soft">
-                    {brand.segmentLabel}
-                  </span>
-                  {brand.tagline && (
-                    <span className="mt-3 block type-body text-ink-soft">{brand.tagline}</span>
-                  )}
-                </Link>
-              </RevealItem>
-            ))}
+            {brands.map((brand) => {
+              const logo = brandLogoSrc(brand.slug, brand.logoUrl);
+              const line = brandLine(brand.slug, brand.tagline);
+              return (
+                <RevealItem key={brand.slug}>
+                  <Link
+                    href={`/brands/${brand.slug}`}
+                    className="group block rounded-card border border-line p-6 motion-accent hover:border-ink"
+                  >
+                    {logo && (
+                      <span className="relative mb-6 block h-16 w-full">
+                        <Image
+                          src={logo}
+                          alt=""
+                          fill
+                          sizes="(min-width: 1024px) 240px, (min-width: 640px) 45vw, 90vw"
+                          className="object-contain object-left"
+                        />
+                      </span>
+                    )}
+                    <span
+                      aria-hidden="true"
+                      className="block h-1 w-10 rounded-full motion-accent group-hover:w-20"
+                      style={{ backgroundColor: brand.accentHex }}
+                    />
+                    <span className="mt-6 block type-heading">{brand.name}</span>
+                    <span className="mt-1 block type-body text-ink-soft">
+                      {brand.segmentLabel}
+                    </span>
+                    {line && <span className="mt-3 block type-body text-ink-soft">{line}</span>}
+                  </Link>
+                </RevealItem>
+              );
+            })}
           </div>
         </Reveal>
       )}

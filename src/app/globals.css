@@ -421,6 +421,21 @@
   animation: bb-rise var(--bb-duration-accent) var(--bb-ease-out) backwards;
 }
 
+/* Illustration bubbles bob a few pixels, slowly. Transform only; the global
+   reduced-motion rule below stops it after one instant iteration. */
+@keyframes bb-drift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
+  }
+}
+
+@utility animate-drift {
+  animation: bb-drift 4.2s ease-in-out infinite alternate;
+}
+
 /* ---------- Stacking — one scale, named by role ---------- */
 :root {
   --z-sticky: 40;

@@ -14,6 +14,8 @@ export const CONTACT = {
   tollFree: '18001230621',
   /** `tel:` needs the digits unpunctuated. */
   tollFreeHref: 'tel:18001230621',
+  /** Grouped the way Indian toll-free numbers are read aloud. */
+  tollFreeDisplay: '1800 123 0621',
   email: 'store-brightbluefmcg@gmail.com',
 } as const;
 

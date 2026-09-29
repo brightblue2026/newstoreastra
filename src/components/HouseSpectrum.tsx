@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
+import { brandLine, brandLogoSrc } from '@/lib/brand-art';
 
 export type SpectrumBrand = {
   name: string;
@@ -9,6 +11,7 @@ export type SpectrumBrand = {
   accentHex: string;
   segmentLabel: string;
   tagline: string | null;
+  logoUrl: string | null;
   productCount: number;
 };
 
@@ -46,6 +49,8 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
         // second-order ones; anything further stays neutral paper.
         const bleedPct = distance === 1 ? 8 : distance === 2 ? 4 : 0;
         const tintPct = isActive ? 16 : bleedPct;
+        const logo = brandLogoSrc(brand.slug, brand.logoUrl);
+        const line = brandLine(brand.slug, brand.tagline);
 
         return (
           <div
@@ -70,6 +75,20 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
               onBlur={() => setActiveIndex(null)}
               className="flex h-full min-h-24 flex-col gap-6 p-6"
             >
+              {/* The brand's own mark, in its own colours. Left-aligned and
+                  height-capped so eight very different logo shapes share one
+                  baseline; the name below stays the accessible label. */}
+              {logo && (
+                <span className="relative block h-16 w-full">
+                  <Image
+                    src={logo}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 240px, (min-width: 640px) 45vw, 90vw"
+                    className="object-contain object-left"
+                  />
+                </span>
+              )}
               {/* Accent reaches this rule, the tint above, and nowhere else —
                   the name and copy stay ink, per the one-accent-at-a-time rule. */}
               <span
@@ -96,9 +115,7 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
                       'opacity var(--bb-duration-accent) var(--bb-ease-out), transform var(--bb-duration-accent) var(--bb-ease-out)',
                   }}
                 >
-                  {brand.tagline && (
-                    <span className="block type-body text-ink-soft">{brand.tagline}</span>
-                  )}
+                  {line && <span className="block type-body text-ink-soft">{line}</span>}
                   <span className="block type-caption text-ink-soft">
                     {brand.productCount} {brand.productCount === 1 ? 'product' : 'products'}
                   </span>

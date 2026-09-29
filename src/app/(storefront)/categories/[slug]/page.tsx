@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Reveal, RevealItem } from '@/components/Reveal';
+import SegmentArt from '@/components/art/SegmentArt';
 import ProductGrid, { EmptyListing } from '@/components/ProductGrid';
 import FilterBar from '@/components/FilterBar';
 import { firstValue } from '@/lib/query';
@@ -73,7 +74,8 @@ export default async function CategoryPage({
 
   return (
     <div className="mx-auto max-w-(--container-page) px-6 py-24">
-      <Reveal>
+      <div className="flex items-center justify-between gap-8">
+      <Reveal className="min-w-0">
         {category.ancestors.length > 0 && (
           <RevealItem>
             <nav aria-label="Breadcrumb">
@@ -104,6 +106,12 @@ export default async function CategoryPage({
           </RevealItem>
         )}
       </Reveal>
+      {/* A sub-range borrows its top-level segment's drawing. */}
+      <SegmentArt
+        slug={category.ancestors[0]?.slug ?? category.slug}
+        className="hidden w-36 shrink-0 sm:block lg:w-44"
+      />
+      </div>
 
       {category.children.length > 0 && (
         <Reveal className="mt-12 flex flex-wrap gap-3" gap={0.04}>

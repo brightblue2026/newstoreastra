@@ -1795,6 +1795,17 @@ Five defects found and fixed:
   while it prices instead of a line of text.
 - **z-index has named tokens**: `--z-sticky`, `--z-header`, `--z-overlay`, `--z-drawer`.
 
+## Storefront illustrations and brand logos (27 September 2026)
+
+- **Brand logos come from `public/brands/`, via `src/lib/brand-art.ts`.** `Brand.logoUrl` is still unset everywhere; the bundled file wins over it, because a stored URL on a host `next/image` is not configured for would take the page down. Logos were trimmed and capped at 1600px; stray fragments were erased from Rafasi (a leaf) and Yellosmelly, and MX-3's ® was kept.
+- **Illustrations are drawn SVG in the site's tokens (ink line, sky and paper fills), never the brand accent.** They are decoration, `aria-hidden`, and never stand in for a product photo. Product imagery is untouched.
+- **The hero has 24 bubbles and the record seal 24 scallops**, one per MX-3 fragrance.
+- **Brand one-liners from `content.json` show only when a brand has no tagline of its own.** Kenzaniya keeps "Pantry staples you can trust." MAKAFA, absent from that file, gets "Premium perfume and fragrance."
+- **Changes from `content.json`:** "Seven" became eight, and "Gentle on hands" became "An ISO 9001:2015 company" (printed on the MX-3 label; the gentleness claim has no evidence). "Combos that save more" shows only while featured combos exist. Otherwise it falls back to "Secure online payment" when Razorpay is configured, else "Straight from the maker".
+- **The support band uses `CONTACT`**, the store's own inbox, not `content.json`'s `info@brightblue.in` from the old site.
+- **Hero copy, and `content.json`'s "Made in Palakkad" heading, were not applied.** The hero and story are admin-edited content blocks, and the record-led hero is the brief's centrepiece.
+- **The newsletter block was not built.** No subscription backend exists, and a form that goes nowhere is worse than none.
+
 ## Hosting on Vercel + Supabase, pre-launch backend pass (28 September 2026)
 
 - **Hosting is Vercel Pro for the whole app, Supabase for Postgres and photos.** Cloudflare Workers was rejected: scrypt at N=2^17 needs ~128 MB, the Workers isolate limit, so staff login would fail; and D1 (SQLite) cannot hold the interactive transactions and row locks orders depend on. Vercel Hobby was rejected too: it forbids commercial use and allows only a daily cron.
