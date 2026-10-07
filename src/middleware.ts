@@ -14,10 +14,12 @@ export default middleware;
 export const config = {
   matcher: [
     /*
-      Everything except Next internals, the auth routes themselves, and static
-      files. The admin check inside `authorized` narrows it further; the
+      Everything except Next internals, the auth routes themselves, sign-out,
+      and static files. Sign-out is excluded because this middleware re-issues
+      the session cookie on every request it handles, which would undo it —
+      see src/app/admin/logout/route.ts. The admin check inside `authorized` narrows it further; the
       storefront simply passes through.
     */
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|woff2)$).*)',
+    '/((?!api/auth|admin/logout|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|woff2)$).*)',
   ],
 };

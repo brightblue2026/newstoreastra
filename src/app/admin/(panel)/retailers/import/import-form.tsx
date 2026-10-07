@@ -17,7 +17,7 @@ export function ImportForm({
   return (
     <div className="mt-10 max-w-2xl">
       <form action={formAction} className="flex flex-wrap items-end gap-4">
-        <div>
+        <div className="max-w-full min-w-0">
           <label htmlFor="file" className="block type-caption text-ink-soft">
             CSV file
           </label>
@@ -32,7 +32,7 @@ export function ImportForm({
               const file = event.target.files?.[0];
               setTooLarge(Boolean(file && file.size > MAX_IMPORT_BYTES));
             }}
-            className="mt-2 block type-body"
+            className="mt-2 block max-w-full type-body"
           />
         </div>
         <button

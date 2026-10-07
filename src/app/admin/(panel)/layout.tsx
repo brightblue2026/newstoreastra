@@ -28,9 +28,21 @@ export default async function AdminLayout({
           <Link href="/admin" className="type-heading text-paper">
             Bright Blue admin
           </Link>
-          <span className="type-caption text-paper/70">
-            {user.name ?? user.email} · {ROLE_LABELS[user.role]}
-          </span>
+          <div className="flex items-center gap-6">
+            <span className="type-caption text-paper/70">
+              {user.name ?? user.email} · {ROLE_LABELS[user.role]}
+            </span>
+            {/* A shared office computer is the normal case here, so leaving
+                has to be one obvious press, on every page. */}
+            <form action="/admin/logout" method="post">
+              <button
+                type="submit"
+                className="type-caption text-paper underline underline-offset-4 hover:text-paper/80"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
 

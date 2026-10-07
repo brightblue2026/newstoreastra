@@ -18,7 +18,7 @@ import d1NextTagCache from '@opennextjs/cloudflare/overrides/tag-cache/d1-next-t
  * reach every location — the same order as the 60-second revalidate window,
  * and only ever for display: prices are re-read from Postgres at the cart.
  */
-export default {
+const config = {
   ...defineCloudflareConfig({
     incrementalCache: kvIncrementalCache,
     queue: doQueue,
@@ -30,3 +30,5 @@ export default {
   // Next config". The Next.js step on its own is `build:next`.
   buildCommand: 'pnpm build:next',
 };
+
+export default config;
