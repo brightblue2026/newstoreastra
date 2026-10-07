@@ -1,0 +1,49 @@
+// Cloudflare Workers deployment, built by @opennextjs/cloudflare.
+//
+// Nothing secret lives here. Secrets (AUTH_SECRET, SUPABASE_SERVICE_ROLE_KEY,
+// RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET, CRON_SECRET) are set with
+// `wrangler secret put`; local previews read them from the gitignored .dev.vars.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bbtc-store",
+  // The custom entry wraps the generated worker to add the cron handler.
+  "main": "worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  // Run next to the database rather than next to the visitor: an order is
+  // several Postgres round trips, and Supabase is in Mumbai.
+  "placement": { "mode": "smart" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "bbtc-store" }],
+  "images": { "binding": "IMAGES" },
+  // ISR cache, tag cache and revalidation queue: see open-next.config.ts.
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "bbtc-store-cache" }],
+  "d1_databases": [
+    {
+      "binding": "NEXT_TAG_CACHE_D1",
+      "database_name": "bbtc-store-tag-cache",
+      // Placeholder until the database is created; local previews ignore it.
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOQueueHandler"] }],
+  // Postgres. Hyperdrive pools connections to Supabase; `localConnectionString`
+  // is what `wrangler dev` uses instead, the Docker database.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Placeholder until the Hyperdrive config is created.
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgresql://bbtc:bbtc@localhost:5432/bbtc_store"
+    }
+  ],
+  // Cancels unpaid orders past their payment window; see worker.ts.
+  "triggers": { "crons": ["*/15 * * * *"] }
+}

@@ -1818,3 +1818,11 @@ Five defects found and fixed:
 - **The e2e scripts accept `E2E_ALLOW_DB_HOST`**, an exact host, to run once against the empty pre-launch database. The default still refuses anything non-local.
 - **MX-3 stays a draft on Supabase.** Publishing needs an HSN code, which no document has confirmed yet. The pass set 3402/18% temporarily and reverted it.
 - **A product with no GST rate was sold at 0%, fixed.** `cart-pricing` fell back with `gstRate ?? 0`, and the publish guard checked HSN but not the rate, so a detergent published before its rate was entered went out untaxed with a matching invoice. Null now makes the line unavailable, as a missing HSN already did, and publishing requires a rate. Nil-rated goods save an explicit 0, which still sells.
+
+## Hosted database readiness audit (6 October 2026)
+
+- **The Sydney Supabase project is gone, and local `.env` storage now points at Mumbai.** `jputwvnpsmmmagifpqik` answers 410, so local uploads had been failing and two local image rows were dead links. Local database URLs stay on Docker; only `SUPABASE_URL` and the service key moved, which means an upload or delete from local admin acts on the production bucket.
+- **Hosted holds no test data, so nothing was removed there.** One product (the real MX-3, 72 priced variants), no orders, combos, discounts, retailers, reviews, content or settings. The local test product "dvdf" was deleted; `ZZTEST` rows remain local only.
+- **Nothing was copied from local to hosted.** Local delivery slabs, COD rules and the MX-3 HSN are test values. Delivery rates, COD and opening stock are BBTC's to enter in the admin.
+- **MX-3 still cannot be published on hosted.** It needs an HSN code and GST rate from the accountant and at least one image. The photographs in `assets/source-photos` and `Brand details/mx3` are 1280px WhatsApp copies and fail the 2000px upload rule, so originals are needed.
+- **Razorpay runs on test keys locally.** No code changed: the existing server action, checkout modal and webhook already cover create, pay and verify. A browser-side verify endpoint was not added, because only the webhook may change order state.

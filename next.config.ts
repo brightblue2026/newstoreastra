@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
 
 /**
  * A baseline CSP, not a strict nonce-based one. Next.js's own bootstrap and
@@ -140,3 +141,7 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+// Gives `next dev` the Cloudflare bindings from wrangler.jsonc. Nothing in the
+// app needs them under Node today, so this only matters once something does.
+initOpenNextCloudflareForDev();

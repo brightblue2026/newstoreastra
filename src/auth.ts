@@ -133,8 +133,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 /**
  * A valid scrypt hash of a value nobody knows. Used only to keep the timing of
- * a failed lookup indistinguishable from a failed password.
+ * a failed lookup indistinguishable from a failed password. Its parameters
+ * must match `SCRYPT_PARAMS` in lib/password.ts, or the two take different
+ * times — and the earlier N=2^17 would not fit in a Workers isolate.
  */
 const DUMMY_HASH =
-  'scrypt$131072$8$1$AAAAAAAAAAAAAAAAAAAAAA==$' +
+  'scrypt$32768$8$3$AAAAAAAAAAAAAAAAAAAAAA==$' +
   'YnJpZ2h0Ymx1ZS1kdW1teS1oYXNoLW5vdC1hLXJlYWwtcGFzc3dvcmQtcGxhY2Vob2xkZXItdmFsdWU=';

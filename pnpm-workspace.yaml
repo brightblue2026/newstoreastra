@@ -1,3 +1,6 @@
+# pnpm 10 refuses a workspace file without this; pnpm 11 does not need it.
+packages:
+  - '.'
 allowBuilds:
   '@prisma/engines': true
   '@sentry/cli': true
@@ -5,3 +8,6 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+  workerd: true
+patchedDependencies:
+  yoga-layout@3.2.1: patches/yoga-layout@3.2.1.patch
