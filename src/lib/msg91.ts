@@ -35,7 +35,7 @@ export type NotificationTemplate =
  * Environment variable holding each template's approved name.
  *
  * Named per template rather than one JSON blob so that a missing one is
- * obvious in `.env.example` and in Vercel's dashboard, and so BBTC can add them
+ * obvious in `.env.example` and in the host's settings, and so BBTC can add them
  * one at a time as Meta approves them — which is how approvals actually
  * arrive.
  */

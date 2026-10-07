@@ -76,3 +76,10 @@ qa/screenshots/
 
 # Phone performance results from `pnpm qa:perf`; machine-dependent, recorded in PROGRESS.md.
 qa/perf-*.txt
+
+# Cloudflare Workers: build output, local runtime state, and local secrets.
+.open-next/
+.wrangler/
+.dev.vars
+# The .wasm files scripts/cf-prepare.mjs extracts for worker.ts.
+.cf/

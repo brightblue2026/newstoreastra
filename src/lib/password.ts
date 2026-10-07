@@ -13,13 +13,16 @@ const scrypt = promisify(scryptCallback) as (
  *
  * scrypt from Node's standard library rather than bcrypt or argon2 — it is a
  * memory-hard KDF on OWASP's recommended list, and it keeps a native
- * dependency out of a build that has to run on Vercel. Customers never have a
- * password at all; they sign in by phone OTP.
+ * dependency out of the build. Customers never have a password at all; they
+ * sign in by phone OTP.
  *
- * Parameters are OWASP's minimum for scrypt (N=2^17, r=8, p=1), roughly 128 MB
- * of memory per hash. Staff logins are rare enough that the cost is invisible.
+ * Parameters are N=2^15, r=8, p=3: one of the equivalent settings OWASP lists
+ * for scrypt, roughly 32 MB of memory per hash. Its first-listed setting
+ * (N=2^17, p=1) needs about 128 MB, which is the whole memory limit of a
+ * Cloudflare Workers isolate, so a login there would be killed. Staff logins
+ * are rare enough that the extra passes are invisible.
  */
-const SCRYPT_PARAMS = { N: 2 ** 17, r: 8, p: 1, maxmem: 256 * 1024 * 1024 } as const;
+const SCRYPT_PARAMS = { N: 2 ** 15, r: 8, p: 3, maxmem: 64 * 1024 * 1024 } as const;
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 16;
 const PREFIX = 'scrypt';
@@ -80,6 +83,8 @@ export async function verifyPassword(password: string, stored: string): Promise<
       N,
       r,
       p,
+      // Sized for a hash made with the earlier N=2^17 setting, which local
+      // accounts may still carry. New hashes need a quarter of it.
       maxmem: 256 * 1024 * 1024,
     });
     return derived.length === expected.length && timingSafeEqual(derived, expected);

@@ -3,7 +3,7 @@
 Storefront and admin panel for **Bright Blue Trading Corporation** — an FMCG manufacturer
 in Ernakulam, Kerala. Seven brands, 100+ SKUs, spanning cleaning, personal care and food.
 
-One Next.js application, one Postgres database, one Vercel deployment.
+One Next.js application, one Postgres database, one Cloudflare Workers deployment.
 
 - `BBTC-STORE-MASTER-BRIEF.md` — the single source of truth: requirements, schema, design
   system, compliance, build phases. Read it before writing code.

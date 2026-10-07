@@ -3,12 +3,12 @@ import { NextResponse } from 'next/server';
 import { expireStaleOrders } from '@/lib/orders';
 
 /*
-  GET /api/cron/expire-stale-orders — triggered by Vercel Cron (see
-  `vercel.json`), not by anything a customer or admin screen calls.
+  GET /api/cron/expire-stale-orders — triggered every 15 minutes by the
+  Worker's cron handler (see `worker.ts` and `triggers` in `wrangler.jsonc`),
+  not by anything a customer or admin screen calls.
 
-  Vercel signs its own cron requests with `Authorization: Bearer
-  $CRON_SECRET` automatically once `CRON_SECRET` is set in the project's
-  environment — this route only has to check that header matches. Fails
+  The handler sends `Authorization: Bearer $CRON_SECRET` — this route only
+  has to check that header matches. Fails
   closed: no configured secret means every request is rejected, same as the
   Shiprocket webhook when its token is unset.
 */

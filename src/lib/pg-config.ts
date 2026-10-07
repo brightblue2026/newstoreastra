@@ -55,10 +55,10 @@ export function isSupabaseHost(hostname: string): boolean {
 }
 
 /**
- * How many connections one server instance may hold. On Vercel every function
- * instance has its own pool; `pg`'s default of 10 each would let a burst of
- * instances exhaust the Supabase pooler's client limit. Five covers the
- * parallel queries a single page makes.
+ * How many connections one Node process may hold: local development, the
+ * seeds and the scripts. `pg`'s default of 10 is more than any of them needs;
+ * five covers the parallel queries a single page makes. The deployed Worker
+ * does not use this at all — Hyperdrive is its pool (see `db.ts`).
  */
 export const POOL_MAX = 5;
 

@@ -1,0 +1,24 @@
+diff --git a/dist/src/load.js b/dist/src/load.js
+index efd1554faeebc6d6d792878f0ec63e4122ff3d96..b79a6f714af877ae2dbbb5a1d204faad78d6fce7 100644
+--- a/dist/src/load.js
++++ b/dist/src/load.js
+@@ -11,7 +11,18 @@
+ import loadYogaImpl from '../binaries/yoga-wasm-base64-esm.js';
+ import wrapAssembly from "./wrapAssembly.js";
+ export async function loadYoga() {
+-  return wrapAssembly(await loadYogaImpl());
++  // Cloudflare Workers refuse to compile WebAssembly from bytes at runtime, so
++  // there the host supplies a module compiled at deploy time instead (see
++  // scripts/cf-prepare.mjs). Everywhere else this is undefined and nothing changes.
++  const precompiled = globalThis.__bbWasm && globalThis.__bbWasm.yoga;
++  if (!precompiled) return wrapAssembly(await loadYogaImpl());
++  return wrapAssembly(await loadYogaImpl({
++    instantiateWasm(imports, receiveInstance) {
++      const instance = new WebAssembly.Instance(precompiled, imports);
++      receiveInstance(instance);
++      return instance.exports;
++    }
++  }));
+ }
+ export * from "./generated/YGEnums.js";
+ //# sourceMappingURL=load.js.map

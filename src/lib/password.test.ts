@@ -26,9 +26,9 @@ describe('hashPassword', () => {
     const hash = await hashPassword('anything');
     const [scheme, N, r, p] = hash.split('$');
     expect(scheme).toBe('scrypt');
-    expect(Number(N)).toBe(2 ** 17);
+    expect(Number(N)).toBe(2 ** 15);
     expect(Number(r)).toBe(8);
-    expect(Number(p)).toBe(1);
+    expect(Number(p)).toBe(3);
   });
 
   it('handles unicode and long passwords', async () => {
