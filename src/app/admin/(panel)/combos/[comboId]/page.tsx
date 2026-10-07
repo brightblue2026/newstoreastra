@@ -4,6 +4,7 @@ import { paiseToRupeesInput } from '@/lib/money';
 import { requireCatalogueAccess } from '@/lib/session';
 import { ComboForm, type ComboFormValues } from '../combo-form';
 import { updateComboAction } from '../actions';
+import { boxSizeInput } from '../../box-size';
 
 export default async function EditComboPage({
   params,
@@ -24,6 +25,8 @@ export default async function EditComboPage({
     imageUrl: combo.imageUrl ?? '',
     priceRupees: paiseToRupeesInput(combo.pricePaise),
     isFeatured: combo.isFeatured,
+    weightGrams: combo.weightGrams === null ? '' : String(combo.weightGrams),
+    ...boxSizeInput(combo),
   };
 
   const boundAction = updateComboAction.bind(null, combo.id);

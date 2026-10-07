@@ -17,7 +17,12 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "invoice:sample": "tsx --tsconfig tsconfig.scripts.json scripts/sample-invoice.ts",
-    "user:create": "tsx scripts/create-staff-user.ts"
+    "user:create": "tsx scripts/create-staff-user.ts",
+    "storage:setup": "tsx scripts/setup-storage.ts",
+    "qa:shoot": "tsx scripts/shoot.ts",
+    "e2e:razorpay": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-razorpay.ts",
+    "e2e:stock-race": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-stock-race.ts",
+    "qa:perf": "tsx scripts/perf.ts"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
@@ -45,6 +50,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",

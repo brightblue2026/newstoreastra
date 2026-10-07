@@ -212,6 +212,8 @@ export async function createProductAction(
     isActive: false,
   };
 
+  let createdProductId = '';
+
   try {
     // All-or-nothing: a duplicate SKU on row 5 of 20 must not leave rows 1-4 orphaned,
     // and must not leave a product with only half its declared catalogue. Every audit row
@@ -223,6 +225,7 @@ export async function createProductAction(
     // never desync from what actually got created.
     await db.$transaction(async (tx) => {
       const product = await tx.product.create({ data });
+      createdProductId = product.id;
       await tx.auditLog.create({
         data: { userId: user.id, action: 'create', entityType: 'Product', entityId: product.id, before: Prisma.JsonNull, after: product },
       });
@@ -259,6 +262,15 @@ export async function createProductAction(
   }
 
   revalidatePath('/admin/products');
+
+  // The guided screen (`quick-add/`) sends the user straight on to photos, because
+  // an image is the one publish requirement it cannot collect itself. This is a
+  // fixed destination keyed off a literal, never a caller-supplied path — a
+  // redirect target from the form body would be an open redirect.
+  if (formData.get('afterCreate') === 'images' && createdProductId) {
+    redirect(`/admin/products/${createdProductId}/images`);
+  }
+
   redirect('/admin/products');
 }
 
@@ -353,10 +365,12 @@ export async function setProductActiveAction(productId: string, isActive: boolea
     const hasVariant = existing.variants.length > 0;
     const hasImage = existing.images.length > 0 || existing.variants.some((v) => v.images.length > 0);
     const hasHsn = Boolean(existing.hsnCode);
+    // Null is "not entered", not 0%: nil-rated goods save an explicit 0.
+    const hasGstRate = existing.gstRate !== null;
     const foodOk =
       !existing.isFoodProduct || !foodLabelIncomplete(readFoodLabel(existing.foodLabel));
 
-    if (!hasVariant || !hasImage || !hasHsn || !foodOk) {
+    if (!hasVariant || !hasImage || !hasHsn || !hasGstRate || !foodOk) {
       // Redirected with the reason rather than thrown: a thrown Error from a
       // server action has its message redacted in a production build (Next
       // replaces it with an opaque digest), so the admin clicking "Publish"
@@ -365,7 +379,7 @@ export async function setProductActiveAction(productId: string, isActive: boolea
       // never throws at all.
       const reason =
         'Cannot publish: needs at least one variant, one image, an HSN code' +
-        (existing.isFoodProduct ? ', and a complete food label.' : '.');
+        (existing.isFoodProduct ? ', a GST rate, and a complete food label.' : ' and a GST rate.');
       revalidatePath('/admin/products');
       redirect(`/admin/products?publishError=${encodeURIComponent(reason)}`);
     }

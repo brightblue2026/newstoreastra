@@ -78,6 +78,15 @@ export interface ShippingSettings {
    * is something an admin turns on deliberately, after looking at both.
    */
   preferLiveRates: boolean;
+
+  /**
+   * Push each order to Shiprocket as soon as it is confirmed — from the
+   * Razorpay webhook for a prepaid order, on placement for COD. Pushing costs
+   * nothing (only an AWB does), so staff open a confirmed order and find the
+   * shipment already created. A failed push is recorded on the order and the
+   * button stays there to retry.
+   */
+  autoPushOrders: boolean;
 }
 
 export interface ShippingQuote {

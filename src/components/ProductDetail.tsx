@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 import { formatPrice, isPurchasable } from '@/lib/money';
+import DeliveryCheck from '@/components/DeliveryCheck';
 import { enquiryHref } from '@/lib/contact';
 import { useCartDrawer, useCartStore } from '@/lib/cart-store';
 import type { ProductPage, ProductVariantView } from '@/lib/storefront';
@@ -48,6 +49,14 @@ function axisOptions(variants: ProductVariantView[], axis: Axis): string[] {
 export default function ProductDetail({ product }: { product: ProductPage }) {
   const { variants } = product;
   const reduced = useReducedMotion();
+  // The fade is for switching photos, never for the first one: Motion writes
+  // `initial` into the server HTML, so fading the first photo in shipped the
+  // page's largest element at opacity 0 until the bundle had hydrated — about
+  // three seconds on a phone on 4G.
+  const photoSwitched = useRef(false);
+  useEffect(() => {
+    photoSwitched.current = true;
+  }, []);
 
   const addLine = useCartStore((state) => state.addLine);
   const openCart = useCartDrawer((state) => state.setOpen);
@@ -137,6 +146,15 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
   const active = gallery[Math.min(imageIndex, gallery.length - 1)] ?? null;
 
   const purchasable = selected !== null && isPurchasable(selected.pricePaise);
+
+  // Reserves room at the end of the page for the fixed buy bar below, so it
+  // never covers the footer for good — see `body[data-sticky-buy-bar]` in
+  // globals.css. Set after hydration; the padding lands below the fold.
+  useEffect(() => {
+    if (!purchasable) return;
+    document.body.setAttribute('data-sticky-buy-bar', '');
+    return () => document.body.removeAttribute('data-sticky-buy-bar');
+  }, [purchasable]);
   const showMrp =
     purchasable &&
     selected.mrpPaise !== null &&
@@ -169,7 +187,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
           </p>
           <a
             href={enquiryHref(product.name, selected?.sku)}
-            className="mt-2 inline-block type-body underline"
+            className="mt-2 inline-block type-body underline decoration-line underline-offset-4 motion-accent hover:decoration-ink"
           >
             Enquire about this product
           </a>
@@ -180,7 +198,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
 
   return (
     <div
-      className="grid gap-16 lg:grid-cols-2"
+      // `grid-cols-1` is `minmax(0, 1fr)`: without it the single mobile column
+      // took the thumbnail strip's full width as its minimum — four thumbnails
+      // are wider than a 360px phone — and the whole page scrolled sideways.
+      className="grid grid-cols-1 gap-16 md:grid-cols-2 md:gap-10 lg:gap-16"
       style={{ ['--bb-accent' as string]: accent }}
     >
       {/* ---------------------------------------------------------- gallery */}
@@ -192,10 +213,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
           }}
         >
           {active ? (
-            <motion.div
+            <m.div
               key={active.url}
               className="absolute inset-0"
-              initial={reduced ? false : { opacity: 0 }}
+              initial={reduced || !photoSwitched.current ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: dur.accent, ease }}
             >
@@ -204,10 +225,11 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 alt={active.alt}
                 fill
                 priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
+                // Minus the page gutters and this box's own p-12 on a phone.
+                sizes="(max-width: 767px) calc(100vw - 9rem), 50vw"
                 className="object-contain p-12"
               />
-            </motion.div>
+            </m.div>
           ) : (
             // No stock photography, no placeholder art — an empty accent field.
             <span className="sr-only">No photograph available</span>
@@ -223,8 +245,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                   onClick={() => setImageIndex(index)}
                   aria-label={`Show image ${index + 1} of ${gallery.length}`}
                   aria-current={index === imageIndex ? 'true' : undefined}
-                  className={`relative size-20 shrink-0 overflow-hidden rounded-control border ${
-                    index === imageIndex ? 'border-ink' : 'border-line'
+                  className={`relative size-20 shrink-0 overflow-hidden rounded-control border motion-accent ${
+                    index === imageIndex
+                      ? 'border-ink'
+                      : 'border-line opacity-70 hover:border-ink hover:opacity-100'
                   }`}
                 >
                   <Image
@@ -275,20 +299,24 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('fragrance', fragrance)}
                     aria-pressed={isSelected}
-                    className="group flex flex-col items-center gap-2"
+                    className="group flex flex-col items-center gap-2 rounded-control py-1"
                   >
+                    {/* A paper gap between the swatch and its ring, so the
+                        selection reads on dark and light fragrances alike. */}
                     <span
                       aria-hidden="true"
-                      className={`size-10 rounded-full border-2 motion-accent ${
-                        isSelected ? 'border-ink' : 'border-transparent group-hover:border-line'
+                      className={`size-10 rounded-full border-2 border-paper transition-[transform,box-shadow] duration-(--bb-duration-accent) ease-(--bb-ease-out) group-active:scale-95 ${
+                        isSelected
+                          ? 'scale-110 shadow-[0_0_0_2px_var(--color-ink)]'
+                          : 'shadow-[0_0_0_1px_var(--color-line)] group-hover:scale-110 group-hover:shadow-[0_0_0_2px_var(--color-line)]'
                       }`}
                       style={{
                         backgroundColor: swatch?.variantHex ?? 'var(--color-line)',
                       }}
                     />
                     <span
-                      className={`text-center type-caption ${
-                        isSelected ? 'text-ink' : 'text-ink-soft'
+                      className={`text-center type-caption motion-accent ${
+                        isSelected ? 'text-ink' : 'text-ink-soft group-hover:text-ink'
                       }`}
                     >
                       {fragrance}
@@ -313,7 +341,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('size', size)}
                     aria-pressed={isSelected}
-                    className={`rounded-control border px-4 py-2 type-body motion-accent ${
+                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent active:scale-95 ${
                       isSelected
                         ? 'border-ink bg-ink text-paper'
                         : 'border-line text-ink-soft hover:border-ink hover:text-ink'
@@ -340,7 +368,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                     type="button"
                     onClick={() => pickAlong('format', format)}
                     aria-pressed={isSelected}
-                    className={`rounded-control border px-4 py-2 type-body motion-accent ${
+                    className={`min-h-11 rounded-control border px-4 py-2 type-body motion-accent active:scale-95 ${
                       isSelected
                         ? 'border-ink bg-ink text-paper'
                         : 'border-line text-ink-soft hover:border-ink hover:text-ink'
@@ -362,7 +390,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 aria-label="Decrease quantity"
-                className="px-4 py-3 type-body text-ink-soft hover:text-ink"
+                className="min-w-11 px-4 py-3 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
               >
                 &minus;
               </button>
@@ -371,7 +399,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.min(999, q + 1))}
                 aria-label="Increase quantity"
-                className="px-4 py-3 type-body text-ink-soft hover:text-ink"
+                className="min-w-11 px-4 py-3 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
               >
                 +
               </button>
@@ -381,12 +409,14 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
             <button
               type="button"
               onClick={handleAdd}
-              className="flex-1 rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift"
+              className="flex-1 btn btn-primary px-8 py-4"
             >
               Add to cart
             </button>
           </div>
         )}
+
+        {purchasable && <DeliveryCheck variantId={selected.id} />}
 
         <p aria-live="polite" className="sr-only">
           {added && selected ? `${product.name} added to your cart.` : ''}
@@ -409,8 +439,10 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
         mid-scroll shifts what is under the thumb.
       */}
       {purchasable && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 px-6 py-3 backdrop-blur-md lg:hidden">
-          <div className="flex items-center gap-4">
+        <div
+          className="fixed inset-x-0 bottom-0 z-(--z-sticky) border-t border-line bg-paper/95 pb-safe safe-x backdrop-blur-md md:hidden"
+        >
+          <div className="flex items-center gap-4 px-6 pt-3">
             <div className="min-w-0">
               <p className="truncate type-caption text-ink-soft">
                 {selected?.variantName ? `${selected.variantName} · ` : ''}
@@ -423,7 +455,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
             <button
               type="button"
               onClick={handleAdd}
-              className="ml-auto rounded-control bg-signal px-6 py-3 type-body font-medium text-paper"
+              className="ml-auto btn btn-primary"
             >
               Add to cart
             </button>

@@ -1,0 +1,41 @@
+{
+  "hero": {
+    "headline": "Clean homes, made in Kerala",
+    "sub": "Seven home-care and pantry brands from Bright Blue, made in Palakkad for every Indian kitchen, wardrobe and floor.",
+    "cta_primary": "Shop all products",
+    "cta_secondary": "Explore our brands",
+    "image": "svg/hero-kitchen-scene.svg"
+  },
+  "record": {
+    "title": "24 fragrances. One record.",
+    "body": "MX-3 dishwashing liquid holds an International Book of Records title for the most fragrance variants of a dishwashing liquid — 24 in all.",
+    "image": "svg/badge-record-24.svg"
+  },
+  "categories": [
+    {"brand": "MX-3", "name": "Dish care", "line": "Grease-cutting dishwash in 24 fragrances.", "image": "svg/cat-dish.svg"},
+    {"brand": "Rafasi", "name": "Fabric care", "line": "Detergents that keep colours bright.", "image": "svg/cat-fabric.svg"},
+    {"brand": "Landfloro", "name": "Floor care", "line": "Floor cleaners for a fresh, spotless home.", "image": "svg/cat-floor.svg"},
+    {"brand": "Fairoze", "name": "Personal care", "line": "Everyday care for hands and body.", "image": "svg/cat-personal.svg"},
+    {"brand": "ANSAF", "name": "Car care", "line": "Wash, shine and protect your vehicle.", "image": "svg/cat-car.svg"},
+    {"brand": "Ilfa Valley", "name": "Tea", "line": "Strong, aromatic tea for every cup.", "image": "svg/cat-tea.svg"},
+    {"brand": "Kenzaniya", "name": "Food & grocery", "line": "Pantry staples you can trust.", "image": "svg/cat-food.svg"}
+  ],
+  "features": [
+    {"title": "Fragrances you'll notice", "body": "Scents that stay long after the wash.", "icon": "svg/icon-fragrance.svg"},
+    {"title": "Gentle on hands", "body": "Made for daily use without harshness.", "icon": "svg/icon-gentle-hands.svg"},
+    {"title": "Combos that save more", "body": "Bundle your home-care essentials and pay less.", "icon": "svg/icon-value-pack.svg"},
+    {"title": "Delivered to your door", "body": "Order online and we'll bring it to you.", "icon": "svg/icon-delivery.svg"}
+  ],
+  "about": {
+    "title": "Made in Palakkad",
+    "body": "Bright Blue Manufacturing Pvt Ltd makes every product at our own facility in Chengaram, Palakkad, so we control quality from formula to bottle.",
+    "image": "svg/made-in-kerala.svg"
+  },
+  "support": {
+    "title": "Questions? We're here.",
+    "body": "Call toll-free 1800 123 0621 or write to info@brightblue.in.",
+    "icon": "svg/icon-support.svg"
+  },
+  "newsletter": {"title": "Get offers first", "body": "New combos and discounts, straight to your inbox.", "button": "Subscribe"},
+  "decor": ["svg/pattern-bubbles.svg","svg/divider-wave.svg","svg/divider-drip.svg","svg/blob-1.svg","svg/blob-2.svg"]
+}

@@ -184,6 +184,7 @@ export async function resolveCartLines(
             imageUrl: true,
             pricePaise: true,
             isActive: true,
+            weightGrams: true,
             items: {
               // Same order the combo page picked in, so the labels in the
               // drawer line up with the pickers that produced them.
@@ -222,7 +223,10 @@ export async function resolveCartLines(
         !variant.isActive ||
         !variant.product.isActive ||
         variant.pricePaise === null ||
-        !variant.product.hsnCode
+        !variant.product.hsnCode ||
+        // Unset is not 0%: nil-rated goods carry an explicit 0, and a missing
+        // rate used to fall through as 0 — an 18% detergent sold untaxed.
+        variant.product.gstRate === null
       ) {
         unavailable.push(cartLine);
         continue;
@@ -242,7 +246,7 @@ export async function resolveCartLines(
         categoryId: variant.product.categoryId,
         productId: variant.productId,
         hsnCode: variant.product.hsnCode,
-        gstRate: variant.product.gstRate ?? 0,
+        gstRate: variant.product.gstRate!,
       });
       lineKeys.push(key);
       snapshots.push({
@@ -254,7 +258,7 @@ export async function resolveCartLines(
         choiceSnapshot: null,
         quantity: cartLine.quantity,
         hsnCode: variant.product.hsnCode,
-        gstRate: variant.product.gstRate ?? 0,
+        gstRate: variant.product.gstRate!,
         weightGrams: variant.weightGrams,
       });
       addWeight(variant.weightGrams, cartLine.quantity);
@@ -284,7 +288,11 @@ export async function resolveCartLines(
     // if the missing component was never part of the combo at all. Matches
     // the VARIANT branch above: one untaxable item makes the whole line
     // unavailable, not just that item.
-    if (resolved.units.some((unit) => !unit.variant.product.hsnCode)) {
+    if (
+      resolved.units.some(
+        (unit) => !unit.variant.product.hsnCode || unit.variant.product.gstRate === null,
+      )
+    ) {
       unavailable.push(cartLine);
       continue;
     }
@@ -301,6 +309,15 @@ export async function resolveCartLines(
     const packageTotal = combo.pricePaise * cartLine.quantity;
     const weights = resolved.units.map((unit) => (unit.variant.pricePaise ?? 0) * unit.units);
     const shares = distributeProportionally(packageTotal, weights);
+
+    // A combo with its own packed weight spreads it across its units, rounded
+    // up, so every weight sum downstream — the rate here, the Shiprocket
+    // declaration later — sees the carton rather than the loose items.
+    const unitsPerPackage = resolved.units.reduce((sum, unit) => sum + unit.units, 0);
+    const comboUnitGrams =
+      combo.weightGrams !== null && unitsPerPackage > 0
+        ? Math.ceil(combo.weightGrams / unitsPerPackage)
+        : null;
 
     resolved.units.forEach((unit, index) => {
       // No `share <= 0` early return: a component with a null/zero price (a
@@ -322,7 +339,7 @@ export async function resolveCartLines(
         categoryId: variant.product.categoryId,
         productId: variant.productId,
         hsnCode: variant.product.hsnCode!,
-        gstRate: variant.product.gstRate ?? 0,
+        gstRate: variant.product.gstRate!,
       });
       lineKeys.push(key);
       snapshots.push({
@@ -334,10 +351,10 @@ export async function resolveCartLines(
         choiceSnapshot,
         quantity: physical,
         hsnCode: variant.product.hsnCode!,
-        gstRate: variant.product.gstRate ?? 0,
-        weightGrams: variant.weightGrams,
+        gstRate: variant.product.gstRate!,
+        weightGrams: comboUnitGrams ?? variant.weightGrams,
       });
-      addWeight(variant.weightGrams, physical);
+      addWeight(comboUnitGrams ?? variant.weightGrams, physical);
     });
   }
 

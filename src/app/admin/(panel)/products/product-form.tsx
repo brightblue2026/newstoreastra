@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
 import { useFormStatus } from 'react-dom';
 import type { ProductFormState } from './actions';
 import { VariantRowsField } from './variant-rows-field';
@@ -98,12 +99,12 @@ export function ProductForm({
   /** Renders the bulk variant-row section — only on the create screen. See `variant-rows.ts`. */
   showVariantRows?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, {} as ProductFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as ProductFormState);
   const values = initialValues ?? EMPTY_VALUES;
   const [isFoodProduct, setIsFoodProduct] = useState(values.isFoodProduct);
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"

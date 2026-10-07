@@ -6,18 +6,20 @@ import { OrderStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
 import { recordAudit } from '@/lib/audit';
 import { requireOrderAccess } from '@/lib/session';
-import { readCheckoutSettings } from '@/lib/settings';
 import { transitionOrder, type TransitionResult } from '@/lib/orders';
 import { notifyOrderEvent } from '@/lib/notifications';
-import { totalWeightGrams } from '@/lib/shipping';
 import {
   assignAwb,
+  cancelShiprocketOrder,
   generateLabel,
   isShiprocketConfigured,
-  pushOrder,
   trackingUrlFor,
 } from '@/lib/shiprocket';
-import type { OrderAddressSnapshot } from '@/lib/orders';
+import {
+  NOT_CONFIGURED,
+  pushOrderToShiprocket,
+  schedulePickupAndManifest,
+} from '@/lib/shiprocket-fulfilment';
 
 /**
  * Moves CONFIRMED → PACKED → SHIPPED, recording the PACKED step for real when
@@ -38,14 +40,12 @@ async function ensureShippedViaPacked(
 }
 
 /*
-  Fulfilment — the three buttons a member of staff presses, in order:
-  push the order to Shiprocket, get an AWB, print the label.
-
-  Kept as separate actions rather than one "ship it" button because each can
-  fail independently against a third party, and a single button that did all
-  three would leave staff unable to tell which step needs retrying. Each is
-  idempotent: pushing an already-pushed order returns the existing ids rather
-  than creating a second shipment.
+  Fulfilment. The everyday path is one button, `shipWithShiprocket`: create
+  the shipment if the automatic push has not, assign an AWB, book the pickup,
+  fetch the manifest and the label. Every step is idempotent and cached on the
+  order, so when one fails against Shiprocket, pressing Ship again resumes
+  from that step — and the message names the step that stopped. The single
+  steps stay exported for the manual retries on the order page.
 
   §6 puts fulfilment squarely in STAFF's remit — "view orders, update
   fulfilment, print invoices and labels" — so `requireOrderAccess` is the guard
@@ -56,126 +56,18 @@ const orderIdSchema = z.object({ orderId: z.string().min(1) });
 
 export type FulfilmentResult = { ok: true; message: string } | { ok: false; error: string };
 
-const NOT_CONFIGURED =
-  'Shiprocket is not connected on this deployment. Add SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD, or enter the AWB by hand.';
-
 /**
- * Create the shipment in Shiprocket.
- *
- * Only for an order that is CONFIRMED or later — pushing a PENDING_PAYMENT
- * order would ask a courier to collect something that may never be paid for.
+ * Create the shipment in Shiprocket. Usually already done by the automatic
+ * push on confirmation; this is the button for when that is off or failed.
  */
 export async function pushToShiprocket(input: unknown): Promise<FulfilmentResult> {
   const user = await requireOrderAccess();
   const parsed = orderIdSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'That is not a valid order.' };
 
-  if (!isShiprocketConfigured()) return { ok: false, error: NOT_CONFIGURED };
-
-  const order = await db.order.findUnique({
-    where: { id: parsed.data.orderId },
-    include: { items: true },
-  });
-
-  if (!order) return { ok: false, error: 'That order no longer exists.' };
-
-  if (order.status === OrderStatus.PENDING_PAYMENT) {
-    return {
-      ok: false,
-      error: 'This order has not been paid for yet. It cannot be handed to a courier.',
-    };
-  }
-  if (order.shiprocketOrderId && order.shiprocketShipmentId) {
-    return { ok: true, message: `Already pushed as shipment ${order.shiprocketShipmentId}.` };
-  }
-
-  const settings = await readCheckoutSettings();
-  if (!settings.shipping.shiprocketPickupLocation) {
-    return {
-      ok: false,
-      error:
-        'No Shiprocket pickup location is set. Enter the pickup point’s name from the Shiprocket dashboard in Settings.',
-    };
-  }
-
-  const address = order.shippingAddress as unknown as OrderAddressSnapshot;
-
-  // The same weight the order was rated on, recomputed from the item snapshots
-  // rather than stored — `weightGrams` is not on `Order`, and a variant's
-  // weight can have changed since. The courier weighs the parcel anyway; this
-  // is a declaration, not a charge.
-  const variants = await db.productVariant.findMany({
-    where: {
-      id: { in: order.items.map((i) => i.variantId).filter((id): id is string => Boolean(id)) },
-    },
-    select: { id: true, weightGrams: true },
-  });
-  const weightById = new Map(variants.map((v) => [v.id, v.weightGrams]));
-
-  const weightGrams = totalWeightGrams(
-    order.items.map((item) => ({
-      quantity: item.quantity,
-      weightGrams: item.variantId ? (weightById.get(item.variantId) ?? null) : null,
-    })),
-    settings.shipping,
-  );
-
-  const pushed = await pushOrder({
-    orderNumber: order.orderNumber,
-    placedAt: order.createdAt,
-    pickupLocationName: settings.shipping.shiprocketPickupLocation,
-
-    customerName: address?.fullName ?? 'Customer',
-    email: order.guestEmail,
-    phone: address?.phone ?? order.guestPhone ?? '',
-    addressLine1: address?.line1 ?? '',
-    addressLine2: address?.line2 ?? null,
-    city: address?.city ?? '',
-    state: address?.state ?? '',
-    pincode: address?.pincode ?? '',
-
-    items: order.items.map((item) => ({
-      name: item.nameSnapshot,
-      sku: item.skuSnapshot,
-      quantity: item.quantity,
-      unitPricePaise: item.unitPricePaise,
-      hsnCode: item.hsnCode,
-    })),
-    subtotalPaise: order.subtotalPaise,
-    shippingPaise: order.shippingPaise,
-    discountPaise: order.discountPaise,
-    codAmountPaise: order.paymentMethod === 'COD' ? order.totalPaise : 0,
-    paymentMethod: order.paymentMethod,
-    weightGrams,
-  });
-
-  if (!pushed) {
-    return {
-      ok: false,
-      error:
-        'Shiprocket did not accept the order. The details are in the server log — check the pickup location name first, it is the usual cause.',
-    };
-  }
-
-  await db.order.update({
-    where: { id: order.id },
-    data: {
-      shiprocketOrderId: pushed.shiprocketOrderId,
-      shiprocketShipmentId: pushed.shipmentId,
-    },
-  });
-
-  await recordAudit({
-    userId: user.id,
-    action: 'update',
-    entityType: 'Order',
-    entityId: order.id,
-    before: { shiprocketShipmentId: order.shiprocketShipmentId },
-    after: { shiprocketShipmentId: pushed.shipmentId },
-  });
-
-  revalidatePath(`/admin/orders/${order.id}`);
-  return { ok: true, message: `Pushed to Shiprocket as shipment ${pushed.shipmentId}.` };
+  const result = await pushOrderToShiprocket(parsed.data.orderId, user.id);
+  revalidatePath(`/admin/orders/${parsed.data.orderId}`);
+  return result;
 }
 
 /**
@@ -205,6 +97,18 @@ export async function assignAwbAndShip(input: unknown): Promise<FulfilmentResult
   if (!order) return { ok: false, error: 'That order no longer exists.' };
   if (!order.shiprocketShipmentId) {
     return { ok: false, error: 'Push this order to Shiprocket first.' };
+  }
+
+  // Already shipped on this AWB: nothing to move and, above all, nothing to
+  // tell the customer twice. This is what makes the Ship button safe to press
+  // again after a later step failed.
+  const shippedOrLater: OrderStatus[] = [
+    OrderStatus.SHIPPED,
+    OrderStatus.DELIVERED,
+    OrderStatus.RETURNED,
+  ];
+  if (order.awbNumber && shippedOrLater.includes(order.status)) {
+    return { ok: true, message: `Shipped on AWB ${order.awbNumber}.` };
   }
 
   let awbNumber = order.awbNumber;
@@ -345,4 +249,106 @@ export async function recordManualAwb(input: unknown): Promise<FulfilmentResult>
 
   revalidatePath(`/admin/orders/${order.id}`);
   return { ok: true, message: `Recorded AWB ${awbNumber}. The customer has been told.` };
+}
+
+/**
+ * The one "Ship" button: every remaining Shiprocket step, in order. Stops at
+ * the first step that fails and says which one, so pressing it again resumes
+ * there — every step before it is cached on the order.
+ */
+export async function shipWithShiprocket(
+  input: unknown,
+): Promise<FulfilmentResult & { labelUrl?: string }> {
+  await requireOrderAccess();
+  const parsed = orderIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'That is not a valid order.' };
+  if (!isShiprocketConfigured()) return { ok: false, error: NOT_CONFIGURED };
+  const { orderId } = parsed.data;
+
+  const pushed = await pushToShiprocket({ orderId });
+  if (!pushed.ok) return { ok: false, error: `Step 1 of 4, create shipment: ${pushed.error}` };
+
+  const shipped = await assignAwbAndShip({ orderId });
+  if (!shipped.ok) return { ok: false, error: `Step 2 of 4, assign AWB: ${shipped.error}` };
+
+  const pickup = await schedulePickupAndManifest(orderId);
+  if (!pickup.ok) {
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: false, error: `Step 3 of 4, book pickup: ${pickup.error}` };
+  }
+
+  const label = await fetchLabel({ orderId });
+  if (!label.ok) return { ok: false, error: `Step 4 of 4, label: ${label.error}` };
+
+  revalidatePath(`/admin/orders/${orderId}`);
+  return {
+    ok: true,
+    message: `${shipped.message} ${pickup.message} Print the label and hand the parcel over.`,
+    ...(label.url ? { labelUrl: label.url } : {}),
+  };
+}
+
+/** Book the courier collection and fetch the manifest — the retry for step 3. */
+export async function bookPickup(input: unknown): Promise<FulfilmentResult> {
+  await requireOrderAccess();
+  const parsed = orderIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'That is not a valid order.' };
+  if (!isShiprocketConfigured()) return { ok: false, error: NOT_CONFIGURED };
+
+  const result = await schedulePickupAndManifest(parsed.data.orderId);
+  revalidatePath(`/admin/orders/${parsed.data.orderId}`);
+  return result;
+}
+
+/**
+ * Cancel the order in Shiprocket and forget its shipment here, so it can be
+ * pushed again or shipped by hand. For test orders above all — Shiprocket has
+ * no sandbox. The store's own order status is not touched; cancel or refund
+ * the order itself separately if that is what is meant.
+ */
+export async function cancelInShiprocket(input: unknown): Promise<FulfilmentResult> {
+  const user = await requireOrderAccess();
+  const parsed = orderIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'That is not a valid order.' };
+  if (!isShiprocketConfigured()) return { ok: false, error: NOT_CONFIGURED };
+
+  const order = await db.order.findUnique({
+    where: { id: parsed.data.orderId },
+    select: { id: true, status: true, shiprocketOrderId: true, awbNumber: true },
+  });
+  if (!order) return { ok: false, error: 'That order no longer exists.' };
+  if (!order.shiprocketOrderId) return { ok: false, error: 'This order is not in Shiprocket.' };
+  if (order.status === OrderStatus.DELIVERED) {
+    return { ok: false, error: 'This order has been delivered. It cannot be cancelled in Shiprocket.' };
+  }
+
+  const cancelled = await cancelShiprocketOrder(order.shiprocketOrderId);
+  if (!cancelled.ok) return { ok: false, error: `Shiprocket did not cancel it: ${cancelled.error}` };
+
+  await db.order.update({
+    where: { id: order.id },
+    data: {
+      shiprocketOrderId: null,
+      shiprocketShipmentId: null,
+      shiprocketError: null,
+      awbNumber: null,
+      courierName: null,
+      trackingUrl: null,
+      labelUrl: null,
+      manifestUrl: null,
+      pickupRequestedAt: null,
+    },
+  });
+
+  await recordAudit({
+    userId: user.id,
+    action: 'update',
+    entityType: 'Order',
+    entityId: order.id,
+    before: { shiprocketOrderId: order.shiprocketOrderId, awbNumber: order.awbNumber },
+    after: { shiprocketOrderId: null, awbNumber: null },
+  });
+
+  revalidatePath(`/admin/orders/${order.id}`);
+  return { ok: true, message: 'Cancelled in Shiprocket. Any AWB charge goes back to the wallet.' };
 }

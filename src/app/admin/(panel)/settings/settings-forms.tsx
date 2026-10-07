@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
 import { useFormStatus } from 'react-dom';
 import {
   saveCodSettingsAction,
   saveSellerEntityAction,
   saveShippingSettingsAction,
+  saveShiprocketSettingsAction,
   type SettingsFormState,
 } from './actions';
 
@@ -82,10 +83,11 @@ export function SellerEntityForm({
   currentEntityId: string | null;
   currentGstin: string | null;
 }) {
-  const [state, action] = useActionState<SettingsFormState, FormData>(saveSellerEntityAction, {});
+  const [state, action, , formRef] = useFormActionKeepingInput<SettingsFormState>(
+    saveSellerEntityAction, {});
 
   return (
-    <form action={action} className="max-w-xl space-y-6">
+    <form ref={formRef} action={action} className="max-w-xl space-y-6">
       <Field
         label="Seller of record"
         hint="The entity that appears on every invoice. Exactly one — choosing here clears it everywhere else."
@@ -132,10 +134,11 @@ export function CodSettingsForm({
   maxOrderRupees: string;
   pincodeAllowlist: string[];
 }) {
-  const [state, action] = useActionState<SettingsFormState, FormData>(saveCodSettingsAction, {});
+  const [state, action, , formRef] = useFormActionKeepingInput<SettingsFormState>(
+    saveCodSettingsAction, {});
 
   return (
-    <form action={action} className="max-w-xl space-y-6">
+    <form ref={formRef} action={action} className="max-w-xl space-y-6">
       <label className="flex items-start gap-3">
         <input type="checkbox" name="enabled" defaultChecked={enabled} className="mt-1" />
         <span>
@@ -200,7 +203,7 @@ export function ShippingSettingsForm({
   defaultUnitGrams: number;
   serviceablePincodePrefixes: string[];
 }) {
-  const [state, action] = useActionState<SettingsFormState, FormData>(
+  const [state, action, , formRef] = useFormActionKeepingInput<SettingsFormState>(
     saveShippingSettingsAction,
     {},
   );
@@ -211,7 +214,7 @@ export function ShippingSettingsForm({
   const rows = Array.from({ length: SLAB_ROWS }, (_, index) => slabs[index]);
 
   return (
-    <form action={action} className="max-w-xl space-y-6">
+    <form ref={formRef} action={action} className="max-w-xl space-y-6">
       <fieldset>
         <legend className="type-caption text-ink-soft">
           Weight slabs — the narrowest slab that holds the order wins
@@ -280,7 +283,7 @@ export function ShippingSettingsForm({
 
       <Field
         label="Pincodes we deliver to"
-        hint="Prefixes allowed. Empty means everywhere. Replaced by a live Shiprocket check in Phase 6, and kept as the fallback."
+        hint="Prefixes allowed. Empty means everywhere. With live rates on, Shiprocket decides instead and this list is the fallback."
       >
         <textarea
           name="serviceablePincodePrefixes"
@@ -292,6 +295,120 @@ export function ShippingSettingsForm({
 
       <Result state={state} />
       <SubmitButton label="Save delivery rates" />
+    </form>
+  );
+}
+
+export interface PickupOption {
+  name: string;
+  pincode: string;
+  city: string;
+  verified: boolean;
+}
+
+/**
+ * `locations` is null when Shiprocket could not be asked — then the pickup
+ * name is typed, exactly as it appears in the Shiprocket dashboard. When it
+ * could, the admin picks from the account's real pickup points instead.
+ */
+export function ShiprocketSettingsForm({
+  locations,
+  pickupLocation,
+  originPincode,
+  preferLiveRates,
+  autoPushOrders,
+}: {
+  locations: PickupOption[] | null;
+  pickupLocation: string;
+  originPincode: string;
+  preferLiveRates: boolean;
+  autoPushOrders: boolean;
+}) {
+  const [state, action, , formRef] = useFormActionKeepingInput<SettingsFormState>(
+    saveShiprocketSettingsAction,
+    {},
+  );
+
+  return (
+    <form ref={formRef} action={action} className="max-w-xl space-y-6">
+      {locations ? (
+        <Field
+          label="Pickup location"
+          hint="Where the courier collects parcels. Its pincode is filled in from Shiprocket when you save."
+        >
+          <select
+            name="shiprocketPickupLocation"
+            defaultValue={pickupLocation}
+            className={inputClass}
+          >
+            <option value="">Not chosen</option>
+            {locations.map((location) => (
+              <option key={location.name} value={location.name}>
+                {`${location.name} — ${location.city} ${location.pincode}`}
+                {location.verified ? '' : ' (phone not verified in Shiprocket)'}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : (
+        <Field
+          label="Pickup location name"
+          hint="Exactly as it appears under Settings → Pickup addresses in the Shiprocket dashboard."
+        >
+          <input
+            name="shiprocketPickupLocation"
+            defaultValue={pickupLocation}
+            className={inputClass}
+          />
+        </Field>
+      )}
+
+      <Field label="Pickup pincode" hint="Six digits. Used to ask for live delivery rates.">
+        <input
+          name="originPincode"
+          defaultValue={originPincode}
+          inputMode="numeric"
+          maxLength={6}
+          className={`${inputClass} type-mono`}
+        />
+      </Field>
+
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          name="preferLiveRates"
+          defaultChecked={preferLiveRates}
+          className="mt-1"
+        />
+        <span>
+          <span className="block type-body">Charge live Shiprocket rates at checkout</span>
+          <span className="mt-1 block type-caption text-ink-soft">
+            Off: customers pay the slab table above. On: they pay the cheapest courier&rsquo;s
+            rate, and the slab table is used whenever Shiprocket does not answer. Compare the
+            two on a few real orders before switching this on.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          name="autoPushOrders"
+          defaultChecked={autoPushOrders}
+          className="mt-1"
+        />
+        <span>
+          <span className="block type-body">Send confirmed orders to Shiprocket automatically</span>
+          <span className="mt-1 block type-caption text-ink-soft">
+            Each order appears in Shiprocket as soon as it is paid, or placed as cash on delivery.
+            Nothing is charged until you press Ship on the order. Shiprocket has no test mode, so
+            cancel any test order in Shiprocket straight away.
+          </span>
+        </span>
+      </label>
+
+      <Result state={state} />
+      <SubmitButton label="Save Shiprocket settings" />
     </form>
   );
 }

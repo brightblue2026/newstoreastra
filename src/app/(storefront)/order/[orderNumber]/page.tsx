@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Suspense } from 'react';
+import PaymentStatusRefresh from '@/components/PaymentStatusRefresh';
+import ShipmentTracking from '@/components/ShipmentTracking';
 import { CONTACT } from '@/lib/contact';
 import { formatINR } from '@/lib/money';
 import { formatRate } from '@/lib/gst';
@@ -90,11 +93,12 @@ export default async function OrderPage({
         {awaitingPayment
           ? payment === 'submitted'
             ? 'Thank you. We are confirming the payment with the bank — this page updates once it clears, usually within a minute.'
-            : 'This order is waiting for payment. Nothing has been charged yet.'
+            : 'This order is waiting for payment. If you have already paid, it will update here within a few minutes.'
           : `Thank you. We have your order and will send updates to ${
               order.shippingAddress?.phone ?? 'your mobile'
             } on WhatsApp.`}
       </p>
+      {awaitingPayment && payment === 'submitted' && <PaymentStatusRefresh />}
 
       <dl className="mt-12 grid gap-6 sm:grid-cols-3">
         <Fact label="Order number" value={order.orderNumber} mono />
@@ -151,7 +155,7 @@ export default async function OrderPage({
         </ul>
       </section>
 
-      <div className="mt-16 grid gap-12 sm:grid-cols-2">
+      <div className="mt-16 grid grid-cols-1 gap-12 sm:grid-cols-2">
         <section>
           <h2 className="type-subhead">Delivering to</h2>
           {order.shippingAddress ? (
@@ -189,6 +193,11 @@ export default async function OrderPage({
               )}
             </p>
           )}
+          {order.awbNumber && order.status === OrderStatus.SHIPPED && (
+            <Suspense fallback={null}>
+              <ShipmentTracking awbNumber={order.awbNumber} />
+            </Suspense>
+          )}
         </section>
 
         <section>
@@ -217,37 +226,39 @@ export default async function OrderPage({
               catalogue spans 18%, 12%, 5% and nil-rated goods, so one blended
               rate would be a fiction. */}
           {order.taxRows.length > 0 && (
-            <table className="mt-6 w-full type-caption">
-              <caption className="text-left type-caption text-ink-soft">
-                GST included, by HSN ({order.intraState ? 'CGST + SGST' : 'IGST'})
-              </caption>
-              <thead>
-                <tr className="border-b border-line text-left text-ink-soft">
-                  <th scope="col" className="py-2 font-normal">
-                    HSN
-                  </th>
-                  <th scope="col" className="py-2 font-normal">
-                    Rate
-                  </th>
-                  <th scope="col" className="py-2 text-right font-normal">
-                    Taxable
-                  </th>
-                  <th scope="col" className="py-2 text-right font-normal">
-                    Tax
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.taxRows.map((row) => (
-                  <tr key={`${row.hsn}-${row.rate}`} className="border-b border-line">
-                    <td className="py-2 type-mono">{row.hsn}</td>
-                    <td className="py-2">{formatRate(row.rate)}</td>
-                    <td className="py-2 text-right tabular-nums">{formatINR(row.taxablePaise)}</td>
-                    <td className="py-2 text-right tabular-nums">{formatINR(row.taxPaise)}</td>
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full type-caption">
+                <caption className="text-left type-caption text-ink-soft">
+                  GST included, by HSN ({order.intraState ? 'CGST + SGST' : 'IGST'})
+                </caption>
+                <thead>
+                  <tr className="border-b border-line text-left text-ink-soft">
+                    <th scope="col" className="py-2 font-normal">
+                      HSN
+                    </th>
+                    <th scope="col" className="py-2 font-normal">
+                      Rate
+                    </th>
+                    <th scope="col" className="py-2 text-right font-normal">
+                      Taxable
+                    </th>
+                    <th scope="col" className="py-2 text-right font-normal">
+                      Tax
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {order.taxRows.map((row) => (
+                    <tr key={`${row.hsn}-${row.rate}`} className="border-b border-line">
+                      <td className="py-2 type-mono">{row.hsn}</td>
+                      <td className="py-2">{formatRate(row.rate)}</td>
+                      <td className="py-2 text-right tabular-nums">{formatINR(row.taxablePaise)}</td>
+                      <td className="py-2 text-right tabular-nums">{formatINR(row.taxPaise)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>
@@ -315,7 +326,7 @@ function Unlock({ orderNumber, denied }: { orderNumber: string; denied: boolean 
 
         <button
           type="submit"
-          className="rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift"
+          className="btn btn-primary px-8 py-4"
         >
           Show my order
         </button>

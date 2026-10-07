@@ -64,10 +64,15 @@ export default function CartContents() {
   if (lines.length === 0) {
     return (
       <CartLine>
-        <p className="type-body text-ink-soft">Your cart is empty.</p>
-        <Link href="/shop" className="mt-4 inline-block type-body underline">
-          Browse the catalogue
-        </Link>
+        <div className="py-12 text-center">
+          <p className="type-heading">Your cart is empty</p>
+          <p className="mx-auto mt-3 max-w-xs type-body text-ink-soft">
+            Eight houses, one factory in Kerala. Start with the catalogue.
+          </p>
+          <Link href="/shop" className="mt-8 btn btn-primary">
+            Browse the catalogue
+          </Link>
+        </div>
       </CartLine>
     );
   }
@@ -86,7 +91,21 @@ export default function CartContents() {
   if (view === null) {
     return (
       <CartLine>
-        <p className="type-body text-ink-soft">Pricing your cart…</p>
+        <span className="sr-only" role="status">
+          Pricing your cart…
+        </span>
+        {/* Shaped like the lines about to arrive, so nothing jumps. */}
+        <div aria-hidden="true" className="space-y-6">
+          {lines.map((_, index) => (
+            <div key={index} className="flex gap-4">
+              <div className="size-16 shrink-0 rounded-control skeleton" />
+              <div className="flex-1 space-y-2 pt-1">
+                <div className="h-4 w-3/4 rounded-full skeleton" />
+                <div className="h-3 w-1/3 rounded-full skeleton" />
+              </div>
+            </div>
+          ))}
+        </div>
       </CartLine>
     );
   }
@@ -119,7 +138,7 @@ export default function CartContents() {
                             ? `/combos/${line.slug}`
                             : `/products/${line.slug}`
                         }
-                        className="hover:underline"
+                        className="link-underline"
                       >
                         {line.name}
                       </Link>
@@ -145,7 +164,7 @@ export default function CartContents() {
                         type="button"
                         onClick={() => setQuantity(line.key, line.quantity - 1)}
                         aria-label={`Decrease quantity of ${line.name}`}
-                        className="px-3 py-1 type-body text-ink-soft hover:text-ink"
+                        className="tap-target px-3 py-1 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
                       >
                         &minus;
                       </button>
@@ -156,7 +175,7 @@ export default function CartContents() {
                         type="button"
                         onClick={() => setQuantity(line.key, line.quantity + 1)}
                         aria-label={`Increase quantity of ${line.name}`}
-                        className="px-3 py-1 type-body text-ink-soft hover:text-ink"
+                        className="tap-target px-3 py-1 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
                       >
                         +
                       </button>
@@ -165,7 +184,7 @@ export default function CartContents() {
                     <button
                       type="button"
                       onClick={() => removeLine(line.key)}
-                      className="type-caption text-ink-soft hover:text-ink"
+                      className="tap-target link-underline type-caption text-ink-soft motion-accent hover:text-warning"
                     >
                       Remove
                     </button>
@@ -210,7 +229,7 @@ export default function CartContents() {
         )}
       </div>
 
-      <div className="sticky bottom-0 mt-4 border-t border-line bg-paper pt-4">
+      <div className="sticky bottom-0 mt-4 border-t border-line bg-paper pt-4 pb-safe">
         {view.freeShippingProgress && view.freeShippingProgress.remainingPaise > 0 && (
           <div className="mb-4">
             <p className="type-caption text-ink-soft">
@@ -224,7 +243,7 @@ export default function CartContents() {
               aria-valuenow={view.subtotalPaise}
             >
               <div
-                className="h-full bg-signal"
+                className="h-full bg-signal transition-[width] duration-(--bb-duration-reveal) ease-(--bb-ease-out)"
                 style={{
                   width: `${Math.min(
                     100,
@@ -267,7 +286,7 @@ export default function CartContents() {
                   setDiscountCode(null);
                   setCodeDraft('');
                 }}
-                className="type-caption underline"
+                className="tap-target type-caption underline"
               >
                 Remove
               </button>
@@ -293,12 +312,12 @@ export default function CartContents() {
                 autoComplete="off"
                 autoCapitalize="characters"
                 spellCheck={false}
-                className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 type-caption uppercase placeholder:normal-case placeholder:text-ink-soft"
+                className="min-h-11 min-w-0 flex-1 rounded-control border border-line px-3 py-2 type-body uppercase placeholder:normal-case placeholder:text-ink-soft"
               />
               <button
                 type="submit"
                 disabled={codeDraft.trim().length === 0}
-                className="rounded-control border border-ink px-4 py-2 type-caption disabled:opacity-40"
+                className="tap-target rounded-control border border-ink px-4 py-2 type-caption disabled:opacity-40"
               >
                 Apply
               </button>
@@ -337,7 +356,7 @@ export default function CartContents() {
         <Link
           href="/checkout"
           aria-disabled={view.lines.length === 0}
-          className={`mt-4 block rounded-control bg-signal px-8 py-4 text-center type-body font-medium text-paper motion-lift ${
+          className={`mt-4 w-full btn btn-primary px-8 py-4 ${
             view.lines.length === 0 ? 'pointer-events-none opacity-50' : ''
           }`}
         >

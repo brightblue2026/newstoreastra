@@ -4,6 +4,7 @@ import { OrderStatus, PaymentStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
 import { transitionOrder } from '@/lib/orders';
 import { notifyOrderEvent } from '@/lib/notifications';
+import { autoPushOrder } from '@/lib/shiprocket-fulfilment';
 import { verifyWebhookSignature } from '@/lib/razorpay';
 import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 
@@ -41,8 +42,17 @@ import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 export const runtime = 'nodejs'; // node:crypto and Prisma, not the edge.
 export const dynamic = 'force-dynamic';
 
-/** Events worth acting on. Everything else is acknowledged and ignored. */
-const PAID_EVENTS = new Set(['payment.captured', 'payment.authorized', 'order.paid']);
+/**
+ * Events worth acting on. Everything else is acknowledged and ignored.
+ *
+ * `payment.authorized` is deliberately absent: an authorised payment is not
+ * money received. On an account set to manual capture it is refunded to the
+ * customer after a few days unless someone captures it, so confirming on it
+ * would ship goods against a payment that may never land. With auto-capture
+ * (Razorpay's default, and what this store expects) `payment.captured`
+ * follows within seconds.
+ */
+const PAID_EVENTS = new Set(['payment.captured', 'order.paid']);
 const FAILED_EVENTS = new Set(['payment.failed']);
 
 const razorpayWebhookSchema = z.object({
@@ -55,6 +65,8 @@ const razorpayWebhookSchema = z.object({
             .object({
               id: z.string().optional(),
               order_id: z.string().optional(),
+              amount: z.number().optional(),
+              currency: z.string().optional(),
               status: z.string().optional(),
               error_description: z.string().optional(),
             })
@@ -133,7 +145,14 @@ export async function POST(request: Request) {
       where: razorpayPaymentId
         ? { OR: [{ razorpayPaymentId }, { razorpayOrderId }] }
         : { razorpayOrderId },
-      select: { id: true, orderNumber: true, status: true, paymentStatus: true },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        paymentStatus: true,
+        totalPaise: true,
+        notes: true,
+      },
     });
 
     if (!order) {
@@ -156,6 +175,52 @@ export async function POST(request: Request) {
         });
       }
       return NextResponse.json({ received: true, order: order.orderNumber, status: 'failed' });
+    }
+
+    /*
+      The Razorpay order was created for exactly `totalPaise`, so a payment
+      against it cannot be for anything else. Checked anyway: confirming an
+      order on a payment that does not cover it must never pass silently.
+    */
+    if (
+      payment &&
+      ((payment.amount !== undefined && payment.amount !== order.totalPaise) ||
+        (payment.currency !== undefined && payment.currency !== 'INR'))
+    ) {
+      console.error(
+        '[razorpay] payment does not match',
+        order.orderNumber,
+        `paid ${payment.amount} ${payment.currency}, order total ${order.totalPaise} INR`,
+      );
+      return NextResponse.json({ received: true, ignored: 'amount mismatch' });
+    }
+
+    if (order.status === OrderStatus.CANCELLED && order.paymentStatus !== PaymentStatus.PAID) {
+      /*
+        Money arrived for an order already cancelled — almost always one the
+        stale-order cron released while the customer was still inside their
+        UPI app. Its stock hold is gone, so it cannot simply be confirmed. It
+        is recorded as paid and flagged, so the admin order list shows a
+        "cancelled · paid" row someone has to act on — refund it from the
+        Razorpay dashboard, then mark it refunded — instead of the payment
+        disappearing into an "already handled" reply.
+      */
+      const lateNote = `Payment${razorpayPaymentId ? ` ${razorpayPaymentId}` : ''} was received after this order was cancelled. Refund it from the Razorpay dashboard, or call the customer.`;
+      await db.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: PaymentStatus.PAID,
+          ...(razorpayPaymentId ? { razorpayPaymentId } : {}),
+          // Appended, never replaced — the customer's delivery notes live here too.
+          notes: [order.notes, lateNote].filter(Boolean).join('\n\n'),
+        },
+      });
+      console.error('[razorpay] payment received for cancelled order', order.orderNumber);
+      return NextResponse.json({
+        received: true,
+        order: order.orderNumber,
+        status: 'paid after cancellation',
+      });
     }
 
     if (order.status !== OrderStatus.PENDING_PAYMENT) {
@@ -196,6 +261,9 @@ export async function POST(request: Request) {
       being killed when the serverless function freezes.
     */
     after(() => notifyOrderEvent({ orderId: order.id, event: 'CONFIRMED' }));
+    // Paid, so it can go to the courier. Here — never on the thank-you page,
+    // which a customer can close before it loads. Never throws.
+    after(() => autoPushOrder(order.id));
 
     console.info('[razorpay] confirmed', order.orderNumber);
     return NextResponse.json({ received: true, order: order.orderNumber, status: 'confirmed' });

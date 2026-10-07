@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   },
   description: SITE_DESCRIPTION,
   // No `images` entry yet — there is no real brand/OG asset in `public/`
-  // (Cloudinary upload isn't built), and a broken image link in a social
+  // (image upload isn't built), and a broken image link in a social
   // preview is worse than no preview at all. Add one here once a real
   // og-image exists.
   openGraph: {
@@ -65,6 +65,10 @@ const organizationJsonLd = {
 export const viewport: Viewport = {
   // BBTC's own declared theme colour, and the page background.
   themeColor: '#faf7f2',
+  // Draw edge to edge on notched phones; `globals.css` pads the body, and
+  // `pb-safe` / `safe-x` the fixed bars, so nothing lands under a notch or
+  // the home indicator.
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({

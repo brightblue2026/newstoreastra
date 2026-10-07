@@ -6,6 +6,12 @@ import PinnedSteps from '@/components/PinnedSteps';
 import ProductCard from '@/components/ProductCard';
 import MagneticButton from '@/components/MagneticButton';
 import HouseSpectrum from '@/components/HouseSpectrum';
+import HeroScene from '@/components/art/HeroScene';
+import RecordSeal from '@/components/art/RecordSeal';
+import StoryScene from '@/components/art/StoryScene';
+import FeatureIcon, { type FeatureIconName } from '@/components/art/FeatureIcon';
+import { CONTACT } from '@/lib/contact';
+import { isRazorpayConfigured } from '@/lib/razorpay';
 import { getContent } from '@/lib/content';
 import { getBrands, getFeaturedCombos, getFeaturedProducts } from '@/lib/storefront';
 import { formatPrice } from '@/lib/money';
@@ -49,26 +55,67 @@ export default async function HomePage() {
 
   // The pinned sequence is photography-led — three captions beside an empty
   // frame is worse than no section. It appears once every step has real art.
+  // "Combos that save more" only while there are combos to point at, and
+  // online payment only once Razorpay's keys are set — the same check the
+  // checkout uses. Otherwise the slot says something that is always true.
+  const features: Array<{ icon: FeatureIconName; title: string; body: string }> = [
+    {
+      icon: 'fragrance',
+      title: 'Fragrances you’ll notice',
+      body: 'Scents that stay long after the wash. MX-3 alone comes in 24.',
+    },
+    {
+      icon: 'certified',
+      title: 'An ISO 9001:2015 company',
+      body: 'Made under a certified quality system, from formula to bottle.',
+    },
+    combos.length > 0
+      ? {
+          icon: 'combo',
+          title: 'Combos that save more',
+          body: 'Bundle your home-care essentials and pay less.',
+        }
+      : isRazorpayConfigured()
+        ? {
+            icon: 'payment',
+            title: 'Secure online payment',
+            body: 'Checkout is handled by Razorpay, so card details never touch this site.',
+          }
+        : {
+            icon: 'maker',
+            title: 'Straight from the maker',
+            body: 'Every order here comes from Bright Blue itself, not a reseller.',
+          },
+    {
+      icon: 'delivery',
+      title: 'Delivered to your door',
+      body: 'Order online and we’ll ship it to you.',
+    },
+  ];
+
   const steps = stepsBlock.steps.filter((step) => step.img.length > 0);
   const showSteps = steps.length === stepsBlock.steps.length && steps.length > 0;
 
   return (
     <>
-      {/* 01 — brand pills */}
+      {/* 01 — brand pills. One swipeable row on a phone: nine pills wrapped
+          into five rows pushed the headline half a screen down, and a wrapped
+          row re-flowed — jolting everything below it — when the brand font
+          arrived a second or two after first paint. */}
       {brands.length > 0 && (
         <Reveal
-          className="mx-auto flex max-w-(--container-page) flex-wrap gap-3 px-6 pt-16"
+          className="mx-auto flex max-w-(--container-page) gap-3 overflow-x-auto px-6 pt-16 [scrollbar-width:none] *:shrink-0 sm:flex-wrap sm:overflow-visible"
           gap={0.04}
         >
           {brands.map((brand) => (
             <RevealItem key={brand.slug}>
               <Link
                 href={`/brands/${brand.slug}`}
-                className="flex items-center gap-2 rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink"
+                className="group flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink hover:bg-ink hover:text-paper"
               >
                 <span
                   aria-hidden="true"
-                  className="size-2 rounded-full"
+                  className="size-2 rounded-full transition-transform duration-(--bb-duration-accent) ease-(--bb-ease-out) group-hover:scale-150"
                   style={{ backgroundColor: brand.accentHex }}
                 />
                 {brand.name}
@@ -79,11 +126,12 @@ export default async function HomePage() {
       )}
 
       {/* 04 — hero */}
-      <Reveal
-        className={`mx-auto max-w-(--container-page) px-6 pb-24 ${
+      <div
+        className={`mx-auto grid max-w-(--container-page) items-center gap-12 px-6 pb-24 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] ${
           brands.length > 0 ? 'pt-16' : 'pt-24'
         }`}
       >
+      <Reveal>
         <RevealItem>
           <p className="type-caption text-ink-soft">{hero.eyebrow}</p>
         </RevealItem>
@@ -113,10 +161,14 @@ export default async function HomePage() {
           </div>
         </RevealItem>
       </Reveal>
+        {/* Decorative: a Kerala counter with 24 bubbles, one per fragrance. */}
+        <HeroScene className="mx-auto w-full max-w-md lg:max-w-none" />
+      </div>
 
       {/* 05 — the record */}
       <section className="bg-sky">
-        <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
+        <div className="mx-auto grid max-w-(--container-page) items-center gap-12 px-6 py-24 md:grid-cols-[minmax(0,1fr)_auto]">
+        <Reveal>
           <RevealItem>
             {/*
               Baseline-aligned rather than inline: the two halves are different
@@ -135,6 +187,8 @@ export default async function HomePage() {
             <p className="mt-8 max-w-2xl type-body-lg text-ink-soft">{record.body}</p>
           </RevealItem>
         </Reveal>
+        <RecordSeal className="mx-auto w-40 md:w-52" />
+        </div>
       </section>
 
       {/* 06 — trust badges */}
@@ -160,6 +214,19 @@ export default async function HomePage() {
           </Reveal>
         </section>
       )}
+
+      {/* 07b — why buy here */}
+      <section className="border-t border-line">
+        <Reveal className="mx-auto grid max-w-(--container-page) gap-10 px-6 py-24 sm:grid-cols-2 lg:grid-cols-4">
+          {features.map((feature) => (
+            <RevealItem key={feature.title}>
+              <FeatureIcon name={feature.icon} className="size-12" />
+              <h3 className="mt-6 type-subhead">{feature.title}</h3>
+              <p className="mt-2 max-w-xs type-body text-ink-soft">{feature.body}</p>
+            </RevealItem>
+          ))}
+        </Reveal>
+      </section>
 
       {/* 08 — how it's made */}
       {showSteps && <PinnedSteps steps={steps} eyebrow={stepsBlock.eyebrow} />}
@@ -195,17 +262,22 @@ export default async function HomePage() {
             </RevealItem>
             <ul className="mt-16 flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4">
               {combos.map((combo) => (
-                <li
-                  key={combo.slug}
-                  className="w-72 shrink-0 snap-start rounded-card border border-line p-6"
-                >
-                  <Link href={`/combos/${combo.slug}`}>
+                <li key={combo.slug} className="flex w-72 shrink-0 snap-start pt-1">
+                  <Link
+                    href={`/combos/${combo.slug}`}
+                    className="group card-lift flex w-full flex-col rounded-card border border-line bg-paper p-6"
+                  >
                     <span className="block type-subhead">{combo.name}</span>
                     <span className="mt-2 block type-body text-ink-soft">
                       {combo.shortDesc}
                     </span>
-                    <span className="mt-4 block type-body font-medium" data-price>
-                      {formatPrice(combo.pricePaise)}
+                    <span className="mt-auto flex items-baseline justify-between gap-4 pt-4">
+                      <span className="type-body font-medium" data-price>
+                        {formatPrice(combo.pricePaise)}
+                      </span>
+                      <span className="type-caption text-ink-soft">
+                        View <span aria-hidden="true" className="arrow-nudge">&rarr;</span>
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -217,7 +289,8 @@ export default async function HomePage() {
 
       {/* 11 — our story */}
       <section className="border-t border-line bg-sky">
-        <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
+        <div className="mx-auto grid max-w-(--container-page) items-end gap-12 px-6 py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Reveal>
           <RevealItem>
             <h2 className="type-display-sm">{story.heading}</h2>
           </RevealItem>
@@ -228,6 +301,31 @@ export default async function HomePage() {
               </RevealItem>
             ))}
           </div>
+        </Reveal>
+        <StoryScene className="w-full max-w-xl" />
+        </div>
+      </section>
+
+      {/* 12 — support */}
+      <section className="border-t border-line">
+        <Reveal className="mx-auto flex max-w-(--container-page) flex-col gap-8 px-6 py-24 md:flex-row md:items-center md:justify-between">
+          <RevealItem className="flex items-start gap-6">
+            <FeatureIcon name="phone" className="size-12 shrink-0" />
+            <div>
+              <h2 className="type-display-sm">Questions? We&rsquo;re here.</h2>
+              <p className="mt-4 max-w-xl type-body-lg text-ink-soft">
+                Call us toll-free or write to us about an order, a product or trade pricing.
+              </p>
+            </div>
+          </RevealItem>
+          <RevealItem className="flex flex-col gap-3 sm:flex-row md:shrink-0">
+            <a href={CONTACT.tollFreeHref} className="btn btn-primary tabular-nums">
+              Call {CONTACT.tollFreeDisplay}
+            </a>
+            <a href={`mailto:${CONTACT.email}`} className="btn btn-secondary">
+              Email us
+            </a>
+          </RevealItem>
         </Reveal>
       </section>
     </>

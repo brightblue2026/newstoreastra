@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { isStorageConfigured } from '@/lib/storage';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 import { ImageCard } from './image-card';
@@ -29,7 +30,26 @@ export default async function ProductImagesPage({
       </p>
       <h1 className="mt-4 type-display-sm">Images</h1>
 
-      <ImageUploader productId={product.id} />
+      {/* Told before a file is chosen, not after. The uploader used to render
+          as though it worked and only failed once the photo had been picked. */}
+      {isStorageConfigured() ? (
+        <ImageUploader productId={product.id} />
+      ) : (
+        <div className="mt-8 rounded-card border border-warning p-6">
+          <p className="type-body text-warning">Photo uploads are not set up yet.</p>
+          <p className="mt-2 type-body text-ink-soft">
+            Photos are stored with Supabase, and this site has no storage connected
+            yet. Until it does, photos cannot be added and no product can be
+            published — publishing needs at least one image.
+          </p>
+          <p className="mt-4 type-caption normal-case text-ink-soft">
+            Whoever manages the site needs to set <code className="type-mono">SUPABASE_URL</code> and{' '}
+            <code className="type-mono">SUPABASE_SERVICE_ROLE_KEY</code>, restart it, then run{' '}
+            <code className="type-mono">pnpm storage:setup</code> once to create the bucket the
+            photos go in.
+          </p>
+        </div>
+      )}
 
       {product.images.length === 0 ? (
         <p className="mt-12 type-body text-ink-soft">

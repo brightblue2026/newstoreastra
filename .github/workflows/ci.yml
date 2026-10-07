@@ -1,0 +1,42 @@
+# Lint, typecheck and unit tests on every push and pull request.
+#
+# No database and no secrets: Prisma generates its client from the schema alone
+# (see prisma.config.ts), and the unit tests never touch Postgres. `next build`
+# is left out on purpose — it needs the real environment, and the three checks
+# below catch what a build would without it.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # postinstall runs `prisma generate`.
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test

@@ -1088,6 +1088,118 @@ content counts were confirmed back to where they started.
 
 ---
 
+## Shiprocket, end to end · 24 September 2026
+
+**Built.** Automatic push to Shiprocket on confirmation (Razorpay webhook, COD placement);
+a single Ship button on the admin order page (create → AWB → pickup + manifest → label,
+resumable), plus Book pickup, Print manifest and Cancel in Shiprocket; "Check delivery" by
+pincode on the product page (rate, days, COD); live scan history on the customer's order page
+(`trackByAwb`); COD switched off per pincode from Shiprocket's courier coverage; the login
+token cached in Postgres; packed box size on variants and combos, and packed weight on
+combos, feeding a real box into every order push. Migration `20260924100000_shiprocket_parcels`.
+
+**Verified.** Typecheck, lint, 541 tests (new: `parcel.test.ts`), production build; migration
+applied locally with no schema drift.
+
+**Not verified.** Nothing has called Shiprocket — no credentials here. Before going live:
+set `SHIPROCKET_API_EMAIL` / `_PASSWORD` / `SHIPROCKET_WEBHOOK_TOKEN` in Vercel, choose the
+pickup in Settings, place one real COD order, press Ship, check the label, then cancel it in
+Shiprocket. Check the pickup, manifest and tracking field names against apidocs.shiprocket.in.
+
+## Razorpay readiness pass · 24 September 2026
+
+Tested and bug-hunted the whole prepaid path before real keys go in. Five bugs fixed:
+
+- **The CSP blocked Razorpay's own script.** `checkout.js` loads a risk-detection bundle off
+  `cdn.razorpay.com`, which `script-src` did not allow. Found by opening the real modal in a
+  browser; `cdn.razorpay.com` added. The modal now opens with no CSP errors.
+- **A payment after auto-cancellation vanished.** If the stale-order cron cancelled an order
+  while the customer was still in their UPI app, the capture was answered "already handled"
+  and nothing recorded that money had arrived. It is now saved as paid on the cancelled order
+  with a note to refund it, so the order list shows "cancelled · paid". Checkout also closes
+  itself after 15 minutes, well inside the 60-minute expiry, to make this rarer.
+- **`payment.authorized` confirmed orders.** Authorised is not captured money; on manual
+  capture it is refunded after a few days. Only `payment.captured` / `order.paid` confirm
+  now. The webhook also refuses a payment whose amount or currency does not match the order.
+- **Closing the payment window and paying again placed a second order**, holding the stock
+  twice. "Pay" now reopens the same Razorpay order until the customer edits the form.
+- **The order page said it would update when payment cleared and never did.** It now
+  refreshes itself every 4 s for about three minutes while a submitted payment is pending,
+  and no longer says "nothing has been charged" to someone who may just have paid.
+
+**Verified.** `pnpm e2e:razorpay` (new, local database only) places real prepaid orders and
+posts signed webhooks at the dev server — 25 checks: forged/missing signatures, authorised
+only, underpayment, failure then success, capture (confirmed, paid, invoice raised, stock
+committed), replay and concurrent redelivery (no double decrement, same invoice), payment on
+a cancelled order, a real 401 from api.razorpay.com (order auto-cancelled, hold released),
+and an unknown order. A COD order placed through the browser end to end. Typecheck, lint,
+tests, production build.
+
+**Needs real test keys to finish.** Put `rzp_test_` keys and a webhook secret in `.env` (and
+Vercel), register the webhook on a public URL (Razorpay cannot reach localhost — use the
+Vercel preview or a tunnel), pay ₹1-level test orders with Razorpay's test card/UPI, and check
+the order turns Confirmed on its own. Set `CRON_SECRET` too, or pending orders never expire.
+
+## Every-device pass for the storefront · 24 September 2026
+
+Scope: the customer store on phones, tablets and desktops. The admin panel was left
+desktop-first, per the owner.
+
+**Tooling.** `pnpm qa:shoot` now also covers checkout (both steps), the cart drawer, the
+order page, a policy page, 404, and the end of the product page, and `--devices` shoots
+iPhone SE and iPhone 14 in WebKit (Safari's engine), Pixel 7, iPad portrait and landscape,
+and Firefox. Each run audits the narrowest view for sideways scrolling, tap targets under
+44px, text under 12px, oversized images, inputs that make iOS zoom, and layout shift.
+`pnpm qa:perf` (new) measures a Pixel 7 at 4× CPU slowdown on slow 4G against a production
+build. No new dependencies; `npx playwright install webkit firefox` once for device mode.
+
+**Bugs found and fixed**
+- Product page scrolled sideways on phones (384px wide at 360, 364px at 320): the thumbnail
+  strip set the grid column's minimum width. `grid-cols-1` (`minmax(0, 1fr)`).
+- Checkout's Pay button stayed disabled with online payment off: the form switched to the
+  unavailable "Pay online" before a pincode was entered and never switched back.
+- The discount-code field was 14px, so iPhone Safari zoomed the page on tap. Now 16px.
+- The "Bright Blue" logo wrapped to two lines on a 320px iPhone.
+- The product page's fixed buy bar covered the footer's seller name and GSTIN for good.
+- The product photo and every first-screen headline were sent invisible and only appeared
+  after the JavaScript had run (~3 s on a slow phone).
+- The header rendered at 44px and grew to 88px after hydration, shoving the page down.
+- Checkout jumped as the one-line "Loading your cart…" was replaced by the form.
+- Checkout downloaded Razorpay's checkout.js (~2 MB with what it pulls in) even with online
+  payment off.
+- 101 tap targets under 44px at 360 → 2 (the breadcrumb words, 36–39px wide, 44 tall).
+
+**Also:** notch/home-indicator safe areas; two columns from 768px on product and combo
+pages (tablets); brand pills as one swipeable row on phones; Motion on `domAnimation` via
+`m.*` (every storefront page ~4 kB gzip lighter); no Lenis loop on touch devices;
+JetBrains Mono not preloaded; correct image `sizes` for the product photo.
+
+**Measured** (Pixel 7, 4× CPU, slow 4G, median of 3 cold loads):
+
+```
+            largest paint        layout shift
+            before   after       before   after
+home        3.08 s   1.14 s      0.082    0.001
+shop        3.31 s   1.25 s      0.046    0.000
+product     3.03 s   0.9–2.2 s   0.053    0.001
+checkout    0.72 s   0.85 s      0.587    0.001
+```
+
+Product's range is whether the photo or the headline is the largest element on that load;
+both are under the 2.5 s target. Main-thread blocking (TBT) is **not** claimed: late runs
+swung from 0.3 s to 2.4 s between identical loads as the machine got busier, including on
+pages this pass did not touch. Rerun `pnpm qa:perf` on a quiet machine for a clean figure.
+
+**Verified.** Screenshot matrix before/after (192 each) and the audit: sideways scrolling
+12 → 0 at 360 and 24 → 0 on the iPhone SE; zooming inputs 1 → 0. Typecheck, lint, 541 tests,
+production build.
+
+**Not done.** Real devices — everything here is emulation, including WebKit for Safari.
+The header still grows 64 → 88px when scrolled back to the very top (the shrink-on-scroll
+design); it scores 0.108 CLS only under the harness's scroll-to-bottom-and-back walk.
+
+---
+
 ## Running it
 
 ```bash

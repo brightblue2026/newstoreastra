@@ -2,6 +2,7 @@ import path from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, UserRole, Segment } from '../src/generated/prisma/client';
 import { hashPassword } from '../src/lib/password';
+import { isSupabaseHost, pgPoolConfig } from '../src/lib/pg-config';
 
 // `prisma db seed` already loads .env via prisma.config.ts, but this script can
 // also run standalone (`node prisma/seed.ts`), so load it again defensively.
@@ -16,7 +17,7 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is not set. Copy .env.example to .env first.');
 }
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pgPoolConfig(connectionString)) });
 
 /**
  * Dev-only login. Never reused in production — rotate every seeded credential
@@ -210,6 +211,13 @@ async function seedCategories() {
 }
 
 async function seedUsers() {
+  // Never onto a hosted database: a known password on an ADMIN account is a
+  // way in. Real staff are created there with `pnpm user:create`.
+  if (isSupabaseHost(new URL(connectionString!).hostname)) {
+    console.log('Hosted database: dev users skipped. Create real staff with `pnpm user:create`.');
+    return;
+  }
+
   const accounts: Array<{ name: string; email: string; role: UserRole }> = [
     { name: 'Dev Staff', email: 'staff@dev.bbtc.local', role: UserRole.STAFF },
     { name: 'Dev Manager', email: 'manager@dev.bbtc.local', role: UserRole.MANAGER },

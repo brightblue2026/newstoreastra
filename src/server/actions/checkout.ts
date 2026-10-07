@@ -1,9 +1,13 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { placeOrderInputSchema, quoteInputSchema } from '@/lib/cart-schema';
+import { CONTACT } from '@/lib/contact';
 import { orderAccessToken } from '@/lib/order-access';
+import { isRazorpayConfigured } from '@/lib/razorpay';
 import { notifyOrderEvent } from '@/lib/notifications';
+import { autoPushOrder } from '@/lib/shiprocket-fulfilment';
 import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
 import {
@@ -101,6 +105,15 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
   const user = await currentUser();
   const data = parsed.data;
 
+  // Refused before anything is written: placing the order first would hold
+  // its stock and use up an order number for a payment that cannot start.
+  if (data.paymentMethod === 'RAZORPAY' && !isRazorpayConfigured()) {
+    return {
+      ok: false,
+      error: `Online payment is not available yet. Choose cash on delivery, or call ${CONTACT.tollFree}.`,
+    };
+  }
+
   let placed;
   try {
     placed = await placeOrder({
@@ -153,6 +166,11 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
       placed order into an error the customer sees.
     */
     await notifyOrderEvent({ orderId: placed.order.id, event: 'CONFIRMED' });
+
+    // Into Shiprocket after the response, so a slow courier API never delays
+    // the customer's confirmation. Off unless enabled in Settings.
+    const orderId = placed.order.id;
+    after(() => autoPushOrder(orderId));
 
     return {
       ok: true,

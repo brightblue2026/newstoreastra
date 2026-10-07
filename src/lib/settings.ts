@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { MAX_PAISE } from '@/lib/money';
 import type { CodSettings } from '@/lib/cod';
 import type { ShippingSettings } from '@/lib/shipping';
+import { shiprocketEnvPickup } from '@/lib/shiprocket';
 
 /*
   Operational settings — the `Setting` table, given a shape.
@@ -75,6 +76,7 @@ export const shippingSettingsSchema = z.object({
   originPincode: z.union([fullPincode, z.literal('')]).default(''),
   shiprocketPickupLocation: z.string().trim().max(120).default(''),
   preferLiveRates: z.boolean().default(false),
+  autoPushOrders: z.boolean().default(true),
 });
 
 export const DEFAULT_COD_SETTINGS: CodSettings = {
@@ -95,6 +97,7 @@ export const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
   originPincode: '',
   shiprocketPickupLocation: '',
   preferLiveRates: false,
+  autoPushOrders: true,
 };
 
 export interface CheckoutSettings {
@@ -133,20 +136,31 @@ export async function readCheckoutSettings(): Promise<CheckoutSettings> {
   const codRow = byKey.get(SETTING_KEYS.cod);
   const shippingRow = byKey.get(SETTING_KEYS.shipping);
 
+  const shipping =
+    shippingRow === undefined
+      ? DEFAULT_SHIPPING_SETTINGS
+      : parseOr(
+          shippingSettingsSchema,
+          shippingRow,
+          DEFAULT_SHIPPING_SETTINGS,
+          SETTING_KEYS.shipping,
+        );
+
+  // SHIPROCKET_PICKUP_LOCATION / _PINCODE fill in what the admin has not set,
+  // so a fresh deployment can ship before anyone opens Settings. What the
+  // admin saved always wins.
+  const envPickup = shiprocketEnvPickup();
+
   return {
     cod:
       codRow === undefined
         ? DEFAULT_COD_SETTINGS
         : parseOr(codSettingsSchema, codRow, DEFAULT_COD_SETTINGS, SETTING_KEYS.cod),
-    shipping:
-      shippingRow === undefined
-        ? DEFAULT_SHIPPING_SETTINGS
-        : parseOr(
-            shippingSettingsSchema,
-            shippingRow,
-            DEFAULT_SHIPPING_SETTINGS,
-            SETTING_KEYS.shipping,
-          ),
+    shipping: {
+      ...shipping,
+      originPincode: shipping.originPincode || envPickup.pincode,
+      shiprocketPickupLocation: shipping.shiprocketPickupLocation || envPickup.location,
+    },
     shippingUnconfigured: shippingRow === undefined,
   };
 }

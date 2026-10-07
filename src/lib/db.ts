@@ -1,5 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
+import { pgPoolConfig } from './pg-config';
 
 /**
  * The Prisma client. Import this — never construct a `PrismaClient` anywhere
@@ -24,12 +25,12 @@ function createClient(): PrismaClient {
 
   if (!connectionString) {
     throw new Error(
-      'DATABASE_URL is not set. Copy .env.example to .env and add the Neon connection string.',
+      'DATABASE_URL is not set. Copy .env.example to .env and add the Supabase connection string.',
     );
   }
 
   return new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
+    adapter: new PrismaPg(pgPoolConfig(connectionString)),
     // Queries are noisy; warnings and errors are not.
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });

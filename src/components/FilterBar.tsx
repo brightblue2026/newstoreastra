@@ -28,7 +28,7 @@ function Chip({
     <Link
       href={href}
       aria-current={selected ? 'true' : undefined}
-      className={`rounded-full border px-4 py-2 type-caption motion-accent ${
+      className={`tap-target rounded-full border px-4 py-2 type-caption motion-accent ${
         selected
           ? 'border-ink bg-ink text-paper'
           : 'border-line text-ink-soft hover:border-ink hover:text-ink'

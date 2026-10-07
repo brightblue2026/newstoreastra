@@ -1,6 +1,8 @@
 import 'server-only';
+import { db } from '@/lib/db';
 import { trackingUrlFor } from '@/lib/shiprocket-tracking';
 import type { Paise } from '@/lib/money';
+import { DEFAULT_BOX, type BoxCm } from '@/lib/parcel';
 
 /*
   Shiprocket — brief §10 "Shipping" and §12 Phase 6.
@@ -17,10 +19,16 @@ import type { Paise } from '@/lib/money';
   being unreachable stops a customer buying something.
 
   Auth: Shiprocket issues a bearer token from an email/password login, valid for
-  ten days. It is cached in module scope with a conservative expiry. On a
-  serverless deployment each cold instance logs in once, which is what the
-  token endpoint is for; a shared cache would need Redis, which this deployment
-  does not have and does not need for a ten-day token.
+  ten days. It is cached in module scope *and* in the `Setting` table, so a
+  cold serverless instance reads the token from Postgres instead of logging in
+  again — on Vercel every cold start would otherwise be a login, and Shiprocket
+  throttles those. The row is keyed to the API email, so changing the
+  credentials invalidates it.
+
+  There is no Shiprocket sandbox. Every order pushed from a test lands in the
+  real dashboard and every AWB assigned is charged to the wallet — cancel test
+  orders straight away (`cancelShiprocketOrder`, the admin "Cancel in
+  Shiprocket" button).
 
   Not built here: return/RTO handling and COD remittance reconciliation. Both
   are real Shiprocket features and both need business decisions about who
@@ -44,11 +52,27 @@ export interface ShiprocketConfig {
   password: string;
 }
 
+/**
+ * Credentials from the environment. Both the `SHIPROCKET_API_*` names and the
+ * older `SHIPROCKET_*` ones are read, so either set of Vercel variables works.
+ */
 export function shiprocketConfig(): ShiprocketConfig | null {
-  const email = process.env.SHIPROCKET_EMAIL?.trim();
-  const password = process.env.SHIPROCKET_PASSWORD?.trim();
+  const email = (process.env.SHIPROCKET_API_EMAIL || process.env.SHIPROCKET_EMAIL)?.trim();
+  const password = (process.env.SHIPROCKET_API_PASSWORD || process.env.SHIPROCKET_PASSWORD)?.trim();
   if (!email || !password) return null;
   return { email, password };
+}
+
+/**
+ * Pickup point from the environment — the fallback for a deployment where
+ * nobody has saved one in Settings yet. The admin form wins when it is set.
+ */
+export function shiprocketEnvPickup(): { location: string; pincode: string } {
+  const pincode = process.env.SHIPROCKET_PICKUP_PINCODE?.trim() ?? '';
+  return {
+    location: process.env.SHIPROCKET_PICKUP_LOCATION?.trim() ?? '',
+    pincode: /^[1-9][0-9]{5}$/.test(pincode) ? pincode : '',
+  };
 }
 
 /** True when live rates and order push can be attempted at all. */
@@ -58,9 +82,46 @@ export function isShiprocketConfigured(): boolean {
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
-/** Exported for tests and for an admin "reconnect" action; clears the cached token. */
+/** The `Setting` row the token is shared through. No page reads it. */
+const TOKEN_SETTING_KEY = 'shiprocket_token';
+
+/** Clears the cached token, here and in the database, so the next call logs in. */
 export function resetShiprocketToken(): void {
   cachedToken = null;
+  db.setting.deleteMany({ where: { key: TOKEN_SETTING_KEY } }).catch(() => {});
+}
+
+async function readStoredToken(email: string): Promise<{ token: string; expiresAt: number } | null> {
+  try {
+    const row = await db.setting.findUnique({ where: { key: TOKEN_SETTING_KEY } });
+    const data = row?.data as { token?: unknown; expiresAt?: unknown; email?: unknown } | undefined;
+    if (
+      data &&
+      typeof data.token === 'string' &&
+      typeof data.expiresAt === 'number' &&
+      data.email === email &&
+      data.expiresAt > Date.now()
+    ) {
+      return { token: data.token, expiresAt: data.expiresAt };
+    }
+  } catch (error) {
+    // A database blip only costs one extra login.
+    console.warn('[shiprocket] could not read the stored token:', error);
+  }
+  return null;
+}
+
+async function storeToken(email: string, token: { token: string; expiresAt: number }) {
+  const data = { ...token, email };
+  try {
+    await db.setting.upsert({
+      where: { key: TOKEN_SETTING_KEY },
+      create: { key: TOKEN_SETTING_KEY, data },
+      update: { data },
+    });
+  } catch (error) {
+    console.warn('[shiprocket] could not store the token:', error);
+  }
 }
 
 async function fetchWithTimeout(
@@ -90,6 +151,12 @@ async function getToken(): Promise<string | null> {
 
   if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.token;
 
+  const stored = await readStoredToken(config.email);
+  if (stored) {
+    cachedToken = stored;
+    return stored.token;
+  }
+
   try {
     const response = await fetchWithTimeout(`${SHIPROCKET_API}/auth/login`, {
       method: 'POST',
@@ -109,6 +176,7 @@ async function getToken(): Promise<string | null> {
     }
 
     cachedToken = { token: body.token, expiresAt: Date.now() + TOKEN_TTL_MS };
+    await storeToken(config.email, cachedToken);
     return body.token;
   } catch (error) {
     console.error('[shiprocket] could not reach the login endpoint:', error);
@@ -116,13 +184,28 @@ async function getToken(): Promise<string | null> {
   }
 }
 
+type CallResult<T> = { ok: true; data: T } | { ok: false; status: number; detail: string };
+
 /** One authenticated call. Null on any failure, having logged it. */
 async function call<T>(
   path: string,
   init: RequestInit & { timeoutMs?: number } = {},
 ): Promise<T | null> {
+  const result = await callDetailed<T>(path, init);
+  return result.ok ? result.data : null;
+}
+
+/**
+ * The same call, keeping Shiprocket's error text — for the steps where its
+ * refusal is information staff need ("wrong pickup location", "already in
+ * pickup queue") rather than a bare failure. Status 0: it could not be asked.
+ */
+async function callDetailed<T>(
+  path: string,
+  init: RequestInit & { timeoutMs?: number } = {},
+): Promise<CallResult<T>> {
   const token = await getToken();
-  if (!token) return null;
+  if (!token) return { ok: false, status: 0, detail: 'Could not log in to Shiprocket.' };
 
   try {
     const response = await fetchWithTimeout(`${SHIPROCKET_API}${path}`, {
@@ -139,20 +222,76 @@ async function call<T>(
       // rather than repeating a request that cannot succeed.
       resetShiprocketToken();
       console.warn('[shiprocket] token rejected on', path);
-      return null;
+      return { ok: false, status: 401, detail: 'Shiprocket rejected the login token. Try again.' };
     }
 
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       console.error('[shiprocket]', path, 'failed with', response.status, detail.slice(0, 400));
-      return null;
+      return { ok: false, status: response.status, detail: shiprocketMessage(detail) };
     }
 
-    return (await response.json()) as T;
+    return { ok: true, data: (await response.json()) as T };
   } catch (error) {
     console.error('[shiprocket]', path, 'threw:', error);
-    return null;
+    return { ok: false, status: 0, detail: 'Shiprocket could not be reached.' };
   }
+}
+
+/** Shiprocket's `message` field when the body is JSON, else the raw text, trimmed. */
+function shiprocketMessage(raw: string): string {
+  try {
+    const body = JSON.parse(raw) as { message?: unknown };
+    if (typeof body.message === 'string' && body.message.trim()) {
+      return body.message.trim().slice(0, 300);
+    }
+  } catch {
+    // Not JSON — fall through to the raw text.
+  }
+  return raw.trim().slice(0, 300);
+}
+
+// ---------- Pickup locations ----------
+
+export interface PickupLocation {
+  /** The exact name an order push must quote as `pickup_location`. */
+  name: string;
+  pincode: string;
+  city: string;
+  /** Shiprocket will not collect from an address whose phone is unverified. */
+  verified: boolean;
+}
+
+/**
+ * The pickup addresses on the Shiprocket account — what the admin chooses from
+ * in Settings, so the name an order push quotes is copied rather than retyped.
+ * A misspelt pickup name is the usual reason Shiprocket refuses an order.
+ *
+ * Null when Shiprocket could not be asked (unconfigured, bad login, down); an
+ * empty list when it answered and the account has none.
+ */
+export async function listPickupLocations(): Promise<PickupLocation[] | null> {
+  const body = await call<{
+    data?: {
+      shipping_address?: {
+        pickup_location?: string;
+        pin_code?: string | number;
+        city?: string;
+        phone_verified?: number | boolean;
+      }[];
+    };
+  }>('/settings/company/pickup', { method: 'GET' });
+
+  if (body === null) return null;
+
+  return (body.data?.shipping_address ?? [])
+    .filter((entry) => typeof entry.pickup_location === 'string' && entry.pickup_location.trim())
+    .map((entry) => ({
+      name: (entry.pickup_location as string).trim(),
+      pincode: String(entry.pin_code ?? '').trim(),
+      city: entry.city?.trim() ?? '',
+      verified: entry.phone_verified === 1 || entry.phone_verified === true,
+    }));
 }
 
 // ---------- Serviceability and rates ----------
@@ -174,11 +313,18 @@ export interface CourierQuote {
   pricePaise: Paise;
   /** Shiprocket's own estimate, in days. Null when it does not give one. */
   estimatedDays: number | null;
+  /** Whether this courier collects cash on delivery at that pincode. */
   cod: boolean;
 }
 
 export interface RateResult {
   serviceable: boolean;
+  /**
+   * True when at least one returned courier takes COD there — so checkout can
+   * switch COD off per pincode from Shiprocket's own coverage, not only from
+   * the admin's allowlist.
+   */
+  codServiceable: boolean;
   /** Cheapest first. Empty when nothing serviceable was returned. */
   couriers: CourierQuote[];
 }
@@ -210,6 +356,7 @@ export async function rateShipment(request: RateRequest): Promise<RateResult | n
         rate?: number;
         estimated_delivery_days?: string | number;
         is_surface?: boolean;
+        cod?: number | boolean;
       }[];
     };
   }>(`/courier/serviceability/?${params.toString()}`, { method: 'GET' });
@@ -226,11 +373,17 @@ export async function rateShipment(request: RateRequest): Promise<RateResult | n
       // Shiprocket quotes rupees as a number; this codebase is paise.
       pricePaise: Math.round((c.rate as number) * 100),
       estimatedDays: parseEstimatedDays(c.estimated_delivery_days),
-      cod: request.cod,
+      // Asked with cod=1, every courier returned takes COD. Asked with cod=0,
+      // each row still carries its own flag.
+      cod: request.cod || c.cod === 1 || c.cod === true,
     }))
     .sort((a, b) => a.pricePaise - b.pricePaise);
 
-  return { serviceable: couriers.length > 0, couriers };
+  return {
+    serviceable: couriers.length > 0,
+    codServiceable: couriers.some((c) => c.cod),
+    couriers,
+  };
 }
 
 function parseEstimatedDays(value: string | number | undefined): number | null {
@@ -272,6 +425,8 @@ export interface PushOrderInput {
   codAmountPaise: Paise;
   paymentMethod: 'RAZORPAY' | 'COD';
   weightGrams: number;
+  /** From `parcelDimensions`. The default carton when omitted. */
+  box?: BoxCm;
 }
 
 export interface PushOrderResult {
@@ -287,10 +442,13 @@ export interface PushOrderResult {
  * unit is the rupee, this codebase's is the paise, and mixing them is the
  * classic hundred-fold bug.
  */
-export async function pushOrder(input: PushOrderInput): Promise<PushOrderResult | null> {
+export async function pushOrder(
+  input: PushOrderInput,
+): Promise<{ ok: true; result: PushOrderResult } | { ok: false; error: string }> {
   const rupees = (paise: Paise) => Number((paise / 100).toFixed(2));
+  const box = input.box ?? DEFAULT_BOX;
 
-  const body = await call<{ order_id?: number | string; shipment_id?: number | string }>(
+  const response = await callDetailed<{ order_id?: number | string; shipment_id?: number | string }>(
     '/orders/create/adhoc',
     {
       method: 'POST',
@@ -324,26 +482,29 @@ export async function pushOrder(input: PushOrderInput): Promise<PushOrderResult 
         shipping_charges: rupees(input.shippingPaise),
         total_discount: rupees(input.discountPaise),
 
-        // Dimensions are required by the API. BBTC has no per-variant box
-        // sizes, so a single conservative carton is declared and the weight —
-        // which is what actually drives the rate — is real.
-        length: 20,
-        breadth: 15,
-        height: 15,
+        // Required on every order. Built from the measured boxes by
+        // `parcelDimensions`; the default carton for anything unmeasured.
+        length: box.lengthCm,
+        breadth: box.breadthCm,
+        height: box.heightCm,
         weight: Number((Math.max(input.weightGrams, 1) / 1000).toFixed(3)),
       }),
     },
   );
 
-  if (body === null) return null;
+  if (!response.ok) return { ok: false, error: response.detail };
+  const body = response.data;
   if (body.order_id === undefined || body.shipment_id === undefined) {
     console.error('[shiprocket] order push returned no ids');
-    return null;
+    return { ok: false, error: 'Shiprocket answered but returned no shipment id.' };
   }
 
   return {
-    shiprocketOrderId: String(body.order_id),
-    shipmentId: String(body.shipment_id),
+    ok: true,
+    result: {
+      shiprocketOrderId: String(body.order_id),
+      shipmentId: String(body.shipment_id),
+    },
   };
 }
 
@@ -423,6 +584,129 @@ export async function generateLabel(shipmentId: string): Promise<string | null> 
     return null;
   }
   return body.label_url;
+}
+
+// ---------- Pickup, manifest, cancel ----------
+
+/**
+ * Ask the courier to collect the shipment. Shiprocket refuses a second request
+ * for the same shipment with an "already" message; that counts as done.
+ */
+export async function requestPickup(
+  shipmentId: string,
+): Promise<{ ok: true; scheduledFor: string | null } | { ok: false; error: string }> {
+  const response = await callDetailed<{
+    pickup_status?: number;
+    response?: { pickup_scheduled_date?: string | null };
+  }>('/courier/generate/pickup', {
+    method: 'POST',
+    body: JSON.stringify({ shipment_id: [Number(shipmentId)] }),
+  });
+
+  if (!response.ok) {
+    if (/already/i.test(response.detail)) return { ok: true, scheduledFor: null };
+    return { ok: false, error: response.detail || 'Shiprocket did not accept the pickup request.' };
+  }
+
+  return { ok: true, scheduledFor: response.data.response?.pickup_scheduled_date ?? null };
+}
+
+/**
+ * The manifest PDF the courier signs at pickup. Generated once; for a shipment
+ * that already has one, Shiprocket refuses to generate again, so this falls
+ * back to printing the existing manifest — keyed by Shiprocket's *order* id.
+ */
+export async function generateManifest(
+  shipmentId: string,
+  shiprocketOrderId: string | null,
+): Promise<string | null> {
+  const generated = await callDetailed<{ manifest_url?: string }>('/manifests/generate', {
+    method: 'POST',
+    body: JSON.stringify({ shipment_id: [Number(shipmentId)] }),
+  });
+  if (generated.ok && generated.data.manifest_url) return generated.data.manifest_url;
+
+  if (!shiprocketOrderId) return null;
+  const printed = await call<{ manifest_url?: string }>('/manifests/print', {
+    method: 'POST',
+    body: JSON.stringify({ order_ids: [Number(shiprocketOrderId)] }),
+  });
+  return printed?.manifest_url ?? null;
+}
+
+/**
+ * Cancel an order in Shiprocket — test orders above all, since there is no
+ * sandbox. Cancelling releases an assigned AWB's charge back to the wallet.
+ */
+export async function cancelShiprocketOrder(
+  shiprocketOrderId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await callDetailed<unknown>('/orders/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ ids: [Number(shiprocketOrderId)] }),
+  });
+  return response.ok ? { ok: true } : { ok: false, error: response.detail };
+}
+
+// ---------- Live tracking ----------
+
+export interface TrackingScan {
+  at: string;
+  status: string;
+  location: string | null;
+}
+
+export interface TrackingSnapshot {
+  currentStatus: string | null;
+  /** Expected delivery date as Shiprocket gives it, or null. */
+  expectedDelivery: string | null;
+  /** Newest first, as Shiprocket returns them. */
+  scans: TrackingScan[];
+}
+
+/**
+ * The courier's scan history for an AWB — for the customer's order page.
+ *
+ * Short timeout: it renders inside a page load, and the page is complete
+ * without it (the AWB and the courier's own link are shown regardless).
+ */
+export async function trackByAwb(awbNumber: string): Promise<TrackingSnapshot | null> {
+  const body = await call<{
+    tracking_data?: {
+      etd?: string | null;
+      shipment_track?: { current_status?: string | null; edd?: string | null }[] | null;
+      shipment_track_activities?:
+        | {
+            date?: string;
+            activity?: string;
+            location?: string | null;
+            'sr-status-label'?: string;
+          }[]
+        | null;
+    };
+  }>(`/courier/track/awb/${encodeURIComponent(awbNumber.trim())}`, {
+    method: 'GET',
+    timeoutMs: 3_000,
+  });
+
+  const data = body?.tracking_data;
+  if (!data) return null;
+
+  const scans = (data.shipment_track_activities ?? [])
+    .filter((scan) => typeof scan.date === 'string' && (scan.activity || scan['sr-status-label']))
+    .map((scan) => ({
+      at: scan.date as string,
+      status: (scan.activity || scan['sr-status-label'] || '').trim(),
+      location: scan.location?.trim() || null,
+    }))
+    .slice(0, 20);
+
+  const track = data.shipment_track?.[0];
+  return {
+    currentStatus: track?.current_status?.trim() || null,
+    expectedDelivery: track?.edd || data.etd || null,
+    scans,
+  };
 }
 
 // ---------- Tracking webhook ----------

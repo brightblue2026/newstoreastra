@@ -71,7 +71,7 @@ export async function assignInvoiceNumber(
   // pattern. Two concurrent callers must not both see "no number yet" and both
   // proceed to mint one; the second must see the first's committed number once
   // it acquires the lock.
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`bbtc:invoice-number:${prefix}`}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`bbtc:invoice-number:${prefix}`}))`;
 
   const existing = await tx.order.findUnique({
     where: { id: orderId },

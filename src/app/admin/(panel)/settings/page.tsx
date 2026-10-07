@@ -4,10 +4,12 @@ import { paiseToRupeesInput } from '@/lib/money';
 import { readCheckoutSettings } from '@/lib/settings';
 import { requireAdministrator } from '@/lib/session';
 import { isRazorpayConfigured } from '@/lib/razorpay';
+import { isShiprocketConfigured, listPickupLocations } from '@/lib/shiprocket';
 import {
   CodSettingsForm,
   SellerEntityForm,
   ShippingSettingsForm,
+  ShiprocketSettingsForm,
 } from './settings-forms';
 
 export const dynamic = 'force-dynamic';
@@ -39,6 +41,14 @@ export default async function SettingsPage() {
 
   const seller = sellers.length === 1 ? sellers[0] : null;
 
+  // Asked on every visit: a login that stopped working should show up here, on
+  // the screen the admin is already looking at, not first as a failed push.
+  const shiprocketConfigured = isShiprocketConfigured();
+  const pickupLocations = shiprocketConfigured ? await listPickupLocations() : null;
+  const shiprocketConnected = pickupLocations !== null;
+  const webhookSecretSet = Boolean(process.env.SHIPROCKET_WEBHOOK_TOKEN?.trim());
+  const siteUrl = (process.env.AUTH_URL || 'https://brightbluefmcg.com').replace(/\/$/, '');
+
   return (
     <div>
       <h1 className="type-display-sm">Settings</h1>
@@ -68,6 +78,17 @@ export default async function SettingsPage() {
           ok={!settings.shippingUnconfigured}
           done="A delivery rate table is set."
           notDone="No delivery rates are set, so every order ships free of charge."
+        />
+        <Status
+          ok={shiprocketConnected && Boolean(settings.shipping.shiprocketPickupLocation)}
+          done="Shiprocket is connected and a pickup location is chosen, so orders can be pushed for dispatch."
+          notDone={
+            !shiprocketConfigured
+              ? 'Shiprocket is not connected. Orders can still be taken and shipped by entering the AWB by hand.'
+              : !shiprocketConnected
+                ? 'Shiprocket login is failing. Check the API user email and password in the environment.'
+                : 'Shiprocket is connected, but no pickup location is chosen yet, so orders cannot be pushed.'
+          }
         />
         <Status
           ok={settings.cod.enabled}
@@ -119,6 +140,40 @@ export default async function SettingsPage() {
           defaultUnitGrams={settings.shipping.defaultUnitGrams}
           serviceablePincodePrefixes={settings.shipping.serviceablePincodePrefixes}
         />
+      </Section>
+
+      <Section
+        title="Shiprocket"
+        note="Shiprocket books the courier, prints the label and sends tracking updates back here. Without it, staff can still record a DTDC AWB by hand on each order."
+      >
+        {!shiprocketConfigured && (
+          <p className="mb-8 max-w-prose type-body text-ink-soft">
+            To connect: in the Shiprocket dashboard go to Settings → API → Configure and create an
+            API user (a separate login from your own). Put its email and password in the
+            environment as SHIPROCKET_API_EMAIL and SHIPROCKET_API_PASSWORD, restart the site, and
+            come back here to choose a pickup location.
+          </p>
+        )}
+        <ShiprocketSettingsForm
+          locations={pickupLocations}
+          pickupLocation={settings.shipping.shiprocketPickupLocation}
+          originPincode={settings.shipping.originPincode}
+          preferLiveRates={settings.shipping.preferLiveRates}
+          autoPushOrders={settings.shipping.autoPushOrders}
+        />
+        <div className="mt-10 max-w-prose">
+          <h3 className="type-caption text-ink-soft">Tracking updates</h3>
+          <p className="mt-2 type-body">
+            In Shiprocket, Settings → API → Webhooks, set the URL to{' '}
+            <code className="type-mono break-all">{siteUrl}/api/webhooks/courier-tracking</code>{' '}
+            and the token to the value of SHIPROCKET_WEBHOOK_TOKEN.
+          </p>
+          <p className="mt-2 type-caption text-ink-soft">
+            {webhookSecretSet
+              ? 'The token is set on this deployment, so tracking updates will be accepted.'
+              : 'SHIPROCKET_WEBHOOK_TOKEN is not set, so every tracking update is refused until it is.'}
+          </p>
+        </div>
       </Section>
 
       <p className="mt-16 border-t border-line pt-6 type-caption text-ink-soft">

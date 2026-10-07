@@ -821,3 +821,34 @@ export async function getSitemapData(): Promise<{
     return { products: [], brands: [], categories: [], combos: [] };
   }
 }
+
+/**
+ * Approved reviews for one product, newest first.
+ *
+ * `isApproved` is in the `where`, not left to the caller: an unapproved review
+ * must never reach the storefront, and a filter the caller has to remember is
+ * a filter that eventually gets forgotten. The rating summary is computed from
+ * exactly this list, so the average can never include something nobody has
+ * read.
+ */
+export async function getApprovedReviews(productId: string) {
+  try {
+    return await db.review.findMany({
+      where: { productId, isApproved: true },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        authorName: true,
+        rating: true,
+        title: true,
+        body: true,
+        createdAt: true,
+      },
+    });
+  } catch {
+    // A product page that renders without its reviews is better than one that
+    // 500s because of them — the same degrade the other readers here take.
+    return [];
+  }
+}

@@ -41,13 +41,13 @@ export default function StorefrontError({
         <button
           type="button"
           onClick={reset}
-          className="rounded-control bg-signal px-6 py-3 type-body font-medium text-paper"
+          className="btn btn-primary"
         >
           Try again
         </button>
         <Link
           href="/shop"
-          className="rounded-control border border-line px-6 py-3 type-body font-medium"
+          className="btn btn-secondary"
         >
           Browse the catalogue
         </Link>

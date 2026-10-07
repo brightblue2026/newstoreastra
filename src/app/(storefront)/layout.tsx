@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import MotionProvider from '@/components/MotionProvider';
 import Ticker from '@/components/Ticker';
 import StorefrontChrome from '@/components/StorefrontChrome';
 import { getContent, getPublishedPolicies } from '@/lib/content';
@@ -15,7 +16,8 @@ import { getBrands, getSellerEntity } from '@/lib/storefront';
       the mega-menu is populated everywhere rather than only on the homepage;
     - every page below stays a server component. The only client boundary is
       `StorefrontChrome`, which owns the single piece of shared state (whether
-      the cart is open).
+      the cart is open). `MotionProvider` wraps it all only to hand the
+      animation engine down, loaded after first paint; it renders no markup.
 
   Both reads degrade to empty rather than throwing — a database hiccup should
   cost the menu and the GSTIN line, not every page on the site.
@@ -34,7 +36,7 @@ export default async function StorefrontLayout({
   ]);
 
   return (
-    <>
+    <MotionProvider>
       <Ticker items={announcement.items} />
 
       <StorefrontChrome brands={brands} />
@@ -49,7 +51,7 @@ export default async function StorefrontLayout({
                 <li key={brand.slug}>
                   <Link
                     href={`/brands/${brand.slug}`}
-                    className="type-body text-ink-soft hover:text-ink"
+                    className="link-underline type-body text-ink-soft motion-accent hover:text-ink"
                   >
                     {brand.name}
                   </Link>
@@ -60,22 +62,22 @@ export default async function StorefrontLayout({
 
           <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-3">
             <li>
-              <Link href="/shop" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/shop" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Shop all
               </Link>
             </li>
             <li>
-              <Link href="/search" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/search" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Search
               </Link>
             </li>
             <li>
-              <Link href="/story" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/story" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Our story
               </Link>
             </li>
             <li>
-              <Link href="/stockists" className="type-body text-ink-soft hover:text-ink">
+              <Link href="/stockists" className="link-underline type-body text-ink-soft motion-accent hover:text-ink">
                 Stockists
               </Link>
             </li>
@@ -88,7 +90,7 @@ export default async function StorefrontLayout({
                 <li key={policy.slug}>
                   <Link
                     href={`/policies/${policy.slug}`}
-                    className="type-body text-ink-soft hover:text-ink"
+                    className="link-underline type-body text-ink-soft motion-accent hover:text-ink"
                   >
                     {policy.title}
                   </Link>
@@ -106,6 +108,6 @@ export default async function StorefrontLayout({
           </div>
         </div>
       </footer>
-    </>
+    </MotionProvider>
   );
 }

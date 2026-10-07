@@ -100,7 +100,7 @@ export default async function ComboPage({
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-2 type-caption text-ink-soft">
             <li className="flex items-center gap-2">
-              <Link href="/shop" className="hover:text-ink">
+              <Link href="/shop" className="inline-flex min-h-11 items-center hover:text-ink">
                 Shop
               </Link>
               <span aria-hidden="true">/</span>
@@ -109,7 +109,7 @@ export default async function ComboPage({
           </ol>
         </nav>
 
-        <div className="mt-12 grid gap-16 lg:grid-cols-2">
+        <div className="mt-12 grid grid-cols-1 gap-16 md:grid-cols-2 md:gap-10 lg:gap-16">
           <div className="relative aspect-square overflow-hidden rounded-card bg-sky">
             {combo.imageUrl ? (
               <Image
@@ -117,7 +117,7 @@ export default async function ComboPage({
                 alt={combo.name}
                 fill
                 priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
+                sizes="(max-width: 767px) 100vw, 50vw"
                 className="object-contain p-12"
               />
             ) : (

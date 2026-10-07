@@ -20,12 +20,17 @@ export default async function ProductsPage({
     <div>
       <div className="flex items-center justify-between gap-4">
         <h1 className="type-display-sm">Products</h1>
-        <Link
-          href="/admin/products/new"
-          className="rounded-control bg-signal px-6 py-3 type-body font-medium text-white"
-        >
-          New product
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/admin/products/new" className="type-body text-signal">
+            Full form
+          </Link>
+          <Link
+            href="/admin/products/quick-add"
+            className="rounded-control bg-signal px-6 py-3 type-body font-medium text-white"
+          >
+            Add a product
+          </Link>
+        </div>
       </div>
 
       {publishError && (
@@ -35,7 +40,13 @@ export default async function ProductsPage({
       )}
 
       {products.length === 0 ? (
-        <p className="mt-12 type-body text-ink-soft">No products yet. Create the first one.</p>
+        <p className="mt-12 type-body text-ink-soft">
+          No products yet.{' '}
+          <Link href="/admin/products/quick-add" className="text-signal underline">
+            Add your first one
+          </Link>{' '}
+          — five short steps, and nothing goes live until you publish it.
+        </p>
       ) : (
         <div className="mt-8 overflow-x-auto">
           <table className="w-full min-w-3xl border-collapse">

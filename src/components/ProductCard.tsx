@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 import { formatPrice, isPurchasable } from '@/lib/money';
 
@@ -40,7 +40,11 @@ export default function ProductCard({
   product: ProductCardData;
   onQuickAdd?: (slug: string) => void;
 }) {
-  const [hover, setHover] = useState(false);
+  const [pointerHover, setHover] = useState(false);
+  // Keyboard focus anywhere inside the card counts as hover, so tabbing
+  // through a grid shows the same lift, border and zoom a pointer does.
+  const [focused, setFocused] = useState(false);
+  const hover = pointerHover || focused;
   const reduced = useReducedMotion();
 
   const {
@@ -65,12 +69,18 @@ export default function ProductCard({
   const field = `color-mix(in oklab, ${accentHex} 12%, var(--color-paper))`;
 
   return (
-    <motion.article
+    <m.article
       onHoverStart={() => setHover(true)}
       onHoverEnd={() => setHover(false)}
-      whileHover={reduced ? undefined : { y: -2 }}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setFocused(false);
+        }
+      }}
+      animate={{ y: hover && !reduced ? -2 : 0 }}
       transition={{ duration: dur.lift, ease }}
-      className="group relative flex flex-col rounded-card border bg-paper p-4"
+      className="group relative flex h-full flex-col rounded-card border bg-paper p-4 transition-[border-color,box-shadow] duration-(--bb-duration-accent) ease-(--bb-ease-out) hover:shadow-bb focus-within:shadow-bb"
       style={{ borderColor: hover ? accentHex : 'var(--color-line)' }}
     >
       <div
@@ -79,7 +89,7 @@ export default function ProductCard({
       >
         {imageUrl ? (
           <>
-            <motion.div
+            <m.div
               className="absolute inset-0"
               animate={{ scale: hover && !reduced ? 1.06 : 1 }}
               transition={{ duration: dur.accent, ease }}
@@ -91,10 +101,10 @@ export default function ProductCard({
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className="object-contain p-6"
               />
-            </motion.div>
+            </m.div>
 
             {hoverImageUrl && (
-              <motion.div
+              <m.div
                 className="absolute inset-0"
                 initial={false}
                 animate={{ opacity: hover ? 1 : 0 }}
@@ -108,7 +118,7 @@ export default function ProductCard({
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-contain p-6"
                 />
-              </motion.div>
+              </m.div>
             )}
           </>
         ) : (
@@ -118,7 +128,7 @@ export default function ProductCard({
         )}
 
         {purchasable && onQuickAdd && (
-          <motion.button
+          <m.button
             type="button"
             onClick={() => onQuickAdd(slug)}
             initial={false}
@@ -131,10 +141,10 @@ export default function ProductCard({
             // keyboard users don't tab into an offscreen control.
             tabIndex={hover ? 0 : -1}
             aria-hidden={!hover && !reduced}
-            className="absolute inset-x-3 bottom-3 rounded-control bg-signal py-3 font-medium text-paper"
+            className="btn btn-primary absolute inset-x-3 bottom-3"
           >
             Quick add
-          </motion.button>
+          </m.button>
         )}
       </div>
 
@@ -142,25 +152,28 @@ export default function ProductCard({
       <p className="mt-4 type-caption text-ink-soft">{brandName}</p>
 
       <h3 className="mt-1 type-subhead">
-        <Link href={`/products/${slug}`} className="after:absolute after:inset-0">
+        <Link
+          href={`/products/${slug}`}
+          className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-signal"
+        >
           {name}
         </Link>
       </h3>
 
       {size && <p className="mt-1 type-body text-ink-soft">{size}</p>}
 
-      <p className="mt-2 type-body" data-price>
+      <p className="mt-auto flex flex-wrap items-baseline gap-x-2 pt-2 type-body" data-price>
         {purchasable ? (
           <>
             <span className="font-medium">{formatPrice(pricePaise)}</span>
             {showMrp && (
-              <s className="ml-2 text-ink-soft">{formatPrice(mrpPaise)}</s>
+              <s className="text-ink-soft">{formatPrice(mrpPaise)}</s>
             )}
           </>
         ) : (
           <span className="text-ink-soft">{formatPrice(null)}</span>
         )}
       </p>
-    </motion.article>
+    </m.article>
   );
 }

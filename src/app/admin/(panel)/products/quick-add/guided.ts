@@ -146,3 +146,124 @@ export function publishChecklist(input: ChecklistInput): ChecklistItem[] {
 
   return items;
 }
+
+/**
+ * One size/fragrance row as the guided screen collects it — a deliberate subset
+ * of `../variant-rows.ts`'s `VariantRowValue`. Format, barcode, wholesale price
+ * and the variant accent colour are not asked for here; they are catalogue-
+ * manager fields, editable afterwards on the full variant form. The row is
+ * widened back to the full shape at submit time, so the server contract is
+ * unchanged.
+ */
+export interface GuidedVariantRow {
+  variantName: string;
+  size: string;
+  mrpRupees: string;
+  priceRupees: string;
+  weightGrams: string;
+  /** Left blank unless the user opens "Use my own stock code" on that row. */
+  skuOverride: string;
+}
+
+export const EMPTY_GUIDED_ROW: GuidedVariantRow = {
+  variantName: '',
+  size: '',
+  mrpRupees: '',
+  priceRupees: '',
+  weightGrams: '',
+  skuOverride: '',
+};
+
+/**
+ * A per-row stock code. The fragrance name joins the size in `suggestSku`'s
+ * discriminator slot because MX-3 ships the same size in 24 fragrances — size
+ * alone would hand every one of them the same `sku`, which is globally unique.
+ */
+export function suggestRowSku(
+  brandName: string,
+  productName: string,
+  variantName: string,
+  size: string,
+): string {
+  const discriminator = [variantName, size]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(' ');
+  return suggestSku(brandName, productName, discriminator);
+}
+
+/**
+ * The stock code actually submitted for each row, in row order.
+ *
+ * Generated codes are made unique within the batch by suffixing `-2`, `-3` …,
+ * because `parseVariantRowsJson` rejects the whole submit on a repeat and a
+ * non-technical user cannot be expected to debug a code they never typed.
+ *
+ * A code the user typed themselves is returned untouched, even when it repeats.
+ * Silently renaming someone's own stock code would be worse than the server's
+ * explicit "SKU is repeated earlier in this batch" — that one they can act on.
+ * Every typed code is reserved before any code is generated, so an automatic
+ * code never steals one.
+ */
+export function resolveRowSkus(
+  rows: GuidedVariantRow[],
+  brandName: string,
+  productName: string,
+): string[] {
+  const taken = new Set<string>();
+  for (const row of rows) {
+    const override = row.skuOverride.trim();
+    if (override) taken.add(override.toLowerCase());
+  }
+
+  return rows.map((row) => {
+    const override = row.skuOverride.trim();
+    if (override) return override;
+
+    const base = suggestRowSku(brandName, productName, row.variantName, row.size);
+    if (!base) return '';
+
+    let candidate = base;
+    let suffix = 2;
+    while (taken.has(candidate.toLowerCase())) {
+      candidate = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    taken.add(candidate.toLowerCase());
+    return candidate;
+  });
+}
+
+/**
+ * What a brand's segment implies about the two regulatory checkboxes, so the
+ * user is not asked a question the brand already answers.
+ *
+ * `FRAGRANCE` deliberately returns neither. Whether MAKAFA's perfume needs a
+ * cosmetics licence is one of the catalogue's open questions (CLAUDE.md: the
+ * brand's licences are still unseeded); pre-ticking a licence requirement is a
+ * guess, and the working agreement says not to guess. The user is prompted
+ * instead — see `segmentNote`.
+ */
+export function segmentDefaults(segment: string | null): {
+  isFoodProduct: boolean;
+  isCosmetic: boolean;
+} {
+  return {
+    isFoodProduct: segment === 'FOOD' || segment === 'BEVERAGE',
+    isCosmetic: segment === 'PERSONAL_CARE',
+  };
+}
+
+/** A one-line warning shown under the brand picker, or '' when there is nothing to say. */
+export function segmentNote(segment: string | null): string {
+  if (segment === 'FOOD' || segment === 'BEVERAGE') {
+    return 'This is a food brand, so the FSSAI label step is required by law before it can go live.';
+  }
+  if (segment === 'PERSONAL_CARE') {
+    return 'This is a personal care brand — it needs a cosmetics licence on the brand record.';
+  }
+  if (segment === 'FRAGRANCE') {
+    return 'Perfume may need a cosmetics licence. Confirm before publishing, and tick the box below if it does.';
+  }
+  return '';
+}

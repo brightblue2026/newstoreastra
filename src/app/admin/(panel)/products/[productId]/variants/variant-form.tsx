@@ -1,8 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
+
 import { useFormStatus } from 'react-dom';
 import type { VariantFormState } from './actions';
+import BoxSizeFields from '../../../box-size-fields';
 
 export interface VariantFormValues {
   sku: string;
@@ -14,6 +16,9 @@ export interface VariantFormValues {
   priceRupees: string;
   wholesaleRupees: string;
   weightGrams: string;
+  lengthCm: string;
+  breadthCm: string;
+  heightCm: string;
   barcode: string;
 }
 
@@ -27,6 +32,9 @@ const EMPTY_VALUES: VariantFormValues = {
   priceRupees: '',
   wholesaleRupees: '',
   weightGrams: '',
+  lengthCm: '',
+  breadthCm: '',
+  heightCm: '',
   barcode: '',
 };
 
@@ -56,11 +64,11 @@ export function VariantForm({
   initialValues?: VariantFormValues;
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as VariantFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as VariantFormState);
   const values = initialValues ?? EMPTY_VALUES;
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"
@@ -220,6 +228,15 @@ export function VariantForm({
       {state.fieldErrors?.weightGrams && (
         <p className={fieldErrorClass}>{state.fieldErrors.weightGrams}</p>
       )}
+
+      <BoxSizeFields
+        values={values}
+        error={state.fieldErrors?.box}
+        hint="The carton one unit ships in. Couriers charge by size as well as weight, so measure it. Leave empty to use the standard 20 × 15 × 15 cm carton."
+        labelClass={labelClass}
+        inputClass={inputClass}
+        errorClass={fieldErrorClass}
+      />
 
       <div className="mt-8">
         <SubmitButton label={submitLabel} />

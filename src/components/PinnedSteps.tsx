@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import Image from 'next/image';
 import {
-  motion,
+  m,
   useReducedMotion,
   useScroll,
   useTransform,
@@ -55,7 +55,7 @@ function PinnedVisual({
   const scale = useTransform(progress, [index * seg, (index + 1) * seg], [1.04, 0.98]);
 
   return (
-    <motion.div
+    <m.div
       style={reduced ? { opacity: index === 0 ? 1 : 0 } : { opacity, scale }}
       className="absolute inset-0"
     >
@@ -66,7 +66,7 @@ function PinnedVisual({
         sizes="(max-width: 768px) 90vw, 45vw"
         className="object-contain"
       />
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -118,7 +118,7 @@ export default function PinnedSteps({
         <div className={reduced ? 'space-y-12' : 'space-y-16'}>
           {eyebrow && <p className="type-caption text-ink-soft">{eyebrow}</p>}
           {steps.map((step, i) => (
-            <motion.div
+            <m.div
               key={step.title}
               initial={reduced ? false : { opacity: 0.25 }}
               whileInView={reduced ? undefined : { opacity: 1 }}
@@ -129,7 +129,7 @@ export default function PinnedSteps({
               </span>
               <h3 className="mt-2 type-display-sm">{step.title}</h3>
               <p className="mt-2 max-w-sm type-body text-ink-soft">{step.body}</p>
-            </motion.div>
+            </m.div>
           ))}
         </div>
       </div>

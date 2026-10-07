@@ -121,6 +121,14 @@
       there is no slack. Only one component guarded against this individually.
     */
     overflow-wrap: break-word;
+    /*
+      The viewport is `viewport-fit=cover` (root layout), so a phone turned
+      sideways draws the page under its notch and rounded corners. These keep
+      everything in the flow clear of them; both are 0 on every other screen.
+      Fixed bars sit outside the body's padding and use `safe-x` / `pb-safe`.
+    */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   /*
@@ -214,7 +222,7 @@
 /* ---------- Motion ---------- */
 
 @utility motion-accent {
-  transition-property: background-color, color;
+  transition-property: background-color, color, border-color;
   transition-duration: var(--bb-duration-accent);
   transition-timing-function: var(--bb-ease-out);
 }
@@ -231,6 +239,211 @@
   transition-timing-function: var(--bb-ease-out);
 }
 
+/*
+  ---------- Buttons — §9: two styles, no third ----------
+  Primary is solid signal and turns ink under the pointer; secondary is a 1px
+  ink outline that fills. Both rise 2px on hover and settle back when pressed,
+  on the lift duration. Transform and colour only — nothing that reflows.
+*/
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border-radius: var(--radius-control);
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.6;
+  text-align: center;
+  cursor: pointer;
+  transition-property: transform, background-color, color, border-color, box-shadow;
+  transition-duration: var(--bb-duration-lift), var(--bb-duration-accent),
+    var(--bb-duration-accent), var(--bb-duration-accent), var(--bb-duration-lift);
+  transition-timing-function: var(--bb-ease-out);
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([aria-disabled='true']) {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-bb);
+    }
+  }
+  &:active:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(0) scale(0.98);
+    box-shadow: none;
+  }
+  &:disabled,
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+@utility btn-primary {
+  background-color: var(--color-signal);
+  color: var(--color-paper);
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--color-ink);
+    }
+  }
+}
+
+@utility btn-secondary {
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+  background-color: transparent;
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--color-ink);
+      color: var(--color-paper);
+    }
+  }
+}
+
+/* A quiet text link whose underline draws in from the left. */
+@utility link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition:
+    background-size var(--bb-duration-accent) var(--bb-ease-out),
+    color var(--bb-duration-accent) var(--bb-ease-out);
+
+  &:hover,
+  &:focus-visible,
+  &[aria-current='page'] {
+    background-size: 100% 1px;
+  }
+}
+
+/* An arrow that nudges 4px along when its parent `group` is hovered. */
+@utility arrow-nudge {
+  display: inline-block;
+  transition: transform var(--bb-duration-lift) var(--bb-ease-out);
+
+  :where(.group):hover &,
+  :where(.group):focus-visible & {
+    transform: translateX(4px);
+  }
+}
+
+/*
+  A card that lifts 2px and darkens its hairline on hover or keyboard focus.
+  The CSS twin of ProductCard's pointer lift, for server-rendered cards.
+*/
+@utility card-lift {
+  transition-property: transform, border-color, box-shadow;
+  transition-duration: var(--bb-duration-lift), var(--bb-duration-accent),
+    var(--bb-duration-lift);
+  transition-timing-function: var(--bb-ease-out);
+
+  &:hover,
+  &:focus-within {
+    transform: translateY(-2px);
+    border-color: var(--color-ink);
+    box-shadow: var(--shadow-bb);
+  }
+}
+
+/* Skeleton shimmer: a soft highlight sweeping across the placeholder. */
+@utility skeleton {
+  background-color: var(--color-line);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--color-paper) 70%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: bb-shimmer 1.4s var(--bb-ease-out) infinite;
+}
+
+@keyframes bb-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* The cart count bumps when it goes up. */
+@keyframes bb-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@utility animate-pop {
+  animation: bb-pop 360ms var(--bb-ease-out);
+}
+
+/* A confirmation check that draws itself. */
+@keyframes bb-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@utility animate-draw {
+  stroke-dasharray: 24;
+  animation: bb-draw var(--bb-duration-accent) var(--bb-ease-out) both;
+}
+
+/* A panel that has just opened settles into place: 8px rise and fade. */
+@keyframes bb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-rise {
+  animation: bb-rise var(--bb-duration-accent) var(--bb-ease-out) backwards;
+}
+
+/* Illustration bubbles bob a few pixels, slowly. Transform only; the global
+   reduced-motion rule below stops it after one instant iteration. */
+@keyframes bb-drift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
+  }
+}
+
+@utility animate-drift {
+  animation: bb-drift 4.2s ease-in-out infinite alternate;
+}
+
+/* ---------- Stacking — one scale, named by role ---------- */
+:root {
+  --z-sticky: 40;
+  --z-header: 50;
+  --z-overlay: 60;
+  --z-drawer: 70;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -239,5 +452,78 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/*
+  Scroll reveals: hidden only for readers who can bring them back.
+
+  `Reveal`/`RevealItem` used to hand Motion an `initial="hidden"`, which Motion
+  writes into the server HTML as an inline `opacity: 0; transform:
+  translateY(24px)`. That is invisible to anyone whose JavaScript never runs —
+  and inline styles cannot be overridden from a stylesheet, so there was no way
+  to undo it for them. The homepage shipped 31 such elements.
+
+  The hidden state lives here instead, and is never in the server HTML at
+  all: `RevealItem` adds `data-reveal-pending` after hydration, and only to an
+  item that is below the fold at that moment. So the first screen paints in
+  full straight from the HTML — no script needed, nothing to wait for — and
+  what is further down is hidden while still off screen, then animated in as
+  it scrolls into view. Motion's inline `opacity: 1` on arrival beats these
+  rules.
+
+  It used to hide every revealing item before first paint (behind a `.js`
+  class set by an inline script) and wait for Motion to bring it back. On a
+  mid-range phone on 4G that held the homepage headline — the largest thing on
+  screen — invisible for about three seconds while the bundle downloaded and
+  ran.
+
+  `prefers-reduced-motion` skips the hidden state entirely rather than merely
+  shortening it: an element that starts invisible and is never animated back is
+  the one failure this must not have.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal-pending] {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+/* ---------- Safe areas: notches, rounded corners, the home indicator ---------- */
+
+/* A fixed bar along the bottom edge: clear of the iPhone home indicator. */
+@utility pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* A fixed, full-width element: clear of the notch in landscape. */
+@utility safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/*
+  A control a thumb can hit: at least 44 × 44 CSS px (WCAG 2.5.5, Apple HIG),
+  whatever its text. The visible label stays its size; the box around it grows.
+*/
+@utility tap-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+}
+
+/*
+  The product page's fixed "Add to cart" bar (below 768px) would otherwise sit
+  over the last 5rem of the page for good — the footer's seller name and GSTIN
+  could never be scrolled into view. `ProductDetail` sets the attribute while
+  the bar is mounted. Deliberately not `body:has(...)`: a `:has()` on the body
+  is re-checked after every DOM change on the page, and Motion changes inline
+  styles every animation frame — it measurably slowed the product page.
+*/
+@media (width < 48rem) {
+  body[data-sticky-buy-bar] {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 }

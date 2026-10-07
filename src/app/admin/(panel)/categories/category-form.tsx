@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
+
 import { useFormStatus } from 'react-dom';
 import type { CategoryFormState } from './actions';
 
@@ -53,11 +54,11 @@ export function CategoryForm({
   parentOptions: ParentOption[];
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as CategoryFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as CategoryFormState);
   const values = initialValues ?? EMPTY_VALUES;
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"

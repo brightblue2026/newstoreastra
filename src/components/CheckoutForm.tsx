@@ -42,6 +42,19 @@ const STATES = Object.values(STATE_CODES).sort((a, b) => a.localeCompare(b));
 
 type Step = 1 | 2 | 3;
 
+/**
+ * Checkout closes itself after this long. Well inside `STALE_ORDER_MINUTES`
+ * (60) in `lib/orders.ts`, so a customer is not still paying when the cron
+ * releases the order's stock — the webhook flags that case if it happens anyway.
+ */
+const RAZORPAY_TIMEOUT_SECONDS = 15 * 60;
+
+interface PendingPayment {
+  payment: { razorpayOrderId: string; keyId: string; amountPaise: number };
+  orderNumber: string;
+  accessToken: string;
+}
+
 interface RazorpayCheckoutOptions {
   key: string;
   amount: number;
@@ -52,6 +65,8 @@ interface RazorpayCheckoutOptions {
   prefill: { name: string; email?: string; contact: string };
   notes: Record<string, string>;
   theme: { color: string };
+  /** Seconds before Checkout closes itself. */
+  timeout: number;
   handler: (response: { razorpay_payment_id: string; razorpay_order_id: string }) => void;
   modal: { ondismiss: () => void };
 }
@@ -74,7 +89,26 @@ const EMPTY_ADDRESS = {
 
 type AddressFields = typeof EMPTY_ADDRESS;
 
-export default function CheckoutForm() {
+/** Server field errors that the Contact and Delivery sections each display. */
+const CONTACT_ERROR_KEYS = new Set(['phone', 'email', 'shipping.phone']);
+const DELIVERY_ERROR_KEYS = new Set([
+  'shipping.fullName',
+  'shipping.pincode',
+  'shipping.line1',
+  'shipping.line2',
+  'shipping.city',
+  'shipping.state',
+]);
+
+/**
+ * `onlinePaymentAvailable` is false until Razorpay's keys are set. Offering the
+ * option anyway created an order, held its stock, and only then failed.
+ */
+export default function CheckoutForm({
+  onlinePaymentAvailable,
+}: {
+  onlinePaymentAvailable: boolean;
+}) {
   const router = useRouter();
   const lines = useCartStore((state) => state.lines);
   const discountCode = useCartStore((state) => state.discountCode);
@@ -87,7 +121,9 @@ export default function CheckoutForm() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState<AddressFields>(EMPTY_ADDRESS);
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'COD'>('RAZORPAY');
+  const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY' | 'COD'>(
+    onlinePaymentAvailable ? 'RAZORPAY' : 'COD',
+  );
 
   const [cart, setCart] = useState<CartView | null>(null);
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
@@ -95,6 +131,17 @@ export default function CheckoutForm() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  /*
+    An order placed whose payment window was closed. Paying again reopens the
+    same Razorpay order rather than placing a second one — which used to hold
+    the stock twice and leave a duplicate "awaiting payment" order behind.
+    Any edit to what was ordered, or where it goes, forgets it: the placed
+    order no longer matches the form, so the next submit places a fresh one.
+  */
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+  useEffect(() => {
+    setPendingPayment(null);
+  }, [lines, discountCode, email, phone, address, notes, paymentMethod]);
 
   // The cart lives in localStorage, so the first server pass cannot know it.
   useEffect(() => setMounted(true), []);
@@ -164,22 +211,32 @@ export default function CheckoutForm() {
   }, [mounted, refreshQuote]);
 
   // A payment method that stops being available — COD switched off, or a
-  // pincode outside its allowlist — must not stay selected.
+  // pincode outside its allowlist — must not stay selected, and when only one
+  // method works it is the one selected. Before a pincode is entered COD reads
+  // as unavailable, which used to flip the form to online payment even with
+  // online payment switched off — and nothing flipped it back, so the Pay
+  // button stayed greyed out until the customer found the COD option themselves.
   useEffect(() => {
-    if (paymentMethod === 'COD' && quote && !quote.cod.available) {
+    if (!quote) return;
+    if (paymentMethod === 'COD' && !quote.cod.available && onlinePaymentAvailable) {
       setPaymentMethod('RAZORPAY');
+    } else if (paymentMethod === 'RAZORPAY' && !onlinePaymentAvailable && quote.cod.available) {
+      setPaymentMethod('COD');
     }
-  }, [paymentMethod, quote]);
+  }, [paymentMethod, quote, onlinePaymentAvailable]);
 
   if (!mounted) {
-    return <p className="type-body text-ink-soft">Loading your cart…</p>;
+    return <CheckoutSkeleton />;
   }
 
   if (lines.length === 0) {
     return (
-      <div>
-        <p className="type-body text-ink-soft">Your cart is empty.</p>
-        <Link href="/shop" className="mt-4 inline-block type-body underline">
+      <div className="rounded-card border border-dashed border-line bg-sky/30 px-6 py-16 text-center">
+        <p className="type-heading">Your cart is empty</p>
+        <p className="mx-auto mt-3 max-w-md type-body text-ink-soft">
+          Add something from the catalogue and it will be waiting here.
+        </p>
+        <Link href="/shop" className="mt-8 btn btn-primary">
           Browse the catalogue
         </Link>
       </div>
@@ -196,11 +253,12 @@ export default function CheckoutForm() {
     });
   };
 
-  const openRazorpay = (
-    payment: { razorpayOrderId: string; keyId: string; amountPaise: number },
-    orderNumber: string,
-    accessToken: string,
-  ) => {
+  const openRazorpay = async ({ payment, orderNumber, accessToken }: PendingPayment) => {
+    // The script starts loading at step 2, so it is almost always here by
+    // now; on a slow connection it may still be arriving.
+    for (let waited = 0; !window.Razorpay && waited < 8000; waited += 200) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
     if (!window.Razorpay) {
       // The order exists and is payable; it just cannot be paid in this tab.
       router.push(`/order/${orderNumber}?t=${accessToken}`);
@@ -221,6 +279,7 @@ export default function CheckoutForm() {
       },
       notes: { orderNumber },
       theme: { color: '#0f9cd6' },
+      timeout: RAZORPAY_TIMEOUT_SECONDS,
       handler: () => {
         // Deliberately does not mark anything paid — §10. The confirmation
         // page reads the order's real status, which the webhook owns.
@@ -230,8 +289,9 @@ export default function CheckoutForm() {
       modal: {
         ondismiss: () => {
           setSubmitting(false);
+          setPendingPayment({ payment, orderNumber, accessToken });
           setFormError(
-            `Payment was not completed, so order ${orderNumber} is still awaiting payment. Call ${CONTACT.tollFree} if you need help.`,
+            `Payment was not completed, so order ${orderNumber} is still awaiting payment. Pay again below, or call ${CONTACT.tollFree} if you need help.`,
           );
         },
       },
@@ -246,6 +306,11 @@ export default function CheckoutForm() {
     setFieldErrors({});
     setSubmitting(true);
 
+    if (pendingPayment) {
+      await openRazorpay(pendingPayment);
+      return;
+    }
+
     try {
       const result = await submitOrder({
         lines,
@@ -253,7 +318,10 @@ export default function CheckoutForm() {
         ...(email ? { email } : {}),
         phone,
         paymentMethod,
-        shipping: { ...address, pincode, line2: address.line2 || null },
+        // The mobile number is asked once, under Contact; the delivery address
+        // carries the same one. Sending `address.phone` (never filled in) made
+        // the server refuse every order.
+        shipping: { ...address, phone, pincode, line2: address.line2 || null },
         ...(notes ? { notes } : {}),
       });
 
@@ -261,15 +329,23 @@ export default function CheckoutForm() {
         setFormError(result.error);
         setFieldErrors(result.fieldErrors ?? {});
         setSubmitting(false);
-        // Send them back to the section that needs attention.
-        if (result.fieldErrors && Object.keys(result.fieldErrors).some((k) => k.startsWith('shipping'))) {
+        // Send them back to the section that shows the problem. An error with
+        // no field on screen stays on Payment, where the message is visible.
+        const errorKeys = Object.keys(result.fieldErrors ?? {});
+        if (errorKeys.some((key) => CONTACT_ERROR_KEYS.has(key))) {
+          setStep(1);
+        } else if (errorKeys.some((key) => DELIVERY_ERROR_KEYS.has(key))) {
           setStep(2);
         }
         return;
       }
 
       if (result.payment) {
-        openRazorpay(result.payment, result.orderNumber, result.accessToken);
+        await openRazorpay({
+          payment: result.payment,
+          orderNumber: result.orderNumber,
+          accessToken: result.accessToken,
+        });
         return;
       }
 
@@ -299,8 +375,14 @@ export default function CheckoutForm() {
   return (
     <>
       {/* Razorpay's own hosted script — it must be loaded from their origin,
-          not bundled, because it is versioned by them and handles card data. */}
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+          not bundled, because it is versioned by them and handles card data.
+          Only when online payment is on, and only once the customer is past
+          the contact step: with everything it pulls in it is about 2 MB, which
+          on a phone was the heaviest thing on the page and bought nothing for
+          anyone paying cash on delivery or still typing their number. */}
+      {onlinePaymentAvailable && step >= 2 && (
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+      )}
 
       <div className="grid gap-12 lg:grid-cols-[1fr_24rem] lg:gap-16">
         <form onSubmit={onSubmit} noValidate className="min-w-0">
@@ -313,7 +395,7 @@ export default function CheckoutForm() {
             summary={contactComplete ? [phone, email].filter(Boolean).join(' · ') : undefined}
             onOpen={() => setStep(1)}
           >
-            <Field label="Mobile number" error={fieldErrors.phone} hint="For delivery updates on WhatsApp.">
+            <Field label="Mobile number" error={fieldErrors.phone ?? fieldErrors['shipping.phone']} hint="For delivery updates on WhatsApp.">
               <input
                 type="tel"
                 inputMode="numeric"
@@ -485,25 +567,32 @@ export default function CheckoutForm() {
             <fieldset className="space-y-3">
               <legend className="sr-only">Payment method</legend>
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-card border border-line p-4 has-[:checked]:border-ink">
+              <label
+                className={`flex items-start gap-3 rounded-card border border-line p-4 motion-accent hover:border-ink-soft has-[:checked]:border-ink has-[:checked]:bg-sky/40 ${
+                  onlinePaymentAvailable ? 'cursor-pointer' : 'opacity-60'
+                }`}
+              >
                 <input
                   type="radio"
                   name="paymentMethod"
                   value="RAZORPAY"
                   checked={paymentMethod === 'RAZORPAY'}
                   onChange={() => setPaymentMethod('RAZORPAY')}
+                  disabled={!onlinePaymentAvailable}
                   className="mt-1"
                 />
                 <span>
                   <span className="block type-body">Pay online</span>
                   <span className="block type-caption text-ink-soft">
-                    UPI, card, netbanking or wallet, through Razorpay.
+                    {onlinePaymentAvailable
+                      ? 'UPI, card, netbanking or wallet, through Razorpay.'
+                      : `Not available yet. Choose cash on delivery, or call ${CONTACT.tollFree} to order.`}
                   </span>
                 </span>
               </label>
 
               <label
-                className={`flex items-start gap-3 rounded-card border border-line p-4 has-[:checked]:border-ink ${
+                className={`flex items-start gap-3 rounded-card border border-line p-4 motion-accent hover:border-ink-soft has-[:checked]:border-ink has-[:checked]:bg-sky/40 ${
                   quote?.cod.available ? 'cursor-pointer' : 'opacity-60'
                 }`}
               >
@@ -538,12 +627,21 @@ export default function CheckoutForm() {
 
             <button
               type="submit"
-              disabled={submitting || quoting || !contactComplete || !deliveryComplete}
-              className="mt-6 w-full rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift disabled:opacity-50"
+              disabled={
+                submitting ||
+                quoting ||
+                !contactComplete ||
+                !deliveryComplete ||
+                (paymentMethod === 'RAZORPAY' && !onlinePaymentAvailable) ||
+                (paymentMethod === 'COD' && !quote?.cod.available)
+              }
+              className="mt-6 w-full btn btn-primary px-8 py-4"
             >
               {submitting
                 ? 'Placing your order…'
-                : paymentMethod === 'COD'
+                : pendingPayment
+                  ? `Pay ${formatINR(pendingPayment.payment.amountPaise)} for order ${pendingPayment.orderNumber}`
+                  : paymentMethod === 'COD'
                   ? `Place order · ${quote ? formatINR(quote.totalPaise) : '—'}`
                   : `Pay ${quote ? formatINR(quote.totalPaise) : ''}`}
             </button>
@@ -661,7 +759,45 @@ export default function CheckoutForm() {
 }
 
 const inputClass =
-  'w-full rounded-control border border-line bg-paper px-4 py-3 type-body focus-visible:border-ink';
+  'w-full rounded-control border border-line bg-paper px-4 py-3 type-body motion-accent hover:border-ink-soft focus-visible:border-ink';
+
+/**
+ * What checkout looks like before the cart has been read from localStorage —
+ * the same grid, the contact step open, the other two closed — so the real
+ * form replaces it in place instead of pushing everything below it down.
+ */
+function CheckoutSkeleton() {
+  return (
+    <>
+      <span className="sr-only" role="status" aria-live="polite">
+        Loading your cart
+      </span>
+      <div className="grid gap-12 lg:grid-cols-[1fr_24rem] lg:gap-16" aria-hidden="true">
+        <div className="min-w-0">
+          <div className="border-b border-line pb-8">
+            <div className="h-7 w-32 rounded-full skeleton" />
+            <div className="mt-6 space-y-6">
+              {[0, 1].map((field) => (
+                <div key={field}>
+                  <div className="h-4 w-32 rounded-full skeleton" />
+                  <div className="mt-2 h-13 rounded-control skeleton" />
+                  <div className="mt-1 h-4 w-56 max-w-full rounded-full skeleton" />
+                </div>
+              ))}
+              <div className="h-12 w-48 rounded-control skeleton" />
+            </div>
+          </div>
+          {[0, 1].map((step) => (
+            <div key={step} className="border-b border-line py-8">
+              <div className="h-7 w-32 rounded-full skeleton" />
+            </div>
+          ))}
+        </div>
+        <div className="h-72 rounded-card border border-line" />
+      </div>
+    </>
+  );
+}
 
 function Section({
   index,
@@ -683,20 +819,50 @@ function Section({
   return (
     <section className="border-b border-line py-8 first:pt-0">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="type-subhead">
-          <span className="mr-3 type-mono text-ink-soft">{index}</span>
+        <h2 className="flex items-center gap-3 type-subhead">
+          {/* Step marker: outlined while waiting, ink while open, a check once done. */}
+          <span
+            aria-hidden="true"
+            className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full border type-mono motion-accent ${
+              open
+                ? 'border-ink bg-ink text-paper'
+                : done
+                  ? 'border-success bg-success text-paper'
+                  : 'border-line text-ink-soft'
+            }`}
+          >
+            {!open && done ? (
+              <svg viewBox="0 0 16 16" className="size-4" fill="none">
+                <path
+                  d="M3.5 8.5l3 3 6-7"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="animate-draw"
+                />
+              </svg>
+            ) : (
+              index
+            )}
+          </span>
+          <span className="sr-only">Step {index}: </span>
           {title}
         </h2>
         {!open && done && (
-          <button type="button" onClick={onOpen} className="type-caption underline">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="tap-target link-underline type-caption text-ink-soft motion-accent hover:text-ink"
+          >
             Change
           </button>
         )}
       </div>
 
-      {!open && summary && <p className="mt-2 type-caption text-ink-soft">{summary}</p>}
+      {!open && summary && <p className="mt-2 pl-11 type-caption text-ink-soft">{summary}</p>}
 
-      {open && <div className="mt-6 space-y-6">{children}</div>}
+      {open && <div className="mt-6 animate-rise space-y-6">{children}</div>}
     </section>
   );
 }

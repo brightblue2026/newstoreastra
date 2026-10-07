@@ -39,6 +39,9 @@ export const jetbrainsMono = JetBrains_Mono({
   weight: ['400'],
   variable: '--font-mono',
   display: 'swap',
+  // Never the largest thing on screen, so it should not compete with the
+  // photo and the headline for a phone's bandwidth during first load.
+  preload: false,
   fallback: ['ui-monospace', 'monospace'],
 });
 

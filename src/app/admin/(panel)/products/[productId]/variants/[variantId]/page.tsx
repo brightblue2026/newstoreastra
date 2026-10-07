@@ -4,6 +4,7 @@ import { paiseToRupeesInput } from '@/lib/money';
 import { requireCatalogueAccess } from '@/lib/session';
 import { VariantForm, type VariantFormValues } from '../variant-form';
 import { updateVariantAction } from '../actions';
+import { boxSizeInput } from '../../../../box-size';
 
 export default async function EditVariantPage({
   params,
@@ -30,6 +31,7 @@ export default async function EditVariantPage({
     wholesaleRupees:
       variant.wholesalePaise === null ? '' : paiseToRupeesInput(variant.wholesalePaise),
     weightGrams: variant.weightGrams === null ? '' : String(variant.weightGrams),
+    ...boxSizeInput(variant),
     barcode: variant.barcode ?? '',
   };
 

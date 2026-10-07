@@ -3,7 +3,7 @@
 import { useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
-  motion,
+  m,
   useMotionValue,
   useReducedMotion,
   useSpring,
@@ -54,19 +54,19 @@ export default function MagneticButton({
   };
 
   return (
-    <motion.a
+    <m.a
       // `asChild` isn't available here, so Link renders through the motion
-      // anchor via legacyBehavior-free composition: motion.a *is* the anchor.
+      // anchor via legacyBehavior-free composition: m.a *is* the anchor.
       ref={ref}
       href={href}
       onPointerMove={handleMove}
       onPointerLeave={release}
       onBlur={release}
       style={{ x: springX, y: springY }}
-      className={`inline-flex items-center justify-center rounded-control bg-signal px-8 py-4 font-medium text-paper transition-colors hover:bg-ink ${className}`}
+      className={`btn btn-primary px-8 py-4 ${className}`}
     >
       {children}
-    </motion.a>
+    </m.a>
   );
 }
 
@@ -86,7 +86,7 @@ export function SignalLink({
   return (
     <Link
       href={href}
-      className={`inline-flex items-center justify-center rounded-control bg-signal px-8 py-4 font-medium text-paper transition-colors hover:bg-ink ${className}`}
+      className={`btn btn-primary px-8 py-4 ${className}`}
     >
       {children}
     </Link>

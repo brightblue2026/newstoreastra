@@ -52,7 +52,7 @@ export default function OrderLookupPage() {
 
         <button
           type="submit"
-          className="rounded-control bg-signal px-8 py-4 type-body font-medium text-paper motion-lift"
+          className="btn btn-primary px-8 py-4"
         >
           Find my order
         </button>

@@ -2,27 +2,32 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ALLOWED_IMAGE_FORMATS, MIN_LONG_EDGE_PX, PHOTOGRAPHY_CHECKLIST } from '@/lib/cloudinary-shared';
+import {
+  ALLOWED_IMAGE_FORMATS,
+  ALLOWED_IMAGE_MIME_TYPES,
+  MIN_LONG_EDGE_PX,
+  PHOTOGRAPHY_CHECKLIST,
+} from '@/lib/storage-shared';
 import { saveProductImageAction, signProductImageUploadAction } from './actions';
 
 /*
   The upload itself never touches this app's server: the browser asks for a
-  signature, then POSTs the file straight to Cloudinary with it, and only the
-  *result* (a public id and a URL) comes back here to be written into
-  `ProductImage`. That keeps a multi-megabyte product photo off the Next.js
-  server entirely.
+  short-lived signed URL, PUTs the file straight to Supabase Storage, and only
+  the *path* comes back here to be written into `ProductImage`. That keeps a
+  multi-megabyte product photo off the Next.js server entirely.
 
   The long-edge and format checks run twice — once here, against the file the
   browser can already see, so a bad upload is never even attempted; once more
-  in `saveProductImageAction`, because a client check is only ever a courtesy.
+  in `saveProductImageAction`, which re-reads them from the stored object
+  rather than believing anything sent from here.
 */
 
-const ACCEPT = ALLOWED_IMAGE_FORMATS.map((format) => `image/${format === 'jpg' ? 'jpeg' : format}`).join(',');
+const ACCEPT = ALLOWED_IMAGE_MIME_TYPES.join(',');
 
 /**
  * Reads pixel dimensions straight from the file. Deliberately not
  * `URL.createObjectURL` + `<img>` — that path loads the blob as a page
- * resource, which the CSP's `img-src` (self, data:, res.cloudinary.com) then
+ * resource, which the CSP's `img-src` (self, data:, the storage host) then
  * blocks, since a `blob:` URL matches none of those. `createImageBitmap`
  * decodes the file in memory without going through the resource-fetch
  * pipeline at all, so it isn't subject to `img-src`.
@@ -54,32 +59,36 @@ function readPreviewDataUrl(file: File): Promise<string> {
 
 /**
  * `fetch` gives no upload progress at all — the response promise only
- * resolves once the whole round trip is done — so the Cloudinary POST
- * specifically goes through `XMLHttpRequest` instead, purely for its
- * `upload.onprogress` event. A multi-megabyte photo over a slow uplink is
- * the normal case here, not the exception, so silence for the whole
- * duration is a real gap, not a cosmetic one.
+ * resolves once the whole round trip is done — so the upload specifically
+ * goes through `XMLHttpRequest` instead, purely for its `upload.onprogress`
+ * event. A multi-megabyte photo over a slow uplink is the normal case here,
+ * not the exception, so silence for the whole duration is a real gap, not a
+ * cosmetic one.
+ *
+ * A signed Storage URL takes the raw file as the request body with `PUT`, not
+ * a multipart form — the token is already in the URL, so there is nothing else
+ * to send. The response body is not parsed: the status is the whole answer,
+ * and the server re-reads the object anyway.
  */
 function uploadWithProgress(
   url: string,
-  body: FormData,
+  file: File,
   onProgress: (percent: number) => void,
-): Promise<{ ok: boolean; json: Record<string, unknown> }> {
+): Promise<{ ok: boolean; status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', file.type);
+    // Never overwrite: the server signs a fresh, random path per upload, so a
+    // collision means something is wrong rather than something to paper over.
+    xhr.setRequestHeader('x-upsert', 'false');
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
     };
-    xhr.onload = () => {
-      try {
-        resolve({ ok: xhr.status >= 200 && xhr.status < 300, json: JSON.parse(xhr.responseText) });
-      } catch {
-        reject(new Error('Cloudinary returned an unexpected response.'));
-      }
-    };
-    xhr.onerror = () => reject(new Error('Network error while uploading to Cloudinary.'));
-    xhr.send(body);
+    xhr.onload = () =>
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, body: xhr.responseText });
+    xhr.onerror = () => reject(new Error('Network error while uploading the photo.'));
+    xhr.send(file);
   });
 }
 
@@ -136,57 +145,35 @@ export function ImageUploader({ productId }: { productId: string }) {
         return;
       }
 
-      const signResult = await signProductImageUploadAction();
+      const signResult = await signProductImageUploadAction(productId, file.type);
       if (!signResult.ok) {
         setError(signResult.error);
         return;
       }
-      const { cloudName, apiKey, folder, timestamp, signature, allowedFormats, maxFileSize } =
-        signResult.signature;
+      const { uploadUrl, path, maxFileSize } = signResult.ticket;
 
-      // A courtesy check only — Cloudinary itself does not enforce a size
-      // cap on this kind of upload (see the comment on
-      // `signProductImageUploadAction`), so the real enforcement is
-      // server-side in `saveProductImageAction`, after the fact, from
-      // Cloudinary's own reported byte count.
+      // A courtesy check. The bucket enforces its own size limit, and
+      // `saveProductImageAction` re-reads the stored object's real size before
+      // writing a row, so this only saves the user a pointless upload.
       if (file.size > maxFileSize) {
         setError(`File is too large — must be under ${Math.round(maxFileSize / (1024 * 1024))}MB.`);
         return;
       }
 
-      // Every one of these has to match exactly what was signed, or
-      // Cloudinary's own signature check fails the request. `max_file_size`
-      // is deliberately not sent — Cloudinary excludes it from what it signs
-      // and does not enforce it here either way; see the same comment.
-      const body = new FormData();
-      body.set('file', file);
-      body.set('api_key', apiKey);
-      body.set('timestamp', String(timestamp));
-      body.set('signature', signature);
-      body.set('folder', folder);
-      body.set('allowed_formats', allowedFormats);
-
-      const uploadResult = await uploadWithProgress(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        body,
-        setProgress,
-      );
+      const uploadResult = await uploadWithProgress(uploadUrl, file, setProgress);
       if (!uploadResult.ok) {
-        const message = uploadResult.json?.error as { message?: string } | undefined;
-        setError(message?.message ?? 'Upload to Cloudinary failed.');
+        setError(
+          uploadResult.status === 409
+            ? 'That photo was already uploaded. Refresh and check the list below.'
+            : 'The photo could not be uploaded. Try again.',
+        );
         return;
       }
-      const uploadJson = uploadResult.json;
 
-      const saveResult = await saveProductImageAction(productId, {
-        publicId: uploadJson.public_id as string,
-        url: uploadJson.secure_url as string,
-        format: uploadJson.format as string,
-        width: uploadJson.width as number,
-        height: uploadJson.height as number,
-        bytes: uploadJson.bytes as number,
-        alt: alt.trim(),
-      });
+      // Only the path and the alt text. Everything else about the file is read
+      // back from storage by the server — it does not take this page's word
+      // for the size, the format or the dimensions.
+      const saveResult = await saveProductImageAction(productId, { path, alt: alt.trim() });
       if (!saveResult.ok) {
         setError(saveResult.error ?? 'Could not save that image.');
         return;
@@ -239,9 +226,9 @@ export function ImageUploader({ productId }: { productId: string }) {
 
       {preview && (
         // A local data: preview of a file that has not been uploaded
-        // anywhere yet — next/image needs a real, hostable src, and
-        // Cloudinary's own optimisation applies once this is uploaded and
-        // rendered as a real ProductImage instead.
+        // anywhere yet — next/image needs a real, hostable src, and it
+        // optimises this properly once it is uploaded and rendered as a real
+        // ProductImage instead.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={preview}

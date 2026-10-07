@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { pgPoolConfig } from '../src/lib/pg-config';
 import { PrismaClient, Segment } from '../src/generated/prisma/client';
 
 /**
@@ -24,7 +25,7 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is not set.');
 }
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pgPoolConfig(connectionString)) });
 
 // ---------- Entity: the real seller of record ----------
 // GST REG-06 certificate, GSTIN 32DCVPK7871P1ZI, issued 15/06/2026.

@@ -29,8 +29,8 @@ export default function ProductGrid({ products }: { products: ProductCardData[] 
  */
 export function EmptyListing({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-card border border-line px-6 py-16 text-center">
-      <p className="type-body text-ink-soft">{children}</p>
+    <div className="rounded-card border border-dashed border-line bg-sky/30 px-6 py-16 text-center">
+      <p className="mx-auto max-w-md type-body-lg text-ink-soft">{children}</p>
     </div>
   );
 }

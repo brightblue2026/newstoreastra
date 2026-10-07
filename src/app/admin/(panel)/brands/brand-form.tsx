@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
 import { useFormStatus } from 'react-dom';
 import type { BrandFormState } from './actions';
 
@@ -74,11 +74,11 @@ export function BrandForm({
   initialValues?: BrandFormValues;
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as BrandFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as BrandFormState);
   const values = initialValues ?? EMPTY_VALUES;
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p role="alert" className="mb-6 rounded-control border border-warning px-4 py-3 type-body text-warning">
           {state.error}

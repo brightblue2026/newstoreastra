@@ -1,8 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useFormActionKeepingInput } from '@/lib/use-form-action';
+
 import { useFormStatus } from 'react-dom';
 import type { ComboFormState } from './actions';
+import BoxSizeFields from '../box-size-fields';
 
 export interface ComboFormValues {
   name: string;
@@ -12,6 +14,10 @@ export interface ComboFormValues {
   imageUrl: string;
   priceRupees: string;
   isFeatured: boolean;
+  weightGrams: string;
+  lengthCm: string;
+  breadthCm: string;
+  heightCm: string;
 }
 
 const EMPTY_VALUES: ComboFormValues = {
@@ -22,6 +28,10 @@ const EMPTY_VALUES: ComboFormValues = {
   imageUrl: '',
   priceRupees: '',
   isFeatured: false,
+  weightGrams: '',
+  lengthCm: '',
+  breadthCm: '',
+  heightCm: '',
 };
 
 function SubmitButton({ label }: { label: string }) {
@@ -50,11 +60,11 @@ export function ComboForm({
   initialValues?: ComboFormValues;
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, {} as ComboFormState);
+  const [state, formAction, , formRef] = useFormActionKeepingInput(action, {} as ComboFormState);
   const values = initialValues ?? EMPTY_VALUES;
 
   return (
-    <form action={formAction} className="mt-8 max-w-2xl" noValidate>
+    <form ref={formRef} action={formAction} className="mt-8 max-w-2xl" noValidate>
       {state.error && (
         <p
           role="alert"
@@ -110,7 +120,7 @@ export function ComboForm({
       />
 
       <label htmlFor="imageUrl" className={`mt-6 ${labelClass}`}>
-        Image URL — Cloudinary upload arrives separately
+        Image URL — upload arrives separately
       </label>
       <input id="imageUrl" name="imageUrl" defaultValue={values.imageUrl} className={inputClass} />
 
@@ -133,6 +143,35 @@ export function ComboForm({
         <input type="checkbox" name="isFeatured" defaultChecked={values.isFeatured} />
         Featured
       </label>
+
+      <h3 className="mt-10 type-subhead">Shipping</h3>
+      <p className="mt-1 type-caption text-ink-soft">
+        Only if this combo ships in its own carton. Left empty, the weights and boxes of the
+        products inside it are used.
+      </p>
+
+      <label htmlFor="weightGrams" className="mt-6 block type-caption text-ink-soft">
+        Packed weight (grams)
+      </label>
+      <input
+        id="weightGrams"
+        name="weightGrams"
+        inputMode="numeric"
+        defaultValue={values.weightGrams}
+        className={inputClass}
+      />
+      {state.fieldErrors?.weightGrams && (
+        <p className={fieldErrorClass}>{state.fieldErrors.weightGrams}</p>
+      )}
+
+      <BoxSizeFields
+        values={values}
+        error={state.fieldErrors?.box}
+        hint="Couriers charge by size as well as weight."
+        labelClass={labelClass}
+        inputClass={inputClass}
+        errorClass={fieldErrorClass}
+      />
 
       <div className="mt-8">
         <SubmitButton label={submitLabel} />

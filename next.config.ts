@@ -28,7 +28,9 @@ import type { NextConfig } from 'next';
  * failure is invisible until someone actually clicks Pay, which is why it is
  * spelled out here rather than left as a hostname in a list:
  *
- *   - `script-src`  — checkout.razorpay.com serves checkout.js itself.
+ *   - `script-src`  — checkout.razorpay.com serves checkout.js itself, which
+ *                     then loads its risk-detection bundle off cdn.razorpay.com
+ *                     (found blocked in a browser run, 24 September 2026).
  *   - `frame-src`   — the modal, and the bank/3-D Secure pages inside it.
  *   - `connect-src` — checkout.js calls api.razorpay.com and posts telemetry to
  *                     lumberjack.razorpay.com.
@@ -40,20 +42,38 @@ import type { NextConfig } from 'next';
  */
 const RAZORPAY_CHECKOUT = 'https://checkout.razorpay.com';
 const RAZORPAY_API = 'https://api.razorpay.com';
+const RAZORPAY_CDN = 'https://cdn.razorpay.com';
 /** Covers cdn., lumberjack. and the regional hosts Checkout picks at runtime. */
 const RAZORPAY_ANY = 'https://*.razorpay.com';
 
+/**
+ * Supabase Storage serves product photos and receives the admin's uploads.
+ * The exact project host is `<ref>.supabase.co`, which differs per
+ * environment, so the CSP allows the wildcard rather than hard-coding a ref
+ * that would silently break every image on a different project.
+ */
+const SUPABASE_ANY = 'https://*.supabase.co';
+
+/** The project host, when one is configured — used for next/image. */
+function supabaseHostname(): string | null {
+  try {
+    return process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).hostname : null;
+  } catch {
+    return null;
+  }
+}
+
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT} ${RAZORPAY_CDN}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: https://res.cloudinary.com ${RAZORPAY_ANY}`,
+  `img-src 'self' data: ${SUPABASE_ANY} ${RAZORPAY_ANY}`,
   "font-src 'self' data:",
-  // The admin image uploader POSTs the file straight from the browser to
-  // Cloudinary (src/app/admin/(panel)/products/[productId]/images/image-uploader.tsx)
-  // rather than through this app's server, so the fetch itself needs an exception —
+  // The admin image uploader PUTs the file straight from the browser to
+  // Supabase Storage (src/app/admin/(panel)/products/[productId]/images/image-uploader.tsx)
+  // rather than through this app's server, so the request itself needs an exception —
   // alongside Razorpay's own connect-src needs above.
-  `connect-src 'self' https://api.cloudinary.com ${RAZORPAY_API} ${RAZORPAY_ANY}`,
+  `connect-src 'self' ${SUPABASE_ANY} ${RAZORPAY_API} ${RAZORPAY_ANY}`,
   `frame-src ${RAZORPAY_CHECKOUT} ${RAZORPAY_API} ${RAZORPAY_ANY}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -98,8 +118,12 @@ const nextConfig: NextConfig = {
   devIndicators: false,
 
   images: {
-    // Product imagery is served from Cloudinary.
-    remotePatterns: [{ protocol: 'https', hostname: 'res.cloudinary.com' }],
+    // Product imagery is served from this project's Supabase Storage bucket.
+    // Pinned to the configured host where there is one, so a stray URL from
+    // another project is not optimised and served as if it were ours.
+    remotePatterns: [
+      { protocol: 'https', hostname: supabaseHostname() ?? '**.supabase.co', pathname: '/storage/v1/object/public/**' },
+    ],
     formats: ['image/avif', 'image/webp'],
   },
 

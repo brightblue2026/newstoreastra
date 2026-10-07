@@ -4,11 +4,12 @@ import Link from 'next/link';
 import ProductDetail from '@/components/ProductDetail';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid from '@/components/ProductGrid';
-import { getProductBySlug, listProducts, type ProductPage } from '@/lib/storefront';
+import { getApprovedReviews, getProductBySlug, listProducts, type ProductPage } from '@/lib/storefront';
 import { isPurchasable } from '@/lib/money';
 import { absoluteUrl } from '@/lib/site';
 import { CONTACT } from '@/lib/contact';
 import { jsonLdString } from '@/lib/json-ld';
+import { Reviews } from '@/components/Reviews';
 
 export const revalidate = 60;
 
@@ -75,7 +76,7 @@ function productJsonLd(product: ProductPage) {
 function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <details className="group border-b border-line py-6">
-      <summary className="flex cursor-pointer list-none items-center justify-between type-subhead">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between type-subhead">
         {title}
         <span
           aria-hidden="true"
@@ -121,6 +122,9 @@ export default async function ProductDetailPage({
   // carries a real 404 rather than a 200 with 404-shaped content on it.
   if (!product) notFound();
 
+  // Approved reviews only — `getApprovedReviews` filters, not the caller.
+  const reviews = await getApprovedReviews(product.id);
+
   // Same brand, minus this product. A related rail is worth having only when
   // there is something to put in it.
   const related = (
@@ -154,13 +158,13 @@ export default async function ProductDetailPage({
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-2 type-caption text-ink-soft">
             <li className="flex items-center gap-2">
-              <Link href="/shop" className="hover:text-ink">
+              <Link href="/shop" className="inline-flex min-h-11 items-center hover:text-ink">
                 Shop
               </Link>
               <span aria-hidden="true">/</span>
             </li>
             <li className="flex items-center gap-2">
-              <Link href={`/brands/${product.brand.slug}`} className="hover:text-ink">
+              <Link href={`/brands/${product.brand.slug}`} className="inline-flex min-h-11 items-center hover:text-ink">
                 {product.brand.name}
               </Link>
               <span aria-hidden="true">/</span>
@@ -257,6 +261,8 @@ export default async function ProductDetailPage({
             </p>
           </Accordion>
         </div>
+
+        <Reviews productId={product.id} reviews={reviews} />
 
         {related.length > 0 && (
           <section className="mt-24 border-t border-line pt-24">

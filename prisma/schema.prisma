@@ -121,6 +121,12 @@ model ProductVariant {
   pricePaise     Int? // null = "Price on request"
   wholesalePaise Int? // B2B tier, hidden at launch
   weightGrams    Int?
+  // Packed box size in whole centimetres. Shiprocket needs a box for every
+  // shipment and rates on the larger of real and volumetric weight, so an
+  // unmeasured variant ships as the default carton — see lib/parcel.ts.
+  lengthCm       Int?
+  breadthCm      Int?
+  heightCm       Int?
   barcode        String?
   isActive       Boolean        @default(true)
   inventory      Inventory[]
@@ -155,6 +161,12 @@ model Combo {
   pricePaise  Int
   isActive    Boolean     @default(true)
   isFeatured  Boolean     @default(false)
+  // Optional: a combo usually ships in its own carton. Weight overrides the sum
+  // of its components' weights; the box overrides stacking their boxes.
+  weightGrams Int?
+  lengthCm    Int?
+  breadthCm   Int?
+  heightCm    Int?
   items       ComboItem[]
 }
 
@@ -340,6 +352,11 @@ model Order {
   courierName          String?
   trackingUrl          String?
   labelUrl             String?
+  manifestUrl          String?
+  pickupRequestedAt    DateTime?
+  // Why the automatic push to Shiprocket after confirmation failed, for staff
+  // to see on the order page. Cleared on a successful push.
+  shiprocketError      String?
 
   sellerEntityId String // which BBTC entity sold this — see §11
   invoiceNumber  String? @unique
