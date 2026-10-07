@@ -21,7 +21,7 @@ import { DEFAULT_BOX, type BoxCm } from '@/lib/parcel';
   Auth: Shiprocket issues a bearer token from an email/password login, valid for
   ten days. It is cached in module scope *and* in the `Setting` table, so a
   cold serverless instance reads the token from Postgres instead of logging in
-  again — on Vercel every cold start would otherwise be a login, and Shiprocket
+  again — every cold start would otherwise be a login, and Shiprocket
   throttles those. The row is keyed to the API email, so changing the
   credentials invalidates it.
 
@@ -54,7 +54,7 @@ export interface ShiprocketConfig {
 
 /**
  * Credentials from the environment. Both the `SHIPROCKET_API_*` names and the
- * older `SHIPROCKET_*` ones are read, so either set of Vercel variables works.
+ * older `SHIPROCKET_*` ones are read, so either set of variables works.
  */
 export function shiprocketConfig(): ShiprocketConfig | null {
   const email = (process.env.SHIPROCKET_API_EMAIL || process.env.SHIPROCKET_EMAIL)?.trim();

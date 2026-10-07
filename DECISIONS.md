@@ -1826,3 +1826,17 @@ Five defects found and fixed:
 - **Nothing was copied from local to hosted.** Local delivery slabs, COD rules and the MX-3 HSN are test values. Delivery rates, COD and opening stock are BBTC's to enter in the admin.
 - **MX-3 still cannot be published on hosted.** It needs an HSN code and GST rate from the accountant and at least one image. The photographs in `assets/source-photos` and `Brand details/mx3` are 1280px WhatsApp copies and fail the 2000px upload rule, so originals are needed.
 - **Razorpay runs on test keys locally.** No code changed: the existing server action, checkout modal and webhook already cover create, pay and verify. A browser-side verify endpoint was not added, because only the webhook may change order state.
+
+## Hosting moves to Cloudflare Workers (7 October 2026)
+
+Reverses "Hosting on Vercel + Supabase" of 28 September. Supabase stays for Postgres and photos.
+
+- **Why:** Vercel Hobby refused the 15-minute cron and forbids commercial use; the client chose Workers Paid ($5 a month) over Vercel Pro ($20). Workers Free is not an option: the bundle is 5.1 MiB compressed against a 3 MiB limit.
+- **The app runs through `@opennextjs/cloudflare`.** R2 holds ISR pages, D1 records `revalidatePath` calls, a Durable Object queue runs the re-renders. All three are needed for an admin edit to reach the storefront.
+- **One Prisma client per request on Workers, through Hyperdrive.** A Worker cannot use a socket another request opened, so the shared pool hung. `db.ts` keys a client on the request's execution context; Node (dev, seeds, scripts, tests) keeps the singleton. This answers the 28 September objection about transactions: it is still Postgres, with the same row locks.
+- **scrypt is now N=2^15, r=8, p=3,** an OWASP-listed equivalent needing about 32 MB. N=2^17 needs 128 MB, a Workers isolate's whole limit, which was the other 28 September objection. Parameters travel in the hash, so older local hashes still verify. The dummy hash in `auth.ts` must match.
+- **Workers will not compile WebAssembly at runtime,** and both Prisma's query compiler and yoga-layout (under `@react-pdf/renderer`) ship theirs as base64 and compile on first use. `scripts/cf-prepare.mjs` extracts both as `.wasm` files, `worker.ts` imports them so they compile at deploy, and each library reads the result from `globalThis.__bbWasm`: Prisma through a patch to the generated client applied by the build, yoga through `patches/yoga-layout@3.2.1.patch`. Prisma's own `runtime = "workerd"` output was tried first and Next cannot bundle it. Both will need re-checking on a Prisma or react-pdf upgrade.
+- **The cron is a `scheduled` handler in `worker.ts`** that requests the existing route through a self-binding with `CRON_SECRET`. The route did not change.
+- **The Workers build only runs on Linux.** On Windows `next build`'s standalone output fails creating symlinks. It runs in Docker locally and in the `workers-build` CI job; `pnpm dev` is unaffected.
+- **`pnpm-workspace.yaml` has a `packages` entry and `package.json` pins `packageManager`,** because Cloudflare's builder defaulted to pnpm 10, which rejects a workspace file without one.
+- **Verified in the Workers runtime against local Postgres:** database pages, staff login, invoice PDF, all 24 `e2e:razorpay` checks, the stale-order route. Not yet verified on a real deployment: Workers memory and CPU limits, revalidation, the cron trigger, image optimisation.

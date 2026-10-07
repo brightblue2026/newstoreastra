@@ -1,9 +1,13 @@
 # Lint, typecheck and unit tests on every push and pull request.
 #
 # No database and no secrets: Prisma generates its client from the schema alone
-# (see prisma.config.ts), and the unit tests never touch Postgres. `next build`
-# is left out on purpose — it needs the real environment, and the three checks
-# below catch what a build would without it.
+# (see prisma.config.ts), and the unit tests never touch Postgres.
+#
+# The second job builds the Cloudflare Worker. It deploys nothing — it is here
+# because the Workers build only runs on Linux, so a change that breaks it
+# cannot be caught on a Windows development machine. With no database the
+# prerendered pages come out empty, which is fine for a build that is thrown
+# away.
 name: CI
 
 on:
@@ -40,3 +44,28 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  workers-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm cf:build
+        env:
+          AUTH_SECRET: ci-build-only-not-a-real-secret
+          NEXT_PUBLIC_SITE_URL: https://example.invalid
+
+      # Fails if the bundle outgrows what Workers accepts.
+      - run: pnpm exec wrangler deploy --dry-run --outdir .wrangler/dry-run

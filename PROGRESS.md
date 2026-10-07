@@ -1213,3 +1213,14 @@ pnpm dev
 `DATABASE_URL` is now required — the first migration exists and `/admin` screens beyond
 the home page query Postgres directly. Sign in with any seeded `{role}@dev.bbtc.local`
 account.
+
+## Hosting: Cloudflare Workers (7 October 2026)
+
+The deployment target is now Cloudflare Workers, not Vercel; earlier sections that name
+Vercel describe the history. `vercel.json` is gone. What replaced each piece, and why,
+is in DECISIONS.md under "Hosting moves to Cloudflare Workers".
+
+- Build for Workers: `pnpm cf:build` (Linux only: Docker locally, or CI).
+- Preview in the Workers runtime: `pnpm cf:preview`. Deploy: `pnpm cf:deploy`.
+- Configuration: `wrangler.jsonc`; secrets are set with `wrangler secret put`.
+- Local development is unchanged: `pnpm dev` against Docker Postgres.
