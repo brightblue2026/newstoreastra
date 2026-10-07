@@ -1,7 +1,7 @@
 /*
   Phone performance, measured the way a mid-range Android on a weak signal sees it.
 
-    pnpm build && pnpm start        # a production server; dev bundles are unminified
+    pnpm build:next && pnpm start        # a production server; dev bundles are unminified
     pnpm qa:perf [label]            # another terminal
 
   Each page is loaded cold, three times, in Chromium emulating a Pixel 7 with

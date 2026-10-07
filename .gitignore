@@ -37,6 +37,8 @@ dev.log
 # env files — secrets never enter the repo, but the template must
 .env*
 !.env.example
+# Public build-time values only (site URL, publishable key ids). No secrets.
+!.env.production
 
 # vercel
 .vercel
