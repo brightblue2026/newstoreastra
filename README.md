@@ -33,7 +33,8 @@ that needs it.
 | Command | Does |
 | --- | --- |
 | `pnpm dev` | Development server |
-| `pnpm build` | Production build (regenerates the Prisma client first) |
+| `pnpm build` | The Cloudflare Worker build, into `.open-next/`. Linux only (Docker or CI) |
+| `pnpm build:next` | The Next.js build on its own (regenerates the Prisma client first) |
 | `pnpm test` | Unit tests |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` | ESLint |

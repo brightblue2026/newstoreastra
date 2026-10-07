@@ -1,7 +1,7 @@
 /*
   Prepares the two WebAssembly modules the app needs for Cloudflare Workers.
 
-    node scripts/cf-prepare.mjs      (run by `pnpm build`, after `prisma generate`)
+    node scripts/cf-prepare.mjs      (run by `pnpm build:next`, after `prisma generate`)
 
   Workers refuse to compile WebAssembly from bytes at runtime — the error is
   "Wasm code generation disallowed by embedder". A module has to be part of

@@ -18,8 +18,15 @@ import d1NextTagCache from '@opennextjs/cloudflare/overrides/tag-cache/d1-next-t
  * reach every location — the same order as the 60-second revalidate window,
  * and only ever for display: prices are re-read from Postgres at the cart.
  */
-export default defineCloudflareConfig({
-  incrementalCache: kvIncrementalCache,
-  queue: doQueue,
-  tagCache: d1NextTagCache,
-});
+export default {
+  ...defineCloudflareConfig({
+    incrementalCache: kvIncrementalCache,
+    queue: doQueue,
+    tagCache: d1NextTagCache,
+  }),
+  // `pnpm build` is the whole Worker build, so that a host which only knows to
+  // run "build" before deploying still ends up with `.open-next/`. Cloudflare's
+  // Git build did exactly that and failed with "Could not find compiled Open
+  // Next config". The Next.js step on its own is `build:next`.
+  buildCommand: 'pnpm build:next',
+};
