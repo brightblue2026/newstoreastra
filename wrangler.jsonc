@@ -23,29 +23,38 @@
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "store" }],
   "images": { "binding": "IMAGES" },
   // ISR cache, tag cache and revalidation queue: see open-next.config.ts.
-  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "bbtc-store-cache" }],
+  "kv_namespaces": [{ "binding": "NEXT_INC_CACHE_KV", "id": "72e56cef7bdb4339afe4cc8a7e2cfb84" }],
   "d1_databases": [
     {
       "binding": "NEXT_TAG_CACHE_D1",
       "database_name": "bbtc-store-tag-cache",
-      // Placeholder until the database is created; local previews ignore it.
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "9dc4a826-27c4-4641-8323-233744530472"
     }
   ],
   "durable_objects": {
     "bindings": [{ "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOQueueHandler"] }],
-  // Postgres. Hyperdrive pools connections to Supabase; `localConnectionString`
+  // Postgres. Hyperdrive (config `bbtc-store-db`) pools connections to Supabase; `localConnectionString`
   // is what `wrangler dev` uses instead, the Docker database.
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      // Placeholder until the Hyperdrive config is created.
-      "id": "00000000000000000000000000000000",
+      "id": "aa1b518b347d403e8adbff21e02e0144",
       "localConnectionString": "postgresql://bbtc:bbtc@localhost:5432/bbtc_store"
     }
   ],
+  // Public configuration only. `NEXT_PUBLIC_*` values are also needed in the
+  // build environment, because Next inlines them into the browser bundle.
+  "vars": {
+    "AUTH_URL": "https://store.brightbluefmcg.workers.dev",
+    "AUTH_TRUST_HOST": "true",
+    "NEXT_PUBLIC_SITE_URL": "https://store.brightbluefmcg.workers.dev",
+    "SUPABASE_URL": "https://mjbebzlknjowvwhmzzzd.supabase.co",
+    // The Razorpay *test* key id. Public by design; the secret is not here.
+    "NEXT_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_TkdJvcsV1WCSON",
+    "RESEND_FROM_EMAIL": "orders@brightbluefmcg.com"
+  },
   // Cancels unpaid orders past their payment window; see worker.ts.
   "triggers": { "crons": ["*/15 * * * *"] }
 }
