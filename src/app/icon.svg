@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Bright Blue tab icon: a drop of the signal blue on the house ink. -->
+  <rect width="64" height="64" rx="14" fill="#0b1f3a"/>
+  <path d="M32 10C32 10 16 28.5 16 39a16 16 0 0 0 32 0C48 28.5 32 10 32 10Z" fill="#0f9cd6"/>
+  <path d="M24.5 39.5a8 8 0 0 0 6 7.6" fill="none" stroke="#dceafb" stroke-width="3.2" stroke-linecap="round"/>
+</svg>
