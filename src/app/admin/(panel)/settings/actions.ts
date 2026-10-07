@@ -157,6 +157,11 @@ export async function saveShippingSettingsAction(
     return { error: `Two slabs both end at ${duplicateBound.uptoGrams} g.` };
   }
 
+  // Stored lightest first, whatever order the rows were typed in. Rating sorts
+  // for itself, so this changes no price — it keeps the table readable when
+  // the form is opened again.
+  slabs.sort((a, b) => a.uptoGrams - b.uptoGrams);
+
   const overflow = RUPEES.safeParse(formData.get('overflowPriceRupees') ?? '0');
   const defaultUnit = z.coerce
     .number()

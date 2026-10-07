@@ -125,7 +125,10 @@ export default async function RetailersPage({
           {retailers.length === 0 ? (
             <p className="mt-8 type-body text-ink-soft">No retailers match that filter.</p>
           ) : (
-            <div className="mt-4 overflow-x-auto">
+            // `relative`, so the visually hidden column heading (absolutely
+            // positioned) is clipped by this scroller instead of widening the
+            // whole page on a phone.
+            <div className="relative mt-4 overflow-x-auto">
               <table className="w-full min-w-3xl border-collapse">
                 <thead>
                   <tr className="border-b border-line text-left">
