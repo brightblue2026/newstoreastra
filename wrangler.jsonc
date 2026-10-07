@@ -5,7 +5,9 @@
 // `wrangler secret put`; local previews read them from the gitignored .dev.vars.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "bbtc-store",
+  // Must match the Worker's name in the Cloudflare dashboard, or its Git
+  // builds fail with "This Worker does not exist on your account".
+  "name": "store",
   // The custom entry wraps the generated worker to add the cron handler.
   "main": "worker.ts",
   "compatibility_date": "2026-09-01",
@@ -18,7 +20,7 @@
   // Run next to the database rather than next to the visitor: an order is
   // several Postgres round trips, and Supabase is in Mumbai.
   "placement": { "mode": "smart" },
-  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "bbtc-store" }],
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "store" }],
   "images": { "binding": "IMAGES" },
   // ISR cache, tag cache and revalidation queue: see open-next.config.ts.
   "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "bbtc-store-cache" }],
