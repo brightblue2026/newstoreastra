@@ -27,6 +27,7 @@
     "qa:shoot": "tsx scripts/shoot.ts",
     "e2e:razorpay": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-razorpay.ts",
     "e2e:admin": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-admin.ts",
+    "e2e:shiprocket": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-shiprocket.ts",
     "e2e:stock-race": "node --env-file=.env --conditions=react-server --import tsx scripts/e2e-stock-race.ts",
     "qa:perf": "tsx scripts/perf.ts"
   },

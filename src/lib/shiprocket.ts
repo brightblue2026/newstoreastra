@@ -3,6 +3,13 @@ import { db } from '@/lib/db';
 import { trackingUrlFor } from '@/lib/shiprocket-tracking';
 import type { Paise } from '@/lib/money';
 import { DEFAULT_BOX, type BoxCm } from '@/lib/parcel';
+import {
+  LOGIN_BACKOFF_MS,
+  credentialFingerprint,
+  isLoginBlocked,
+  isLoginRefusal,
+  type LoginBlock,
+} from '@/lib/shiprocket-login';
 
 /*
   Shiprocket — brief §10 "Shipping" and §12 Phase 6.
@@ -85,10 +92,48 @@ let cachedToken: { token: string; expiresAt: number } | null = null;
 /** The `Setting` row the token is shared through. No page reads it. */
 const TOKEN_SETTING_KEY = 'shiprocket_token';
 
+/**
+ * A refused login, remembered the same two ways as the token — a cold instance
+ * must not be the one that retries a password Shiprocket has already rejected.
+ */
+let loginBlock: LoginBlock | null = null;
+const LOGIN_BLOCK_SETTING_KEY = 'shiprocket_login_block';
+
 /** Clears the cached token, here and in the database, so the next call logs in. */
 export function resetShiprocketToken(): void {
   cachedToken = null;
-  db.setting.deleteMany({ where: { key: TOKEN_SETTING_KEY } }).catch(() => {});
+  loginBlock = null;
+  db.setting
+    .deleteMany({ where: { key: { in: [TOKEN_SETTING_KEY, LOGIN_BLOCK_SETTING_KEY] } } })
+    .catch(() => {});
+}
+
+async function loginIsPaused(fingerprint: string): Promise<boolean> {
+  if (isLoginBlocked(loginBlock, fingerprint, Date.now())) return true;
+  try {
+    const row = await db.setting.findUnique({ where: { key: LOGIN_BLOCK_SETTING_KEY } });
+    if (isLoginBlocked(row?.data, fingerprint, Date.now())) {
+      loginBlock = row?.data as unknown as LoginBlock;
+      return true;
+    }
+  } catch (error) {
+    console.warn('[shiprocket] could not read the login pause:', error);
+  }
+  return false;
+}
+
+async function pauseLogin(fingerprint: string) {
+  loginBlock = { fingerprint, until: Date.now() + LOGIN_BACKOFF_MS };
+  const data = { ...loginBlock };
+  try {
+    await db.setting.upsert({
+      where: { key: LOGIN_BLOCK_SETTING_KEY },
+      create: { key: LOGIN_BLOCK_SETTING_KEY, data },
+      update: { data },
+    });
+  } catch (error) {
+    console.warn('[shiprocket] could not store the login pause:', error);
+  }
 }
 
 async function readStoredToken(email: string): Promise<{ token: string; expiresAt: number } | null> {
@@ -157,6 +202,11 @@ async function getToken(): Promise<string | null> {
     return stored.token;
   }
 
+  // A refused login is not retried on every call: that is how the API user
+  // got blocked. See `shiprocket-login.ts`.
+  const fingerprint = credentialFingerprint(config.email, config.password);
+  if (await loginIsPaused(fingerprint)) return null;
+
   try {
     const response = await fetchWithTimeout(`${SHIPROCKET_API}/auth/login`, {
       method: 'POST',
@@ -165,7 +215,16 @@ async function getToken(): Promise<string | null> {
     });
 
     if (!response.ok) {
-      console.error('[shiprocket] login failed with', response.status);
+      if (isLoginRefusal(response.status)) {
+        await pauseLogin(fingerprint);
+        console.error(
+          '[shiprocket] login refused with',
+          response.status,
+          `— not retrying for ${LOGIN_BACKOFF_MS / 60_000} minutes or until the credentials change`,
+        );
+      } else {
+        console.error('[shiprocket] login failed with', response.status);
+      }
       return null;
     }
 

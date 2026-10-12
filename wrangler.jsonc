@@ -47,9 +47,9 @@
   // Public configuration only. `NEXT_PUBLIC_*` values are also needed in the
   // build environment, because Next inlines them into the browser bundle.
   "vars": {
-    "AUTH_URL": "https://store.brightbluefmcg.workers.dev",
+    "AUTH_URL": "https://brightbluefmcg.com",
     "AUTH_TRUST_HOST": "true",
-    "NEXT_PUBLIC_SITE_URL": "https://store.brightbluefmcg.workers.dev",
+    "NEXT_PUBLIC_SITE_URL": "https://brightbluefmcg.com",
     "SUPABASE_URL": "https://mjbebzlknjowvwhmzzzd.supabase.co",
     // The Razorpay *test* key id. Public by design; the secret is not here.
     "NEXT_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_TkdJvcsV1WCSON",
