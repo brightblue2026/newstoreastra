@@ -45,19 +45,12 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
         Menu
       </button>
 
-      {open && (
-        <div
-          role="presentation"
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-40 bg-ink/40 lg:hidden"
-        />
-      )}
 
       <nav
         id="admin-nav"
         aria-label="Admin sections"
         className={`${
-          open ? 'fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto border-r bg-paper p-6' : 'hidden'
+          open ? 'mb-4 w-full rounded-card border bg-white p-6' : 'hidden'
         } border-line lg:sticky lg:top-0 lg:z-auto lg:block lg:h-dvh lg:w-60 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:bg-transparent lg:p-0 lg:pt-12`}
       >
         {open && (
@@ -86,7 +79,7 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
                         href={item.href}
                         aria-current={current ? 'page' : undefined}
                         className={`block rounded-control px-3 py-2 type-body ${
-                          current ? 'bg-ink text-paper' : 'text-ink hover:bg-line/40'
+                          current ? 'bg-ink text-paper shadow-bb' : 'text-ink hover:bg-line/40'
                         }`}
                       >
                         {item.label}

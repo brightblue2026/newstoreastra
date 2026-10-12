@@ -145,7 +145,8 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
 
   const active = gallery[Math.min(imageIndex, gallery.length - 1)] ?? null;
 
-  const purchasable = selected !== null && isPurchasable(selected.pricePaise);
+  const priced = selected !== null && isPurchasable(selected.pricePaise);
+  const purchasable = priced && selected.availableStock > 0;
 
   // Reserves room at the end of the page for the fixed buy bar below, so it
   // never covers the footer for good — see `body[data-sticky-buy-bar]` in
@@ -164,14 +165,14 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
 
   function handleAdd() {
     if (!selected || !purchasable) return;
-    addLine({ kind: 'VARIANT', id: selected.id, quantity });
+    addLine({ kind: 'VARIANT', id: selected.id, quantity: Math.min(quantity, selected.availableStock) });
     setAdded(true);
     openCart(true);
   }
 
   const priceBlock = (
     <div>
-      {purchasable ? (
+      {priced ? (
         <p className="type-display-sm tabular-nums" data-price>
           {formatPrice(selected.pricePaise)}
           {showMrp && (
@@ -382,6 +383,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
           </fieldset>
         )}
 
+        {priced && !purchasable && <p role="status" className="mt-8 rounded-control border border-line bg-sky p-4 type-body">Currently out of stock. Contact us for availability.</p>}
         {/* ------------------------------------------------------ add to cart */}
         {purchasable && (
           <div className="mt-12 flex flex-wrap items-center gap-4">
@@ -397,7 +399,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
               <span className="min-w-10 text-center tabular-nums type-body">{quantity}</span>
               <button
                 type="button"
-                onClick={() => setQuantity((q) => Math.min(999, q + 1))}
+                onClick={() => setQuantity((q) => Math.min(999, selected.availableStock, q + 1))}
                 aria-label="Increase quantity"
                 className="min-w-11 px-4 py-3 type-body text-ink-soft motion-accent hover:bg-sky hover:text-ink active:scale-90"
               >

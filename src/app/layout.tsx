@@ -14,14 +14,13 @@ export const metadata: Metadata = {
   // resolve it against the real origin.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: SITE_TITLE,
+    default: 'Bright Blue | Everyday essentials, made in Kerala',
     template: '%s · Bright Blue',
   },
   description: SITE_DESCRIPTION,
-  // No `images` entry yet — there is no real brand/OG asset in `public/`
-  // (image upload isn't built), and a broken image link in a social
-  // preview is worse than no preview at all. Add one here once a real
-  // og-image exists.
+  applicationName: SITE_TITLE,
+  category: 'shopping',
+  robots: { index: true, follow: true, googleBot: { 'max-image-preview': 'large', 'max-snippet': -1 } },
   openGraph: {
     type: 'website',
     locale: 'en_IN',
@@ -31,7 +30,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
   },
@@ -45,6 +44,7 @@ export const metadata: Metadata = {
 const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
+  '@id': `${SITE_URL}/#organization`,
   name: 'Bright Blue Trading Corporation',
   url: SITE_URL,
   telephone: '+91-1800-123-0621',

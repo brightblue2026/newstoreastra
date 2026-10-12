@@ -75,7 +75,7 @@ export default async function ShopPage({
         </RevealItem>
         <RevealItem>
           <p className="mt-6 max-w-2xl type-body-lg text-ink-soft">
-            Eight houses, made in one factory in Ernakulam.
+            Everyday essentials from eight Bright Blue brands, made in Kerala.
           </p>
         </RevealItem>
       </Reveal>

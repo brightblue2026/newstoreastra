@@ -37,7 +37,7 @@ describe('pgPoolConfig', () => {
 
   it('leaves local Postgres without TLS', () => {
     const local = 'postgresql://bbtc:bbtc@localhost:5432/bbtc_store';
-    expect(pgPoolConfig(local)).toEqual({ connectionString: local, max: POOL_MAX });
+    expect(pgPoolConfig(local)).toMatchObject({ connectionString: local, max: POOL_MAX, connectionTimeoutMillis: 5000 });
   });
 
   it('caps the pool for serverless instances', () => {

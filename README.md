@@ -1,82 +1,60 @@
-# bbtc-store
+# Bright Blue store
 
-Storefront and admin panel for **Bright Blue Trading Corporation** — an FMCG manufacturer
-in Ernakulam, Kerala. Seven brands, 100+ SKUs, spanning cleaning, personal care and food.
+A strict TypeScript / Next.js storefront and role-protected admin for Bright Blue Trading Corporation. PostgreSQL/Prisma, Razorpay, Supabase Storage, Shiprocket, and configurable communications.
 
-One Next.js application, one Postgres database, one Cloudflare Workers deployment.
+## Current review
 
-- `BBTC-STORE-MASTER-BRIEF.md` — the single source of truth: requirements, schema, design
-  system, compliance, build phases. Read it before writing code.
-- `PROGRESS.md` — **what has been built so far, and what blocks the next phase.** Start here.
-- `CLAUDE.md` — project memory, loaded every session.
-- `DECISIONS.md` — judgement calls not covered by the brief, one line each.
-- `catalogue.json` — scraped product data from brightblue.in and the brand site.
-- `docs/` — the company brochure and the earlier PRD corrections.
-- `assets/source-photos/` — unprocessed product photography.
+- [Detailed review: all 11 requested points](docs/REVIEW-2026-10.md)
+- [Hosting, staging acceptance and rollback runbook](docs/HOSTING-READINESS.md)
+- [Photography sources](docs/ASSET-SOURCES.md)
 
-## Getting started
+The code has local build, type, lint, unit/regression and HTTP smoke coverage. This is **not a certification of live payment settlement, browser accessibility or production capacity**; the runbook identifies the remaining launch gates.
 
-Requires Node 22+ and pnpm 10+.
+## Local setup
+
+Node.js 24 and pnpm 11 are required.
 
 ```bash
-pnpm install
-cp .env.example .env        # then fill in DATABASE_URL and AUTH_SECRET
+pnpm install --frozen-lockfile
+cp .env.example .env
+# Fill in a local DATABASE_URL and a unique AUTH_SECRET.
+pnpm db:deploy
 pnpm dev
 ```
 
-Generate an auth secret with `npx auth secret`. Phase 0 needs only `DATABASE_URL` and
-`AUTH_SECRET`; every other variable is documented in `.env.example` ahead of the phase
-that needs it.
+Never run integration fixtures, development staff seeds or destructive tests against a real customer database. Use test-mode gateway keys in staging. Environment credentials belong in the hosting secret manager, never Git.
 
 ## Commands
 
-| Command | Does |
+| Command | Purpose |
 | --- | --- |
-| `pnpm dev` | Development server |
-| `pnpm build` | The Cloudflare Worker build, into `.open-next/`. Linux only (Docker or CI) |
-| `pnpm build:next` | The Next.js build on its own (regenerates the Prisma client first) |
-| `pnpm test` | Unit tests |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm lint` | ESLint |
-| `pnpm db:migrate` | Create and apply a migration |
-| `pnpm db:seed` | Seed the database |
-| `pnpm db:studio` | Prisma Studio |
+| `pnpm check` | Lint, strict typecheck, unit and isolated regression tests |
+| `pnpm audit:production` | Production dependency vulnerability gate |
+| `pnpm build:next` | Native Next.js production build; Vercel uses this |
+| `pnpm start` | Serve the native production build |
+| `pnpm build` / `pnpm cf:build` | Existing Cloudflare/OpenNext build |
+| `pnpm check:config` | Configuration-presence check; requires actual deployment environment |
+| `pnpm test:http` | HTTP smoke tests against localhost |
+| `pnpm test:load` | Bounded read-only localhost load; not a checkout capacity certification |
+| `pnpm db:deploy` | Apply reviewed migrations using direct DB connection |
+| `pnpm user:create` | Create a real staff account |
 
-## Layout
+`QA_BASE_URL` and `LOAD_BASE_URL` can select a local test server. Default is `http://localhost:3000`. `LOAD_REQUESTS` and `LOAD_CONCURRENCY` set bounded test volume. Keep the test server and runner in the same network namespace.
 
-```
-src/app/(storefront)/   server components, ISR 60s
-src/app/admin/          role-gated in middleware, layout and every server action
-src/app/api/            webhooks, cart routes
-src/lib/                money, gst, roles, session, db, integrations
-src/server/actions/     server actions, all Zod-validated
-prisma/                 schema, migrations, seed
-```
+## Deploy
 
-## Non-negotiables
+Recommended: Vercel with Node in Mumbai and nearby managed PostgreSQL. `vercel.json` supplies the native build, region and 15-minute cron. See the runbook before domain cutover. The Cloudflare configuration remains available and requires its own cache/Hyperdrive bindings; use `CLOUDFLARE_DEV=1` only when local development needs those bindings.
 
-These come from the brief and are not up for rediscovery:
+`/api/health` is liveness only. `/admin/readiness` is administrator-only configuration guidance, not a live-service test.
 
-- **Money is `Int` in paise.** ₹149.00 is `14900`. Never a float. One `formatINR()`, in
-  `src/lib/money.ts`.
-- **GST is per product, never global.** 18% detergents, 12% ghee, 5% spices, nil-rated
-  jaggery. Invoices need a per-HSN summary table.
-- **A null price renders "Price on request", never ₹0.00.** Do not seed placeholders.
-- **Food products require FSSAI fields at publish.** Fairoze needs a cosmetics licence.
-- **Every mutation checks the role server-side.** Hiding a button is not access control.
-- **Order status changes only from a verified Razorpay webhook**, never the client.
-- **`OrderItem` stores snapshots.** A product edit must never alter a past order.
-- **One accent colour live at a time**, never on body text, never on the CTA.
-- No emoji, no lorem ipsum, no stock photography, no placeholder images. Not Inter.
+## Commerce invariants
 
-## Status
+- Money is integer paise; GST and HSN are product-specific.
+- Prices and totals are derived server-side. A missing price is “Price on request.”
+- Inventory must be tracked and available before an order can reserve it.
+- Paid state follows a verified captured-payment webhook, never a client success callback.
+- Transactions hold order/inventory changes together; historical order lines are snapshots.
+- Every protected mutation checks the current role server-side.
+- Food/cosmetic publishing requires the corresponding catalogue and licence fields.
 
-**Phase 0 — Foundation: complete.** Scaffold, design tokens, self-hosted fonts, Prisma
-schema, Auth.js with five roles, `/admin` gated in three layers, Cloudinary and Sentry
-config, `money.ts` and `gst.ts` with 95 passing tests.
-
-**No migration has been run.** Six open questions in brief §14 block the first one — see
-the end of `DECISIONS.md`.
-
-Phases 1 to 8 are listed in brief §12. Verify a phase's acceptance criteria before
-starting the next.
+The original master brief, `CLAUDE.md`, `DECISIONS.md` and `PROGRESS.md` retain historical context; their old phase-status statements should not be confused with the current review.

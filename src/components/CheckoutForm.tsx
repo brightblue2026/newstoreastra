@@ -302,6 +302,7 @@ export default function CheckoutForm({
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     setFormError(null);
     setFieldErrors({});
     setSubmitting(true);
@@ -354,7 +355,7 @@ export default function CheckoutForm({
       router.push(`/order/${result.orderNumber}?t=${result.accessToken}`);
     } catch (error) {
       console.error('[checkout] submit failed:', error);
-      setFormError('Something went wrong. Nothing has been charged — please try again.');
+      setFormError('We could not confirm the result. Check your order or payment status before trying again.');
       setSubmitting(false);
     }
   };

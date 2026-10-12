@@ -27,8 +27,11 @@ export class OrderNumberError extends Error {
  * 2025-26 (`"2526"`); `2026-04-15` is in FY 2026-27 (`"2627"`).
  */
 export function financialYearCode(date: Date): string {
-  const year = date.getFullYear();
-  const isBeforeApril = date.getMonth() < 3; // Jan=0, Feb=1, Mar=2
+  if (!Number.isFinite(date.getTime())) throw new OrderNumberError('Invalid date.');
+  // Business dates are Indian dates, independently of the host timezone.
+  const india = new Date(date.getTime() + 330 * 60_000);
+  const year = india.getUTCFullYear();
+  const isBeforeApril = india.getUTCMonth() < 3; // Jan=0, Feb=1, Mar=2
   const startYear = isBeforeApril ? year - 1 : year;
   const two = (y: number) => String(((y % 100) + 100) % 100).padStart(2, '0');
   return `${two(startYear)}${two(startYear + 1)}`;

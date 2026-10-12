@@ -8,7 +8,7 @@
  * before the production domain is configured.
  */
 
-const configured = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const configured = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://brightbluefmcg.com';
 
 /** No trailing slash, so `${SITE_URL}${path}` never doubles it. */
 export const SITE_URL = configured.replace(/\/+$/, '');

@@ -85,3 +85,7 @@ qa/perf-*.txt
 .dev.vars
 # The .wasm files scripts/cf-prepare.mjs extracts for worker.ts.
 .cf/
+
+# Machine-specific validation evidence and local server logs.
+qa/*.log
+qa/*.json

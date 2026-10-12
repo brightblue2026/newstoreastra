@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { OrderStatus } from '@/generated/prisma/client';
 import { db } from '@/lib/db';
 import { requireAdminAccess } from '@/lib/session';
-import { canManageCatalogue } from '@/lib/roles';
+import { canManageCatalogue, canAdminister } from '@/lib/roles';
 import { summarise } from './inventory/stock';
 
 const nf = new Intl.NumberFormat('en-IN');
@@ -58,16 +58,18 @@ export default async function AdminHomePage() {
 
   return (
     <div>
-      <h1 className="type-display-sm">Dashboard</h1>
+      <p className="type-caption text-ink-soft">Your store at a glance</p>
+      <h1 className="mt-3 type-display-sm">Welcome back{user.name ? `, ${user.name.split(' ')[0]}` : ''}.</h1>
       <p className="mt-4 type-body-lg text-ink-soft">
         Signed in as {user.email} · {user.role.toLowerCase()}.
       </p>
 
-      <div className="mt-12 grid gap-6 border-t border-line pt-12 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-8 flex flex-wrap gap-3"><Link href="/admin/orders" className="btn btn-primary">Manage orders</Link>{catalogue && <Link href="/admin/products/quick-add" className="btn btn-secondary">Add product</Link>}{canAdminister(user.role) && <Link href="/admin/readiness" className="btn btn-secondary">Check store readiness</Link>}</div>
+      <div className="mt-8 grid gap-6 border-t border-line pt-12 sm:grid-cols-2 lg:grid-cols-3">
         <Tile
           label="Orders to pack"
           value={nf.format(awaitingFulfilment)}
-          note={awaitingFulfilment === 0 ? 'Nothing waiting.' : 'Paid and waiting to go out.'}
+          note={awaitingFulfilment === 0 ? 'Nothing waiting.' : 'Confirmed orders awaiting packing or dispatch.'}
           href="/admin/orders"
           action="Open orders"
           alert={awaitingFulfilment > 0}
@@ -152,7 +154,7 @@ function Tile({
 }) {
   return (
     <section
-      className={`flex flex-col rounded-card border p-6 ${alert ? 'border-warning' : 'border-line'}`}
+      className={`flex flex-col rounded-card border bg-white p-6 shadow-bb ${alert ? 'border-warning' : 'border-line'}`}
     >
       <h2 className="type-caption text-ink-soft">{label}</h2>
       {value !== '' && (

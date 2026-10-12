@@ -16,7 +16,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
  */
 const staffCredentialsSchema = z.object({
   email: z.email({ message: 'Enter a valid email address.' }).trim().toLowerCase(),
-  password: z.string().min(1, { message: 'Enter your password.' }),
+  password: z.string().min(1, { message: 'Enter your password.' }).max(1024),
 });
 
 /**

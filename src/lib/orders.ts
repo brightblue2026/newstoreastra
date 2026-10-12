@@ -359,6 +359,9 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
 
   const placed = await db.$transaction(
     async (tx) => {
+      if (input.userId) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`bbtc:customer-checkout:${input.userId}`}))`;
+      }
       // 1–2. Re-read every price through this transaction, and re-price.
       const resolved = await resolveCartLines(input.lines, tx);
 
@@ -812,7 +815,7 @@ function appendNote(existing: string | null, addition: string): string {
   return existing ? `${existing}\n\n${addition}` : addition;
 }
 
-export type TransitionResult = { ok: true } | { ok: false; error: string };
+export type TransitionResult = { ok: true; changed: boolean } | { ok: false; error: string };
 
 /**
  * Move an order's status, with the state machine and the stock effect applied
@@ -850,7 +853,7 @@ export async function transitionOrder(input: {
       });
 
       if (!order) return { ok: false as const, error: 'That order no longer exists.' };
-      if (order.status === input.to) return { ok: true as const }; // Idempotent by design.
+      if (order.status === input.to) return { ok: true as const, changed: false }; // Idempotent by design.
 
       if (!canTransition(order.status, input.to, input.actor)) {
         return {
@@ -906,7 +909,7 @@ export async function transitionOrder(input: {
         await assignInvoiceNumber(tx, order.id);
       }
 
-      return { ok: true as const };
+      return { ok: true as const, changed: true };
     },
     { timeout: 20_000, maxWait: 10_000 },
   );
@@ -951,6 +954,8 @@ export async function expireStaleOrders(
 
   const stale = await db.order.findMany({
     where: { status: OrderStatus.PENDING_PAYMENT, createdAt: { lt: cutoff } },
+    orderBy: { createdAt: 'asc' },
+    take: 100,
     select: { id: true, orderNumber: true },
   });
 

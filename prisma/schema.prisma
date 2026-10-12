@@ -372,6 +372,8 @@ model Order {
   updatedAt DateTime @updatedAt
 
   @@index([status, createdAt])
+  @@index([razorpayOrderId])
+  @@index([createdAt])
   @@index([userId])
 }
 

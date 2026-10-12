@@ -5,20 +5,9 @@ import { clientIpFrom } from './client-ip';
 
 export { clientIpFrom };
 
-/**
- * Rate limiting over Upstash Redis — REST-based, so it works from any
- * serverless runtime without a persistent connection.
- *
- * Built the same way Shiprocket, MSG91 and Resend were: against
- * documented behaviour, ahead of real credentials, gated by `isConfigured()`
- * so an unconfigured deployment degrades to "not limited" rather than
- * throwing. That degrade direction is deliberate here too, not just
- * convenient — this store already has one documented case (staff login) where
- * "no shared store" was treated as "cannot limit yet", not "reject every
- * request"; unconfigured must fail the same way everywhere this is used, or
- * checkout breaks the moment this file is added, before anyone has set up
- * Upstash. Configure it before relying on it for anything that actually needs
- * throttling.
+/** Shared limits protect authentication, checkout and public queries.
+ * Sensitive operations fail closed in production. Signed webhook endpoints
+ * remain available during Redis outages: their HMAC is still mandatory.
  */
 
 const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -46,13 +35,14 @@ function limiterFor(name: string, requests: number, windowSeconds: number): Rate
     redis: client(),
     limiter: Ratelimit.slidingWindow(requests, `${windowSeconds} s`),
     prefix: `bbtc-ratelimit:${name}`,
+    timeout: 2000,
   });
   limiters.set(cacheKey, limiter);
   return limiter;
 }
 
 export interface RateLimitResult {
-  /** Always true when Upstash is not configured — see the module comment. */
+  /** Whether this request may proceed. */
   allowed: boolean;
   retryAfterSeconds: number;
 }
@@ -70,22 +60,25 @@ export async function checkRateLimit(
   requests: number,
   windowSeconds: number,
 ): Promise<RateLimitResult> {
+  const fallback = {
+    allowed: process.env.NODE_ENV !== 'production' || name.startsWith('webhook-'),
+    retryAfterSeconds: 60,
+  };
   if (!isRateLimitConfigured()) {
-    console.warn(`[rate-limit] "${name}" not enforced — UPSTASH_REDIS_REST_URL/TOKEN unset.`);
-    return { allowed: true, retryAfterSeconds: 0 };
+    console.warn(`[rate-limit] "${name}" unavailable — UPSTASH_REDIS_REST_URL/TOKEN unset.`);
+    return fallback;
   }
 
   try {
     const result = await limiterFor(name, requests, windowSeconds).limit(key);
+    if (result.reason === 'timeout') return fallback;
     return {
       allowed: result.success,
-      retryAfterSeconds: result.success ? 0 : Math.ceil((result.reset - Date.now()) / 1000),
+      retryAfterSeconds: result.success ? 0 : Math.max(1, Math.ceil((result.reset - Date.now()) / 1000)),
     };
   } catch (error) {
-    // Upstash being unreachable must not be able to take down login or
-    // checkout — same "a third party going down never blocks a sale"
-    // principle §10 already applies to Razorpay/Shiprocket.
-    console.error(`[rate-limit] "${name}" check failed, allowing the request:`, error);
-    return { allowed: true, retryAfterSeconds: 0 };
+    // Log no key, email, token or provider response.
+    console.error(`[rate-limit] "${name}" unavailable (${error instanceof Error ? error.name : 'unknown'}).`);
+    return fallback;
   }
 }

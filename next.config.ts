@@ -83,6 +83,7 @@ const CSP = [
 ].join('; ');
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   async headers() {
     return [
       {
@@ -144,4 +145,4 @@ export default nextConfig;
 
 // Gives `next dev` the Cloudflare bindings from wrangler.jsonc. Nothing in the
 // app needs them under Node today, so this only matters once something does.
-initOpenNextCloudflareForDev();
+if (process.env.CLOUDFLARE_DEV === '1') initOpenNextCloudflareForDev();

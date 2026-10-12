@@ -57,7 +57,7 @@ export function navFor(role: UserRole): NavGroup[] {
   }
 
   if (canAdminister(role)) {
-    groups.push({ title: 'Admin', items: [{ href: '/admin/settings', label: 'Settings' }] });
+    groups.push({ title: 'Admin', items: [{ href: '/admin/readiness', label: 'Store readiness' }, { href: '/admin/settings', label: 'Settings' }] });
   }
 
   return groups;

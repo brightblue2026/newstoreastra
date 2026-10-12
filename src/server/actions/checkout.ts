@@ -43,6 +43,8 @@ import {
 export type QuoteResult = { ok: true; quote: CheckoutQuote } | { ok: false; error: string };
 
 export async function quoteCheckout(input: unknown): Promise<QuoteResult> {
+  const limit = await checkRateLimit('quote-checkout', clientIpFrom(await headers()), 60, 60);
+  if (!limit.allowed) return { ok: false, error: 'Please wait a moment before requesting another quote.' };
   const parsed = quoteInputSchema.safeParse(input);
   if (!parsed.success) {
     // Nobody types this payload; a malformed one is a bug, not a mistake.
@@ -165,7 +167,8 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
       `notifyOrderEvent` never throws, so a failed WhatsApp cannot turn a
       placed order into an error the customer sees.
     */
-    await notifyOrderEvent({ orderId: placed.order.id, event: 'CONFIRMED' });
+    const confirmedOrderId = placed.order.id;
+    after(() => notifyOrderEvent({ orderId: confirmedOrderId, event: 'CONFIRMED' }));
 
     // Into Shiprocket after the response, so a slow courier API never delays
     // the customer's confirmation. Off unless enabled in Settings.

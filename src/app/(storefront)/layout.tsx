@@ -37,11 +37,12 @@ export default async function StorefrontLayout({
 
   return (
     <MotionProvider>
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <Ticker items={announcement.items} />
 
       <StorefrontChrome brands={brands} />
 
-      <main>{children}</main>
+      <main id="main-content" tabIndex={-1}>{children}</main>
 
       <footer className="border-t border-line">
         <div className="mx-auto max-w-(--container-page) px-6 py-16">

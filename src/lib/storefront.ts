@@ -476,6 +476,7 @@ export async function getTopCategories(): Promise<CategoryNode[]> {
 
 export type ProductVariantView = {
   id: string;
+  availableStock: number;
   sku: string;
   variantName: string | null;
   variantHex: string | null;
@@ -551,7 +552,7 @@ function readSteps(value: unknown): string[] {
 export async function getProductBySlug(slug: string): Promise<ProductPage | null> {
   try {
     const product = await db.product.findFirst({
-      where: { slug, isActive: true },
+      where: { slug, isActive: true, brand: { isActive: true }, category: { isActive: true } },
       select: {
         id: true,
         name: true,
@@ -596,6 +597,7 @@ export async function getProductBySlug(slug: string): Promise<ProductPage | null
             format: true,
             pricePaise: true,
             mrpPaise: true,
+            inventory: { where: { location: { isActive: true } }, select: { quantity: true, reserved: true } },
             images: {
               orderBy: { sortOrder: 'asc' },
               take: 1,
@@ -639,6 +641,7 @@ export async function getProductBySlug(slug: string): Promise<ProductPage | null
       images: product.images,
       variants: product.variants.map((variant) => ({
         id: variant.id,
+        availableStock: variant.inventory.reduce((n, row) => n + Math.max(0, row.quantity - row.reserved), 0),
         sku: variant.sku,
         variantName: variant.variantName,
         variantHex: variant.variantHex,

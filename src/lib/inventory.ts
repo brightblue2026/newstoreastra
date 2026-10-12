@@ -8,11 +8,9 @@
  *
  * Two rules that are judgement calls, not spec:
  *
- *   1. **A variant with no `Inventory` row at all is not blocked.** Almost
- *      nothing in this catalogue is stocked in the database yet, and treating
- *      "no row" as "no stock" would reject every order. So an untracked variant
- *      allocates nothing and ships — the honest reading of an empty table is
- *      "nobody is counting this", not "there are none".
+ *   1. A variant without tracked stock cannot be reserved. This agrees with
+ *      the storefront and prevents a forged cart from buying uncounted stock.
+ *
  *   2. **Allocation ignores `Location.handles`.** Whether food ships from the
  *      Thrissur or Malappuram units rather than Palakkad is brief §14 Q19, and
  *      unanswered — so stock is drawn from wherever there is stock, deepest
@@ -45,13 +43,14 @@ export function availableTotal(rows: InventoryRow[]): number {
 /**
  * How to reserve `quantity` units, deepest row first.
  *
- * Returns `[]` for an untracked variant (no rows), and `null` when the rows
+ * Returns `null` for an untracked variant (no rows), and `null` when the rows
  * exist but cannot cover the order — which is the caller's signal to abort the
  * whole transaction rather than partially reserve.
  */
 export function planReservation(rows: InventoryRow[], quantity: number): AllocationStep[] | null {
-  if (quantity <= 0) return [];
-  if (rows.length === 0) return [];
+  if (!Number.isSafeInteger(quantity) || quantity < 0) return null;
+  if (quantity === 0) return [];
+  if (rows.length === 0) return null;
   if (availableTotal(rows) < quantity) return null;
 
   const steps: AllocationStep[] = [];

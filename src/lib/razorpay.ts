@@ -23,6 +23,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { z } from 'zod';
 import type { Paise } from './money';
 
 const RAZORPAY_API = 'https://api.razorpay.com/v1';
@@ -89,7 +90,7 @@ export async function createRazorpayOrder(
   if (!config) {
     throw new RazorpayError('Razorpay is not configured on this deployment.');
   }
-  if (!Number.isInteger(input.amountPaise) || input.amountPaise < RAZORPAY_MIN_AMOUNT_PAISE) {
+  if (!Number.isSafeInteger(input.amountPaise) || input.amountPaise < RAZORPAY_MIN_AMOUNT_PAISE) {
     throw new RazorpayError(`Amount must be a whole number of paise, at least ₹1.00.`);
   }
 
@@ -110,6 +111,7 @@ export async function createRazorpayOrder(
         notes: input.notes ?? {},
       }),
       cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
     });
   } catch (error) {
     throw new RazorpayError('Could not reach Razorpay.', error);
@@ -122,20 +124,16 @@ export async function createRazorpayOrder(
     throw new RazorpayError(`Razorpay rejected the order (${response.status}): ${detail}`);
   }
 
-  const body = (await response.json()) as {
-    id?: string;
-    amount?: number;
-    currency?: string;
-    status?: string;
-  };
-
-  if (!body.id || typeof body.amount !== 'number') {
-    throw new RazorpayError('Razorpay returned an order without an id or amount.');
+  const parsed = z.object({
+    id: z.string().regex(/^order_[A-Za-z0-9]+$/),
+    amount: z.number().int().positive(),
+    currency: z.literal('INR'),
+    status: z.literal('created'),
+  }).safeParse(await response.json());
+  if (!parsed.success || parsed.data.amount !== input.amountPaise) {
+    throw new RazorpayError('Razorpay returned an invalid or mismatched order.');
   }
-  if (body.amount !== input.amountPaise) {
-    // Cannot happen with a correct request, and must never pass silently if it does.
-    throw new RazorpayError('Razorpay echoed a different amount than was sent.');
-  }
+  const body = parsed.data;
 
   return {
     id: body.id,
@@ -147,7 +145,7 @@ export async function createRazorpayOrder(
 
 /** Constant-time compare of two hex digests. False for any length mismatch. */
 function hexEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+  if (!/^[a-fA-F0-9]{64}$/.test(a) || !/^[a-fA-F0-9]{64}$/.test(b)) return false;
   try {
     return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
   } catch {

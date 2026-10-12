@@ -1,6 +1,8 @@
 'use server';
 
 import { z } from 'zod';
+import { headers } from 'next/headers';
+import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 import { db } from '@/lib/db';
 import { priceCart } from '@/lib/cart-pricing';
 import { cartLineKey, type CartLineRef } from '@/lib/cart-line';
@@ -69,6 +71,8 @@ const emptyView: CartView = {
 };
 
 export async function readCart(input: unknown): Promise<CartView> {
+  const limit = await checkRateLimit('read-cart', clientIpFrom(await headers()), 120, 60);
+  if (!limit.allowed) throw new Error('Cart temporarily unavailable. Try again shortly.');
   const parsed = readCartSchema.safeParse(input);
 
   if (!parsed.success) {

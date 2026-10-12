@@ -22,6 +22,7 @@ export type NavBrand = {
 /** The primary destinations, shared by the desktop bar and the mobile panel. */
 const PRIMARY_LINKS = [
   { href: '/shop', label: 'Shop' },
+  { href: '/order', label: 'Track order' },
   { href: '/story', label: 'Our story' },
   { href: '/stockists', label: 'Stockists' },
   { href: '/search', label: 'Search' },

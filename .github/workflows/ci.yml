@@ -44,6 +44,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm audit --prod --audit-level=moderate
 
   workers-build:
     runs-on: ubuntu-latest
@@ -69,3 +70,53 @@ jobs:
 
       # Fails if the bundle outgrows what Workers accepts.
       - run: pnpm exec wrangler deploy --dry-run --outdir .wrangler/dry-run
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bbtc
+          POSTGRES_PASSWORD: local-integration-only
+          POSTGRES_DB: bbtc_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bbtc -d bbtc_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://bbtc:local-integration-only@localhost:5432/bbtc_test
+      AUTH_SECRET: local-integration-only-not-a-production-secret
+      RAZORPAY_WEBHOOK_SECRET: local-integration-webhook
+      SHIPROCKET_WEBHOOK_TOKEN: local-integration-courier
+      NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_isolated
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:deploy
+      - run: node --conditions=react-server --import tsx scripts/seed-test-fixture.ts
+      - run: node --conditions=react-server --import tsx scripts/e2e-stock-race.ts
+      - name: Start isolated test server
+        run: |
+          pnpm dev > /tmp/store-test-server.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            curl --fail --silent http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          exit 1
+      - run: node --conditions=react-server --import tsx scripts/e2e-razorpay.ts
+      - run: node --conditions=react-server --import tsx scripts/e2e-shiprocket.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: integration-server-log
+          path: /tmp/store-test-server.log

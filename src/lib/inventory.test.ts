@@ -38,10 +38,8 @@ describe('planReservation', () => {
     expect(planReservation([row('a', 2), row('b', 1)], 4)).toBeNull();
   });
 
-  it('allocates nothing for an untracked variant instead of blocking the order', () => {
-    // Almost nothing in this catalogue is stocked in the database yet. "No row"
-    // means nobody is counting, not that there are none.
-    expect(planReservation([], 3)).toEqual([]);
+  it('refuses untracked inventory, including a forged cart', () => {
+    expect(planReservation([], 3)).toBeNull();
   });
 
   it('never invents stock from a negative available count', () => {

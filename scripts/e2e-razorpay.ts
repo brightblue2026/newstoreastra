@@ -216,8 +216,8 @@ async function run() {
     !started.ok && o.status === 'CANCELLED' && (await stock()).reserved === afterConfirm.reserved, { started, o });
 
   // --- Unknown order ---
-  r = await send('payment.captured', { id: 'pay_ghost', order_id: 'order_ghost', amount: 100, currency: 'INR' });
-  check('payment for unknown order acknowledged (no retry storm)', r.status === 200 && r.json?.ignored === 'unknown order', r);
+  r = await send('payment.captured', { id: 'pay_ghost', order_id: 'order_ghost', amount: 100, currency: 'INR', status: 'captured' });
+  check('unknown provider order asks for retry until the local order is visible', r.status === 503, r);
 }
 
 main().catch(async (e) => {

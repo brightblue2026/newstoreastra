@@ -2,6 +2,7 @@ import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { OrderStatus, PaymentStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
+import { readBoundedBody, RequestBodyTooLarge } from '@/lib/request-body';
 import { transitionOrder } from '@/lib/orders';
 import { notifyOrderEvent } from '@/lib/notifications';
 import { autoPushOrder } from '@/lib/shiprocket-fulfilment';
@@ -93,7 +94,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
-  const rawBody = await request.text();
+  let rawBody: string;
+  try {
+    rawBody = await readBoundedBody(request);
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid body' }, {
+      status: error instanceof RequestBodyTooLarge ? 413 : 400,
+    });
+  }
   const signature = request.headers.get('x-razorpay-signature');
 
   if (!verifyWebhookSignature(rawBody, signature)) {
@@ -127,7 +135,15 @@ export async function POST(request: Request) {
 
   if (!razorpayOrderId) {
     console.warn('[razorpay] a signed', event, 'carried no order id');
-    return NextResponse.json({ received: true, ignored: 'no order id' });
+    return NextResponse.json({ error: 'Missing order id' }, { status: 400 });
+  }
+
+  if (PAID_EVENTS.has(event) && (
+    !payment || !razorpayPaymentId || !payment.order_id ||
+    !Number.isSafeInteger(payment.amount) || (payment.amount ?? 0) < 100 ||
+    payment.currency !== 'INR' || payment.status !== 'captured'
+  )) {
+    return NextResponse.json({ error: 'Incomplete captured payment' }, { status: 400 });
   }
 
   try {
@@ -142,9 +158,7 @@ export async function POST(request: Request) {
       arrive.
     */
     const order = await db.order.findFirst({
-      where: razorpayPaymentId
-        ? { OR: [{ razorpayPaymentId }, { razorpayOrderId }] }
-        : { razorpayOrderId },
+      where: { razorpayOrderId, paymentMethod: 'RAZORPAY' },
       select: {
         id: true,
         orderNumber: true,
@@ -159,15 +173,15 @@ export async function POST(request: Request) {
       // A payment for an order this database has never seen. Acknowledged so
       // Razorpay stops retrying, and logged loudly because it should not happen.
       console.error('[razorpay] no order matches', razorpayOrderId);
-      return NextResponse.json({ received: true, ignored: 'unknown order' });
+      return NextResponse.json({ error: 'Order not available yet' }, { status: 503 });
     }
 
     if (FAILED_EVENTS.has(event)) {
       // A failed attempt is not a cancelled order — the customer can try again
       // on the same order. Only the payment status moves.
       if (order.status === OrderStatus.PENDING_PAYMENT) {
-        await db.order.update({
-          where: { id: order.id },
+        await db.order.updateMany({
+          where: { id: order.id, status: OrderStatus.PENDING_PAYMENT, paymentStatus: { not: PaymentStatus.PAID } },
           data: {
             paymentStatus: PaymentStatus.FAILED,
             ...(razorpayPaymentId ? { razorpayPaymentId } : {}),
@@ -206,8 +220,8 @@ export async function POST(request: Request) {
         disappearing into an "already handled" reply.
       */
       const lateNote = `Payment${razorpayPaymentId ? ` ${razorpayPaymentId}` : ''} was received after this order was cancelled. Refund it from the Razorpay dashboard, or call the customer.`;
-      await db.order.update({
-        where: { id: order.id },
+      await db.order.updateMany({
+        where: { id: order.id, status: OrderStatus.CANCELLED, paymentStatus: { not: PaymentStatus.PAID } },
         data: {
           paymentStatus: PaymentStatus.PAID,
           ...(razorpayPaymentId ? { razorpayPaymentId } : {}),
@@ -245,6 +259,8 @@ export async function POST(request: Request) {
       // Our problem, not Razorpay's — ask for the event again.
       return NextResponse.json({ error: 'Could not confirm the order' }, { status: 500 });
     }
+
+    if (!result.changed) return NextResponse.json({ received: true, status: 'already handled' });
 
     /*
       The confirmation email and WhatsApp go out only now, after the transition

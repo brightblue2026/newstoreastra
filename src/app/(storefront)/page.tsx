@@ -6,7 +6,9 @@ import PinnedSteps from '@/components/PinnedSteps';
 import ProductCard from '@/components/ProductCard';
 import MagneticButton from '@/components/MagneticButton';
 import HouseSpectrum from '@/components/HouseSpectrum';
-import HeroScene from '@/components/art/HeroScene';
+import Image from 'next/image';
+import HomeCollections from '@/components/HomeCollections';
+import StoreQuestions from '@/components/StoreQuestions';
 import RecordSeal from '@/components/art/RecordSeal';
 import StoryScene from '@/components/art/StoryScene';
 import FeatureIcon, { type FeatureIconName } from '@/components/art/FeatureIcon';
@@ -17,7 +19,8 @@ import { getBrands, getFeaturedCombos, getFeaturedProducts } from '@/lib/storefr
 import { formatPrice } from '@/lib/money';
 
 export const metadata: Metadata = {
-  title: 'Bright Blue',
+  title: { absolute: 'Bright Blue | Home care, food & everyday essentials' },
+  alternates: { canonical: '/' },
   description:
     'Bright Blue Trading Corporation — home care, personal care and food, manufactured in Kerala since 2019.',
 };
@@ -156,14 +159,22 @@ export default async function HomePage() {
           <p className="mt-8 max-w-2xl type-body-lg text-ink-soft">{hero.body}</p>
         </RevealItem>
         <RevealItem>
-          <div className="mt-12">
+          <div className="mt-10 flex flex-wrap items-center gap-4">
             <MagneticButton href={hero.ctaHref}>{hero.ctaLabel}</MagneticButton>
+            <Link href="/shop?brand=mx-3" className="btn btn-secondary">Discover MX-3</Link>
           </div>
+          <p className="mt-6 type-caption text-ink-soft">Made in India · Since 2019</p>
         </RevealItem>
       </Reveal>
         {/* Decorative: a Kerala counter with 24 bubbles, one per fragrance. */}
-        <HeroScene className="mx-auto w-full max-w-md lg:max-w-none" />
+        <div className="relative rounded-card border border-line bg-sky/60 p-8 lg:p-12">
+          <div className="flex items-center justify-between gap-4"><span className="type-caption">The MX-3 collection</span><span className="rounded-full border border-ink/20 px-3 py-1 text-xs">Dish care</span></div>
+          <Image src="/collection/dishwash-cutout.webp" alt="Original MX-3 dishwashing liquid bottles from the Bright Blue collection" width={800} height={800} priority sizes="(max-width: 1024px) 90vw, 500px" className="mx-auto aspect-square w-full object-contain" />
+          <div className="flex items-end justify-between border-t border-ink/15 pt-6"><div><span className="type-display-sm">24</span><p className="mt-1 type-body text-ink-soft">Signature fragrances</p></div><Link href="/shop?brand=mx-3" aria-label="Explore MX-3 dish care" className="flex size-12 items-center justify-center rounded-full bg-ink text-paper">↗</Link></div>
+        </div>
       </div>
+
+      <HomeCollections />
 
       {/* 05 — the record */}
       <section className="bg-sky">
@@ -206,7 +217,7 @@ export default async function HomePage() {
         <section className="border-t border-line">
           <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
             <RevealItem>
-              <h2 className="type-display-sm">Eight houses, one factory</h2>
+              <h2 className="type-display-sm">Our brands. One standard.</h2>
             </RevealItem>
             <RevealItem className="mt-16">
               <HouseSpectrum brands={brands} />
@@ -305,6 +316,8 @@ export default async function HomePage() {
         <StoryScene className="w-full max-w-xl" />
         </div>
       </section>
+
+      <StoreQuestions />
 
       {/* 12 — support */}
       <section className="border-t border-line">

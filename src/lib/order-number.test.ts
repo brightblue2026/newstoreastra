@@ -48,3 +48,13 @@ describe('parseOrderNumber', () => {
     expect(parseOrderNumber('BB-2627-1')).toBeNull();
   });
 });
+
+describe('Indian financial-year boundary on any host', () => {
+  it('rolls at midnight IST, not UTC or server-local midnight', () => {
+    expect(financialYearCode(new Date('2026-03-31T18:29:59.999Z'))).toBe('2526');
+    expect(financialYearCode(new Date('2026-03-31T18:30:00.000Z'))).toBe('2627');
+  });
+  it('rejects invalid dates', () => {
+    expect(() => financialYearCode(new Date('invalid'))).toThrow();
+  });
+});

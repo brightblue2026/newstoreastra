@@ -68,11 +68,11 @@ export function pgPoolConfig(connectionString: string): PoolConfig {
     url = new URL(connectionString);
   } catch {
     // Not a URL we can reason about; hand it to pg unchanged and let it fail loudly.
-    return { connectionString, max: POOL_MAX };
+    return { connectionString, max: POOL_MAX, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10_000, statement_timeout: 15_000 };
   }
 
   if (!isSupabaseHost(url.hostname)) {
-    return { connectionString, max: POOL_MAX };
+    return { connectionString, max: POOL_MAX, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10_000, statement_timeout: 15_000 };
   }
 
   // pg lets SSL parameters in the URL override the `ssl` object below, so any
@@ -84,6 +84,6 @@ export function pgPoolConfig(connectionString: string): PoolConfig {
   return {
     connectionString: url.toString(),
     ssl: { ca: SUPABASE_ROOT_CA, rejectUnauthorized: true },
-    max: POOL_MAX,
+    max: POOL_MAX, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10_000, statement_timeout: 15_000,
   };
 }

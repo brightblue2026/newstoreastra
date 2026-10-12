@@ -32,6 +32,7 @@ export async function generateMetadata({
       description: product.metaDesc ?? product.shortDesc,
       images: product.images[0] ? [product.images[0].url] : undefined,
       type: 'website',
+      url: absoluteUrl(`/products/${product.slug}`),
     },
   };
 }
@@ -55,7 +56,7 @@ function productJsonLd(product: ProductPage) {
     // Schema.org wants a decimal string, not paise.
     price: ((variant.pricePaise as number) / 100).toFixed(2),
     sku: variant.sku,
-    availability: 'https://schema.org/InStock',
+    availability: variant.availableStock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
     itemCondition: 'https://schema.org/NewCondition',
   }));
 
@@ -64,7 +65,8 @@ function productJsonLd(product: ProductPage) {
     '@type': 'Product',
     name: product.name,
     description: product.shortDesc,
-    sku: product.variants[0]?.sku,
+    url: absoluteUrl(`/products/${product.slug}`),
+    productID: product.id,
     brand: { '@type': 'Brand', name: product.brand.name },
     category: product.category.name,
     ...(product.images.length > 0 ? { image: product.images.map((i) => i.url) } : {}),
@@ -154,6 +156,14 @@ export default async function ProductDetailPage({
         dangerouslySetInnerHTML={{ __html: jsonLdString(productJsonLd(product)) }}
       />
 
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString({
+        '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Shop', item: absoluteUrl('/shop') },
+          { '@type': 'ListItem', position: 2, name: product.brand.name, item: absoluteUrl(`/brands/${product.brand.slug}`) },
+          { '@type': 'ListItem', position: 3, name: product.name, item: absoluteUrl(`/products/${product.slug}`) },
+        ],
+      }) }} />
       <div className="mx-auto max-w-(--container-page) px-6 py-16">
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-2 type-caption text-ink-soft">

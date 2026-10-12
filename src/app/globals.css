@@ -527,3 +527,7 @@
     padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Keyboard entry point is visible before any animation or navigation. */
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; transform: translateY(-150%); background: var(--color-ink); color: var(--color-paper); padding: 12px 24px; border-radius: 4px; }
+.skip-link:focus { transform: translateY(0); }

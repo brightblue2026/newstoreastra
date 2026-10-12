@@ -22,14 +22,16 @@ export default async function AdminLayout({
   const groups = navFor(user.role);
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen bg-sky/25 text-ink">
+      <a href="#admin-content" className="skip-link">Skip to workspace</a>
       <header className="border-b border-line bg-ink text-paper">
         <div className="mx-auto flex max-w-(--container-page) items-center justify-between gap-4 px-6 py-4">
           <Link href="/admin" className="type-heading text-paper">
-            Bright Blue admin
+            Bright Blue / workspace
           </Link>
-          <div className="flex items-center gap-6">
-            <span className="type-caption text-paper/70">
+          <div className="flex flex-wrap items-center justify-end gap-4">
+            <Link href="/" className="hidden rounded-control border border-paper/30 px-3 py-2 text-sm sm:block">View store ↗</Link>
+            <span className="text-sm text-paper/80">
               {user.name ?? user.email} · {ROLE_LABELS[user.role]}
             </span>
             {/* A shared office computer is the normal case here, so leaving
@@ -51,7 +53,7 @@ export default async function AdminLayout({
       <div className="mx-auto flex max-w-(--container-page) flex-col px-6 pt-6 lg:flex-row lg:gap-10 lg:pt-0">
         <Sidebar groups={groups} />
 
-        <main className="min-w-0 flex-1 py-12">
+        <main id="admin-content" tabIndex={-1} className="min-w-0 flex-1 py-8 lg:py-12">
           {children}
           {!canSeePricing(user.role) && (
             <p className="mt-12 border-t border-line pt-6 type-body text-ink-soft">
