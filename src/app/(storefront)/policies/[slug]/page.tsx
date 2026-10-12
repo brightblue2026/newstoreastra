@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPolicy } from '@/lib/content';
 import { isPolicySlug, policyBlocks } from '@/lib/content-schema';
+import { POLICY_ROUTES } from '@/lib/policy-defaults';
 
 export const revalidate = 60;
 
@@ -22,7 +23,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const policy = await getPolicy(slug);
   if (!policy) return {};
 
-  return { title: policy.title, alternates: { canonical: `/policies/${slug}` } };
+  // The same text is served at the policy's own address; that one is canonical.
+  return { title: policy.title, alternates: { canonical: POLICY_ROUTES[slug].path } };
 }
 
 export default async function PolicyPage({ params }: Props) {

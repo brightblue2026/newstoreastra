@@ -193,6 +193,18 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
           </a>
         </div>
       )}
+      {/* The label declarations for the size chosen: MRP and net quantity. An
+          MRP is printed only when one is recorded — the selling price is not
+          passed off as it. */}
+      {selected && (
+        <p className="mt-2 type-caption normal-case text-ink-soft">
+          {purchasable &&
+            (selected.mrpPaise !== null
+              ? `MRP ${formatPrice(selected.mrpPaise)} (incl. of all taxes) · `
+              : 'Inclusive of all taxes · ')}
+          Net quantity: {selected.size}
+        </p>
+      )}
     </div>
   );
 
