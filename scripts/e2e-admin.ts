@@ -1416,9 +1416,15 @@ async function imagesSection(page: Page) {
 
   const upload = async (name: string, file: Buffer, alt: string) => {
     await open(page, `/admin/products/${product.id}/images`);
-    await page.fill('#imageAlt', alt);
     await page.setInputFiles('#imageFile', { name, mimeType: 'image/png', buffer: file });
-    await page.getByRole('button', { name: /upload/i }).first().click();
+    // A photo that fails the size rule is refused as it is chosen and never gets a
+    // description box; one that passes is pre-filled with the product's name.
+    const altBox = page.locator('#imageAlt');
+    // Scoped to the queue: Next's route announcer is also an alert.
+    await page.locator('#imageAlt, li p[role="alert"]').first().waitFor({ timeout: 15_000 });
+    if (await altBox.count()) await altBox.fill(alt);
+    if (!(await page.getByRole('button', { name: /^upload/i }).isEnabled())) return;
+    await page.getByRole('button', { name: /^upload/i }).first().click();
   };
 
   await upload('small.png', solidPng(800, 800), `${P} too small`);

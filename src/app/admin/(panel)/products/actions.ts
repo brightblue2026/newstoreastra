@@ -7,7 +7,8 @@ import { Prisma } from '@/generated/prisma/client';
 import { recordAudit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
-import { type FoodLabel, foodLabelIncomplete, parseClaims, parseSteps, readFoodLabel } from './format';
+import { type FoodLabel, foodLabelIncomplete, parseClaims, parseSteps } from './format';
+import { joinList, publishBlockers } from './publish-check';
 import { isVariantSkuConflict } from './unique-conflict';
 import { parseVariantRowsJson } from './variant-rows';
 
@@ -268,10 +269,14 @@ export async function createProductAction(
   // fixed destination keyed off a literal, never a caller-supplied path — a
   // redirect target from the form body would be an open redirect.
   if (formData.get('afterCreate') === 'images' && createdProductId) {
-    redirect(`/admin/products/${createdProductId}/images`);
+    redirect(`/admin/products/${createdProductId}/images?created=1`);
   }
 
-  redirect('/admin/products');
+  // The id, never a message: the list looks the product up and words the
+  // confirmation itself, so nothing shown there comes from the address bar.
+  redirect(
+    createdProductId ? `/admin/products?notice=created&product=${createdProductId}` : '/admin/products',
+  );
 }
 
 export async function updateProductAction(
@@ -345,8 +350,10 @@ export async function updateProductAction(
     after: updated,
   });
 
+  // The storefront shows the name, description and tax details saved here.
+  if (updated.isActive) revalidatePath('/', 'layout');
   revalidatePath('/admin/products');
-  redirect('/admin/products');
+  redirect(`/admin/products?notice=updated&product=${updated.id}`);
 }
 
 export async function setProductActiveAction(productId: string, isActive: boolean): Promise<void> {
@@ -358,28 +365,18 @@ export async function setProductActiveAction(productId: string, isActive: boolea
   });
   if (!existing) return;
 
-  // The full Phase 1 publish guard: a variant, an image somewhere on the
-  // product or one of its variants, an HSN code, and — for food — a complete
-  // label. Deactivating never needs the guard.
+  // The full Phase 1 publish guard — see `publishBlockers`. Deactivating never
+  // needs it.
   if (isActive) {
-    const hasVariant = existing.variants.length > 0;
-    const hasImage = existing.images.length > 0 || existing.variants.some((v) => v.images.length > 0);
-    const hasHsn = Boolean(existing.hsnCode);
-    // Null is "not entered", not 0%: nil-rated goods save an explicit 0.
-    const hasGstRate = existing.gstRate !== null;
-    const foodOk =
-      !existing.isFoodProduct || !foodLabelIncomplete(readFoodLabel(existing.foodLabel));
-
-    if (!hasVariant || !hasImage || !hasHsn || !hasGstRate || !foodOk) {
+    const missing = publishBlockers(existing);
+    if (missing.length > 0) {
       // Redirected with the reason rather than thrown: a thrown Error from a
       // server action has its message redacted in a production build (Next
       // replaces it with an opaque digest), so the admin clicking "Publish"
       // on an incomplete product used to get a blank error page instead of
       // being told what's missing. This survives that redaction because it
       // never throws at all.
-      const reason =
-        'Cannot publish: needs at least one variant, one image, an HSN code' +
-        (existing.isFoodProduct ? ', a GST rate, and a complete food label.' : ' and a GST rate.');
+      const reason = `Cannot publish "${existing.name}" yet. It still needs ${joinList(missing)}.`;
       revalidatePath('/admin/products');
       redirect(`/admin/products?publishError=${encodeURIComponent(reason)}`);
     }
@@ -396,5 +393,10 @@ export async function setProductActiveAction(productId: string, isActive: boolea
     after: updated,
   });
 
+  // Every storefront page that lists products, not only this product's own:
+  // without this the shop kept showing the old state for up to a minute, and
+  // "did that work?" had no answer.
+  revalidatePath('/', 'layout');
   revalidatePath('/admin/products');
+  redirect(`/admin/products?notice=${isActive ? 'published' : 'unpublished'}&product=${updated.id}`);
 }
