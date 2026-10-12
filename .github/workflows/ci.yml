@@ -120,3 +120,37 @@ jobs:
         with:
           name: integration-server-log
           path: /tmp/store-test-server.log
+
+  native-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AUTH_SECRET: ci-build-only-not-a-production-secret
+      CRON_SECRET: ci-cron-only-not-a-production-secret
+      NEXT_PUBLIC_SITE_URL: https://example.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:next
+      - name: Production HTTP smoke
+        run: |
+          pnpm exec next start -H 127.0.0.1 > /tmp/native-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3000/api/health && break
+            sleep 1
+          done
+          QA_BASE_URL=http://127.0.0.1:3000 pnpm test:http
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: native-server-log
+          path: /tmp/native-server.log
