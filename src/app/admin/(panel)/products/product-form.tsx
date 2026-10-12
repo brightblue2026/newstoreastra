@@ -32,6 +32,11 @@ export interface ProductFormValues {
   vegMark: string;
   nutrition: string;
   allergens: string;
+  countryOfOrigin: string;
+  manufacturerName: string;
+  manufacturerAddress: string;
+  shelfLife: string;
+  safetyWarnings: string;
   isFeatured: boolean;
   sortOrder: number;
   metaTitle: string;
@@ -50,6 +55,11 @@ const EMPTY_VALUES: ProductFormValues = {
   claims: '',
   ingredients: '',
   usageSteps: '',
+  countryOfOrigin: '',
+  manufacturerName: '',
+  manufacturerAddress: '',
+  shelfLife: '',
+  safetyWarnings: '',
   isFoodProduct: false,
   isCosmetic: false,
   netQty: '',
@@ -372,6 +382,98 @@ export function ProductForm({
           <p className={fieldErrorClass}>{state.fieldErrors.foodLabel}</p>
         )}
       </div>
+
+      {/* Closed by default: most products take the standing details, and the
+          form is long enough already. Open when anything in it is filled, so a
+          saved value is never hidden. */}
+      <details
+        className={sectionClass}
+        open={Boolean(
+          values.countryOfOrigin ||
+            values.manufacturerName ||
+            values.manufacturerAddress ||
+            values.shelfLife ||
+            values.safetyWarnings,
+        )}
+      >
+        <summary className="cursor-pointer type-body font-medium">Compliance and label details</summary>
+        <p className="mt-2 type-caption normal-case text-ink-soft">
+          Shown under &quot;Product details&quot; on the product page. Leave a box empty to use the
+          standing detail named beside it. MRP and net quantity are set on each variant; ingredients
+          and how to use are above.
+        </p>
+
+        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <div>
+            <label htmlFor="countryOfOrigin" className={labelClass}>
+              Country of origin
+            </label>
+            <input
+              id="countryOfOrigin"
+              name="countryOfOrigin"
+              placeholder="India"
+              defaultValue={values.countryOfOrigin}
+              className={inputClass}
+            />
+            <p className="mt-2 type-caption normal-case text-ink-soft">Empty shows India.</p>
+          </div>
+          <div>
+            <label htmlFor="shelfLife" className={labelClass}>
+              Shelf life or best before
+            </label>
+            <input
+              id="shelfLife"
+              name="shelfLife"
+              placeholder="24 months from manufacture"
+              defaultValue={values.shelfLife}
+              className={inputClass}
+            />
+            <p className="mt-2 type-caption normal-case text-ink-soft">
+              For food, tea, personal care and perfume. Empty shows nothing.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="manufacturerName" className={labelClass}>
+              Manufacturer name
+            </label>
+            <input
+              id="manufacturerName"
+              name="manufacturerName"
+              defaultValue={values.manufacturerName}
+              className={inputClass}
+            />
+            <p className="mt-2 type-caption normal-case text-ink-soft">
+              Empty shows the seller as the marketer.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="manufacturerAddress" className={labelClass}>
+              Manufacturer address
+            </label>
+            <input
+              id="manufacturerAddress"
+              name="manufacturerAddress"
+              defaultValue={values.manufacturerAddress}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <label htmlFor="safetyWarnings" className={`mt-6 ${labelClass}`}>
+          Caution and safety warnings
+        </label>
+        <textarea
+          id="safetyWarnings"
+          name="safetyWarnings"
+          rows={2}
+          placeholder="Keep out of reach of children. Avoid contact with eyes."
+          defaultValue={values.safetyWarnings}
+          className={inputClass}
+        />
+        <p className="mt-2 type-caption normal-case text-ink-soft">
+          Empty shows the standard caution on cleaning and car-care products, and nothing on others.
+        </p>
+      </details>
 
       <div className={sectionClass}>
         <label className="flex items-center gap-3 type-body">

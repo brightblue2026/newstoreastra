@@ -8,15 +8,20 @@
  * the "Price on request" enquiry link, the footer and any future contact
  * page cannot drift apart — most of this catalogue has no published price
  * yet, so this link is the primary conversion path today, not a courtesy.
+ *
+ * The values themselves live in `business.ts`, with the rest of the seller's
+ * details; this module keeps the shapes the storefront already uses.
  */
 
+import { BUSINESS } from '@/lib/business';
+
 export const CONTACT = {
-  tollFree: '18001230621',
+  tollFree: BUSINESS.tollFreeDigits,
   /** `tel:` needs the digits unpunctuated. */
-  tollFreeHref: 'tel:18001230621',
+  tollFreeHref: `tel:${BUSINESS.tollFreeDigits}`,
   /** Grouped the way Indian toll-free numbers are read aloud. */
-  tollFreeDisplay: '1800 123 0621',
-  email: 'store-brightbluefmcg@gmail.com',
+  tollFreeDisplay: BUSINESS.tollFree,
+  email: BUSINESS.email,
 } as const;
 
 /**

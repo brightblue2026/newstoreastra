@@ -129,6 +129,9 @@ export default function CheckoutForm({
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Agreement to the terms and the privacy policy. Asked for on every visit,
+  // never remembered: it is consent to this order.
+  const [agreed, setAgreed] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   /*
@@ -625,9 +628,32 @@ export default function CheckoutForm({
               </p>
             )}
 
+            <label className="mt-6 flex cursor-pointer items-start gap-3 type-body">
+              <input
+                type="checkbox"
+                name="agreeToTerms"
+                required
+                checked={agreed}
+                onChange={(event) => setAgreed(event.target.checked)}
+                className="mt-1 size-5 shrink-0"
+              />
+              <span>
+                I agree to the{' '}
+                <a href="/terms" target="_blank" rel="noreferrer" className="underline">
+                  Terms and conditions
+                </a>{' '}
+                and{' '}
+                <a href="/privacy-policy" target="_blank" rel="noreferrer" className="underline">
+                  Privacy policy
+                </a>
+                .
+              </span>
+            </label>
+
             <button
               type="submit"
               disabled={
+                !agreed ||
                 submitting ||
                 quoting ||
                 !contactComplete ||
@@ -647,7 +673,10 @@ export default function CheckoutForm({
             </button>
 
             <p className="mt-4 type-caption text-ink-soft">
-              Prices include GST. You will get a tax invoice with a per-HSN breakdown.
+              Prices are inclusive of all taxes. You will get a tax invoice with a per-HSN breakdown.
+            </p>
+            <p className="mt-2 type-caption text-ink-soft">
+              Payments are processed securely by Razorpay. We never see or store your card details.
             </p>
           </Section>
         </form>

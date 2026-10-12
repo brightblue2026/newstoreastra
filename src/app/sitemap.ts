@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { getPublishedPolicies } from '@/lib/content';
+import { POLICY_ROUTES } from '@/lib/policy-defaults';
 import { getSitemapData } from '@/lib/storefront';
 import { absoluteUrl } from '@/lib/site';
 
@@ -19,16 +19,21 @@ export const revalidate = 60;
   recoverable, a 500 on /sitemap.xml is a crawl error.
 */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [{ products, brands, categories, combos }, policies] = await Promise.all([
-    getSitemapData(),
-    getPublishedPolicies(),
-  ]);
+  const { products, brands, categories, combos } = await getSitemapData();
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: absoluteUrl('/'), changeFrequency: 'weekly', priority: 1 },
     { url: absoluteUrl('/shop'), changeFrequency: 'daily', priority: 0.9 },
     { url: absoluteUrl('/story'), changeFrequency: 'monthly', priority: 0.5 },
     { url: absoluteUrl('/stockists'), changeFrequency: 'weekly', priority: 0.5 },
+    { url: absoluteUrl('/contact'), changeFrequency: 'yearly', priority: 0.4 },
+    // The policy pages always exist: each shows the admin-written text, or the
+    // standing text in `policy-defaults.ts` until one is written.
+    ...Object.values(POLICY_ROUTES).map((route) => ({
+      url: absoluteUrl(route.path),
+      changeFrequency: 'yearly' as const,
+      priority: 0.3,
+    })),
   ];
 
   return [
@@ -54,12 +59,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: absoluteUrl(`/combos/${combo.slug}`),
       changeFrequency: 'weekly' as const,
       priority: 0.6,
-    })),
-    ...policies.map((policy) => ({
-      url: absoluteUrl(`/policies/${policy.slug}`),
-      lastModified: policy.updatedAt,
-      changeFrequency: 'yearly' as const,
-      priority: 0.3,
     })),
   ];
 }
