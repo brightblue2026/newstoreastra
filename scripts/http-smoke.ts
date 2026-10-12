@@ -13,7 +13,7 @@ assert.ok(html.includes('Find your kind of care.'));
 assert.ok(html.includes('application/ld+json'));
 assert.ok(html.includes('rel="canonical"'));
 assert.ok(html.includes('Skip to content'));
-for (const path of ['/shop', '/order', '/robots.txt', '/sitemap.xml', '/opengraph-image', '/api/health']) {
+for (const path of ['/shop', '/order', '/contact', '/terms', '/privacy-policy', '/refund-policy', '/shipping-policy', '/robots.txt', '/sitemap.xml', '/opengraph-image', '/api/health']) {
   assert.equal((await request(path)).status, 200, path);
 }
 const admin = await request('/admin', { redirect: 'manual' });

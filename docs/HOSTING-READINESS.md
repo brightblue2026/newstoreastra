@@ -1,6 +1,6 @@
 # Bright Blue store: hosting and launch runbook
 
-Review date: 13 October 2026 (India). Source reviewed: `brightblue2026/store`, commit `4a3250f`. Destination: `brightblue2026/newstoreastra`.
+Review date: 13 October 2026 (India). Source reviewed: `brightblue2026/store`, initial commit `4a3250f`, with subsequent source `3535676` merged before handoff. Destination: `brightblue2026/newstoreastra`.
 
 ## Recommendation
 
@@ -28,7 +28,7 @@ Official references consulted:
 3. Configure the final store origin, `AUTH_URL`, a random `AUTH_SECRET` of at least 32 characters, `CRON_SECRET` of at least 32 characters, Upstash credentials, Supabase Storage settings, and the required service credentials described in `.env.example`. Set `AUTH_TRUST_HOST` only behind the trusted hosting proxy. Override the repository's public production values in the preview environment; never use live payment keys for staging.
 4. Online payments require **all three**: `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`. Start with test-mode keys. Keep webhook secrets separate from API secrets. Select automatic capture and subscribe to `payment.captured`, `order.paid`, and `payment.failed`.
 5. Run `pnpm check:config` with the actual host environment available. This checks configuration presence, not network connectivity, provider permissions or settlement.
-6. Back up the database, review migrations, then run `pnpm db:deploy` against staging. This change adds two indexes to Order, without rewriting commerce data. On a large production Order table, plan index creation during a maintenance window: ordinary CREATE INDEX can block writers.
+6. Back up the database, review migrations, then run `pnpm db:deploy` against staging. The hardening change adds two indexes to Order; the merged upstream compliance update also adds product-label columns. Review both migration files. On a large production Order table, plan index creation during a maintenance window: ordinary CREATE INDEX can block writers.
 7. Create real staff with `pnpm user:create`; do not seed development staff into production. Use least-privilege accounts and an access policy/MFA for administrative sign-in.
 8. In the admin, publish complete products with real prices, HSN/GST values, images and required labels; record stock at active locations; configure exactly one confirmed seller of record. Configure shipping, COD eligibility, and approved customer policies. `/admin/readiness` reports configuration gaps without exposing secret values.
 

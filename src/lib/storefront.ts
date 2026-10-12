@@ -501,12 +501,18 @@ export type ProductPage = {
   isFoodProduct: boolean;
   isCosmetic: boolean;
   foodLabel: Record<string, unknown> | null;
+  countryOfOrigin: string | null;
+  manufacturerName: string | null;
+  manufacturerAddress: string | null;
+  shelfLife: string | null;
+  safetyWarnings: string | null;
   metaTitle: string | null;
   metaDesc: string | null;
   brand: {
     name: string;
     slug: string;
     accentHex: string;
+    segment: Segment;
     segmentLabel: string;
     fssaiLicence: string | null;
     cosmeticLicence: string | null;
@@ -567,6 +573,11 @@ export async function getProductBySlug(slug: string): Promise<ProductPage | null
         isFoodProduct: true,
         isCosmetic: true,
         foodLabel: true,
+        countryOfOrigin: true,
+        manufacturerName: true,
+        manufacturerAddress: true,
+        shelfLife: true,
+        safetyWarnings: true,
         metaTitle: true,
         metaDesc: true,
         brand: {
@@ -627,12 +638,18 @@ export async function getProductBySlug(slug: string): Promise<ProductPage | null
         product.foodLabel !== null && typeof product.foodLabel === 'object'
           ? (product.foodLabel as Record<string, unknown>)
           : null,
+      countryOfOrigin: product.countryOfOrigin,
+      manufacturerName: product.manufacturerName,
+      manufacturerAddress: product.manufacturerAddress,
+      shelfLife: product.shelfLife,
+      safetyWarnings: product.safetyWarnings,
       metaTitle: product.metaTitle,
       metaDesc: product.metaDesc,
       brand: {
         name: product.brand.name,
         slug: product.brand.slug,
         accentHex: product.brand.accentHex,
+        segment: product.brand.segment,
         segmentLabel: segmentLabel(product.brand.segment),
         fssaiLicence: product.brand.fssaiLicence,
         cosmeticLicence: product.brand.cosmeticLicence,

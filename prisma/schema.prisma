@@ -91,6 +91,15 @@ model Product {
   // — required when isFoodProduct
   foodLabel     Json?
 
+  // Label declarations shown on the product page (Legal Metrology). All
+  // optional: when one is empty the page falls back to the seller's standing
+  // details in src/lib/business.ts — India, and the seller as marketer.
+  countryOfOrigin     String?
+  manufacturerName    String?
+  manufacturerAddress String?
+  shelfLife           String? // "24 months from manufacture"
+  safetyWarnings      String?
+
   isActive   Boolean          @default(true)
   isFeatured Boolean          @default(false)
   sortOrder  Int              @default(0)

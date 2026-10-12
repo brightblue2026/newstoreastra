@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { db } from '@/lib/db';
 import { requireAdministrator } from '@/lib/session';
 import { configurationChecks } from '@/lib/readiness';
+import { missingBusinessDetails } from '@/lib/business';
 import { getPublishedPolicies } from '@/lib/content';
 
 export default async function ReadinessPage() {
@@ -12,12 +13,14 @@ export default async function ReadinessPage() {
     db.entity.findMany({ where: { isSeller: true, isActive: true }, select: { gstin: true } }),
     getPublishedPolicies(),
   ]);
+  const missingDetails = missingBusinessDetails();
   const checks = [
     ...configurationChecks(process.env),
     { id: 'catalogue', label: 'Published catalogue', ready: products > 0, detail: `${products} published products. Verify prices, product images, HSN/GST and required label information in Products.` },
     { id: 'stock', label: 'Stock recorded', ready: stocked > 0, detail: 'Record stock for every sellable variant at an active location. Untracked products cannot be ordered.' },
     { id: 'seller', label: 'Seller of record', ready: sellers.length === 1 && Boolean(sellers[0].gstin), detail: 'Exactly one active seller with a confirmed GSTIN is needed for invoicing.' },
-    { id: 'policies', label: 'Customer policies', ready: policies.length === 4, detail: `${policies.length} of 4 policies published: shipping, returns, privacy and terms.` },
+    { id: 'business', label: 'Business details confirmed', ready: missingDetails.length === 0, detail: missingDetails.length ? `Confirm: ${missingDetails.join(', ')}.` : 'Confirm the public seller identity matches the invoice entity and payment account.' },
+    { id: 'policies', label: 'Customer policies', ready: policies.length === 4, detail: `${policies.length} of 4 policies explicitly published in admin: shipping, returns, privacy and terms. Standing fallback text also exists; review and approve it before launch.` },
   ];
   const passed = checks.filter((check) => check.ready).length;
   return (

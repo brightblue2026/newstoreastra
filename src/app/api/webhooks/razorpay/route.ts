@@ -25,13 +25,13 @@ import { checkRateLimit, clientIpFrom } from '@/lib/rate-limit';
 
   Three properties, in order of importance:
 
-  1. **Raw body.** `req.text()` before any parsing. The digest is over the exact
+  1. **Raw body.** Bounded raw text before any JSON parsing. The digest is over the exact
      bytes Razorpay signed; re-serialising a parsed object can reorder keys and
      would fail a signature that is in fact valid.
   2. **Fail closed.** No signature, no secret configured, or a mismatch → 400 and
      nothing happens. An unconfigured deployment confirms nothing.
   3. **Idempotent.** Razorpay retries, and a retry must change nothing. The
-     `razorpayPaymentId` is matched first, and an order already past
+     provider order ID is matched exactly, and an order already past
      PENDING_PAYMENT is acknowledged without touching stock — replaying a
      webhook must not decrement inventory twice.
 
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     /*
       Idempotency, in two layers.
 
-      First by payment id: a retry of an event already recorded finds the order
+      First by provider order id: a retry of an event already recorded finds the order
       and returns without doing anything, because its status is no longer
       PENDING_PAYMENT. Then by order state: `transitionOrder` treats a move to
       the status an order is already in as a no-op, so stock is never
@@ -170,8 +170,8 @@ export async function POST(request: Request) {
     });
 
     if (!order) {
-      // A payment for an order this database has never seen. Acknowledged so
-      // Razorpay stops retrying, and logged loudly because it should not happen.
+      // Delivery can precede the local provider-order update. Ask Razorpay to
+      // retry; alert if it keeps referring to an unknown order.
       console.error('[razorpay] no order matches', razorpayOrderId);
       return NextResponse.json({ error: 'Order not available yet' }, { status: 503 });
     }

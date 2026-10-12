@@ -7,6 +7,7 @@ import ProductGrid from '@/components/ProductGrid';
 import { getApprovedReviews, getProductBySlug, listProducts, type ProductPage } from '@/lib/storefront';
 import { isPurchasable } from '@/lib/money';
 import { absoluteUrl } from '@/lib/site';
+import { BUSINESS } from '@/lib/business';
 import { CONTACT } from '@/lib/contact';
 import { jsonLdString } from '@/lib/json-ld';
 import { Reviews } from '@/components/Reviews';
@@ -92,6 +93,38 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
+/** Segments sold as chemical preparations, which carry a caution by default. */
+const CHEMICAL_SEGMENTS = ['HOME_CARE', 'DISH_CARE', 'FABRIC_CARE', 'CAR_CARE'];
+const STANDARD_CAUTION = 'Keep out of reach of children. Avoid contact with eyes.';
+
+/**
+ * The label declarations that are not already shown elsewhere on the page.
+ * A product's own value wins; otherwise the seller's standing detail from
+ * `business.ts`; and a row with neither is left out rather than shown blank.
+ */
+function labelDetailRows(product: ProductPage): { name: string; value: string; mono?: boolean }[] {
+  const sizes = [...new Set(product.variants.map((variant) => variant.size))];
+  const edible =
+    product.isFoodProduct || product.brand.segment === 'FOOD' || product.brand.segment === 'BEVERAGE';
+  const fssai = edible ? (product.brand.fssaiLicence ?? BUSINESS.fssaiLicense) : null;
+
+  const rows: { name: string; value: string; mono?: boolean }[] = [];
+  if (sizes.length > 0) rows.push({ name: 'Net quantity', value: sizes.join(', ') });
+  rows.push({ name: 'Country of origin', value: product.countryOfOrigin ?? 'India' });
+  rows.push(
+    product.manufacturerName
+      ? {
+          name: 'Manufactured and marketed by',
+          value: [product.manufacturerName, product.manufacturerAddress].filter(Boolean).join(', '),
+        }
+      : { name: 'Marketed by', value: `${BUSINESS.legalName}, ${BUSINESS.registeredAddress}` },
+  );
+  if (product.shelfLife) rows.push({ name: 'Best before', value: product.shelfLife });
+  if (fssai) rows.push({ name: 'FSSAI Lic. No.', value: fssai, mono: true });
+  rows.push({ name: 'Customer care', value: `${CONTACT.tollFreeDisplay} · ${CONTACT.email}` });
+  return rows;
+}
+
 const FOOD_LABEL_FIELDS: { key: string; label: string }[] = [
   { key: 'netQty', label: 'Net quantity' },
   { key: 'batch', label: 'Batch number' },
@@ -141,6 +174,9 @@ export default async function ProductDetailPage({
     product.foodLabel.vegMark === true;
 
   const labelRows = product.foodLabel ? foodLabelRows(product.foodLabel) : [];
+  const caution =
+    product.safetyWarnings ??
+    (CHEMICAL_SEGMENTS.includes(product.brand.segment) ? STANDARD_CAUTION : null);
 
   return (
     <>
@@ -219,6 +255,28 @@ export default async function ProductDetailPage({
           {product.ingredients && (
             <Accordion title="Ingredients">
               <p className="type-body text-ink-soft">{product.ingredients}</p>
+            </Accordion>
+          )}
+
+          <Accordion title="Product details">
+            <dl className="space-y-3">
+              {labelDetailRows(product).map((row) => (
+                <div key={row.name} className="flex flex-col gap-1 sm:flex-row sm:gap-4">
+                  <dt className="shrink-0 type-caption text-ink-soft sm:w-40">{row.name}</dt>
+                  <dd className={`min-w-0 break-words ${row.mono ? 'type-mono' : 'type-body'}`}>
+                    {row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-4 type-caption normal-case text-ink-soft">
+              MRP is shown with the price for the size you select, inclusive of all taxes.
+            </p>
+          </Accordion>
+
+          {caution && (
+            <Accordion title="Caution">
+              <p className="whitespace-pre-line type-body text-ink-soft">{caution}</p>
             </Accordion>
           )}
 
