@@ -43,28 +43,7 @@ export default async function ProductImagesPage({
 
   const variantLabel = (variant: { variantName: string | null; format: string | null; size: string }) =>
     [variant.variantName, variant.format, variant.size].filter(Boolean).join(' · ');
-  const labels = new Map(product.variants.map((variant) => [variant.id, variantLabel(variant)]));
-
-  // One stored photo can belong to several variants (one row each, sharing
-  // `publicId`), so the rows are folded back into photos for display.
-  const variantRows = await db.productImage.findMany({
-    where: { productId: product.id, variantId: { not: null } },
-    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-    select: { id: true, url: true, alt: true, publicId: true, variantId: true },
-  });
-  const variantPhotos = new Map<
-    string,
-    { image: { id: string; url: string; alt: string }; variants: string[] }
-  >();
-  for (const row of variantRows) {
-    const photo = variantPhotos.get(row.publicId) ?? { image: row, variants: [] };
-    photo.variants.push(labels.get(row.variantId ?? '') ?? 'a removed variant');
-    variantPhotos.set(row.publicId, photo);
-  }
-  const shownFor = (variants: string[]) =>
-    variants.length <= 3
-      ? `Shown for ${variants.join(', ')}`
-      : `Shown for ${variants.slice(0, 2).join(', ')} and ${variants.length - 2} more`;
+  const variantPhotoCount = product.variants.reduce((sum, variant) => sum + variant.images.length, 0);
 
   return (
     <div>
@@ -75,6 +54,15 @@ export default async function ProductImagesPage({
         / {product.name}
       </p>
       <h1 className="mt-4 type-display-sm">Photos</h1>
+      {product.variants.length > 0 && (
+        <p className="mt-4 max-w-2xl type-body text-ink-soft">
+          These are photos of the product as a whole. Each variant also has its own photo page:{' '}
+          <a href="#variant-photos" className="text-signal underline">
+            photos for each variant
+          </a>
+          .
+        </p>
+      )}
 
       {/* Arriving here straight from "Save and add photos": say the save
           happened before asking for anything else. */}
@@ -92,15 +80,7 @@ export default async function ProductImagesPage({
       {/* Told before a file is chosen, not after. The uploader used to render
           as though it worked and only failed once the photo had been picked. */}
       {isStorageConfigured() ? (
-        <ImageUploader
-          productId={product.id}
-          defaultAlt={product.name}
-          variants={product.variants.map((variant) => ({
-            id: variant.id,
-            name: variant.variantName,
-            label: variantLabel(variant),
-          }))}
-        />
+        <ImageUploader productId={product.id} defaultAlt={product.name} />
       ) : (
         <div className="mt-8 rounded-card border border-warning p-6">
           <p className="type-body text-warning">Photo uploads are not set up yet.</p>
@@ -121,7 +101,7 @@ export default async function ProductImagesPage({
       <h2 className="mt-12 type-heading">Saved photos ({product.images.length})</h2>
       {product.images.length === 0 ? (
         <p className="mt-4 type-body text-ink-soft">
-          {variantPhotos.size === 0
+          {variantPhotoCount === 0
             ? 'No photos saved yet. This product cannot be published without at least one.'
             : 'No photo of the product as a whole yet. Cards and search results use a variant photo until there is one.'}
         </p>
@@ -146,26 +126,35 @@ export default async function ProductImagesPage({
         </>
       )}
 
-      {variantPhotos.size > 0 && (
+      {product.variants.length > 0 && (
         <>
-          <h2 className="mt-12 type-heading">Photos for specific variants ({variantPhotos.size})</h2>
-          <p className="mt-4 type-caption text-ink-soft">
-            Each of these leads the product page when a customer picks that variant, and is the
-            picture shown in the cart.
+          <h2 id="variant-photos" className="mt-12 scroll-mt-6 type-heading">
+            Photos for each variant
+          </h2>
+          <p className="mt-4 max-w-2xl type-caption text-ink-soft">
+            A variant&apos;s own photo leads the product page when a customer picks that variant,
+            and is the picture shown in the cart. A variant without one uses the photos above.
           </p>
-          <div className="mt-4 grid gap-6 sm:grid-cols-3">
-            {[...variantPhotos.values()].map(({ image, variants }) => (
-              <ImageCard
-                key={image.id}
-                productId={product.id}
-                image={image}
-                isCover={false}
-                isFirst
-                isLast
-                shownFor={shownFor(variants)}
-              />
+          <ul className="mt-4 max-w-2xl border-t border-line">
+            {product.variants.map((variant) => (
+              <li
+                key={variant.id}
+                className="flex items-center justify-between gap-4 border-b border-line py-3"
+              >
+                <span className="min-w-0 type-body">{variantLabel(variant)}</span>
+                <Link
+                  href={`/admin/products/${product.id}/variants/${variant.id}/photos`}
+                  className="shrink-0 type-body text-signal underline"
+                >
+                  {variant.images.length === 0
+                    ? 'Add photos'
+                    : variant.images.length === 1
+                      ? '1 photo'
+                      : `${variant.images.length} photos`}
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </>
       )}
 
