@@ -277,6 +277,11 @@ model User {
   passwordHash String? // staff only
   role         UserRole  @default(CUSTOMER)
   isActive     Boolean   @default(true)
+  // Staff sign-in protection — see src/lib/login-lockout.ts.
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  // Copied into the JWT at sign-in. Raising it ends every session issued before.
+  sessionVersion   Int       @default(0)
   addresses    Address[]
   orders       Order[]
   reviews      Review[]

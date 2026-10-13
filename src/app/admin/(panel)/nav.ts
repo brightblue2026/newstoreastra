@@ -60,6 +60,9 @@ export function navFor(role: UserRole): NavGroup[] {
     groups.push({ title: 'Admin', items: [{ href: '/admin/settings', label: 'Settings' }] });
   }
 
+  // Everyone who can sign in can change their own password.
+  groups.push({ title: 'Your account', items: [{ href: '/admin/account', label: 'Password' }] });
+
   return groups;
 }
 

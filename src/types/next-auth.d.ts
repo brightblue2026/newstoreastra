@@ -15,12 +15,14 @@ declare module 'next-auth' {
       id: string;
       role: UserRole;
       isActive: boolean;
+      sessionVersion: number;
     } & DefaultSession['user'];
   }
 
   interface User {
     role: UserRole;
     isActive: boolean;
+    sessionVersion?: number;
   }
 }
 
@@ -29,5 +31,6 @@ declare module '@auth/core/jwt' {
     id: string;
     role: UserRole;
     isActive: boolean;
+    sessionVersion?: number;
   }
 }

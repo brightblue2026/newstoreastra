@@ -23,12 +23,12 @@ const GITHUB_REFUSED =
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; changed?: string | string[] }>;
 }) {
   const user = await currentUser();
   if (user && canAccessAdmin(user.role)) redirect('/admin');
 
-  const { error } = await searchParams;
+  const { error, changed } = await searchParams;
   const githubEnabled = isGitHubSignInConfigured();
 
   return (
@@ -44,6 +44,14 @@ export default async function AdminLoginPage({
             className="mt-8 rounded-control border border-warning px-4 py-3 type-body text-warning"
           >
             {GITHUB_REFUSED}
+          </p>
+        )}
+        {changed && !error && (
+          <p
+            role="status"
+            className="mt-8 rounded-control border border-line px-4 py-3 type-body text-ink"
+          >
+            Password changed. Sign in with the new one.
           </p>
         )}
         <SignInForm />
