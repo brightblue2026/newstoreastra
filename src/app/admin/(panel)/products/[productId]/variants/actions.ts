@@ -237,26 +237,127 @@ export async function updateVariantAction(
   redirect(`/admin/products/${productId}/variants`);
 }
 
+const idSchema = z.string().trim().min(1).max(64);
+
+/** The page a publish button was pressed on, and so the page to land back on. */
+const returnToSchema = z.enum(['list', 'edit', 'photos']);
+
+function variantPagePath(
+  productId: string,
+  variantId: string,
+  returnTo: z.infer<typeof returnToSchema>,
+): string {
+  const list = `/admin/products/${productId}/variants`;
+  if (returnTo === 'edit') return `${list}/${variantId}`;
+  if (returnTo === 'photos') return `${list}/${variantId}/photos`;
+  return list;
+}
+
+const setVariantActiveSchema = z.object({
+  productId: idSchema,
+  variantId: idSchema,
+  isActive: z.boolean(),
+  returnTo: returnToSchema,
+});
+
+/**
+ * Publish or unpublish one variant — the same button, pending state and
+ * said-back result as publishing a product.
+ *
+ * A refusal is a redirect with a notice kind, never a thrown error: Next
+ * redacts a thrown message in a production build, which would leave the admin
+ * looking at a blank error page instead of the reason.
+ */
 export async function setVariantActiveAction(
   productId: string,
   variantId: string,
   isActive: boolean,
+  returnTo: 'list' | 'edit' | 'photos' = 'list',
 ): Promise<void> {
   const user = await requireCatalogueAccess();
 
-  const existing = await db.productVariant.findUnique({ where: { id: variantId } });
-  if (!existing || existing.productId !== productId) return;
+  const parsed = setVariantActiveSchema.safeParse({ productId, variantId, isActive, returnTo });
+  if (!parsed.success) return;
 
-  const updated = await db.productVariant.update({ where: { id: variantId }, data: { isActive } });
+  const found = await db.productVariant.findUnique({
+    where: { id: parsed.data.variantId },
+    include: { product: { select: { isActive: true } } },
+  });
+  if (!found || found.productId !== parsed.data.productId) return;
+  const { product, ...existing } = found;
+
+  const back = variantPagePath(existing.productId, existing.id, parsed.data.returnTo);
+  const landing = (kind: string) => `${back}?notice=${kind}&variant=${existing.id}`;
+
+  // A product on the store must keep something a customer can choose.
+  if (!parsed.data.isActive && existing.isActive && product.isActive) {
+    const otherPublished = await db.productVariant.count({
+      where: { productId: existing.productId, isActive: true, id: { not: existing.id } },
+    });
+    if (otherPublished === 0) redirect(landing('last'));
+  }
+
+  const updated = await db.productVariant.update({
+    where: { id: existing.id },
+    data: { isActive: parsed.data.isActive },
+  });
 
   await recordAudit({
     userId: user.id,
-    action: isActive ? 'reactivate' : 'deactivate',
+    action: parsed.data.isActive ? 'reactivate' : 'deactivate',
     entityType: 'ProductVariant',
     entityId: updated.id,
     before: existing,
     after: updated,
   });
 
-  revalidatePath(`/admin/products/${productId}/variants`);
+  // The shop lists and prices by published variant, so it changes with this
+  // one — but only a published product is on the shop at all.
+  if (product.isActive) revalidatePath('/', 'layout');
+  revalidatePath('/admin/products');
+  revalidatePath(`/admin/products/${existing.productId}`, 'layout');
+  redirect(landing(parsed.data.isActive ? 'published' : 'unpublished'));
+}
+
+/**
+ * Publish or unpublish every variant of a product at once. MX-3 alone has
+ * ninety-six; nobody should press a button that many times.
+ */
+export async function setAllVariantsActiveAction(productId: string, isActive: boolean): Promise<void> {
+  const user = await requireCatalogueAccess();
+
+  const parsed = z.object({ productId: idSchema, isActive: z.boolean() }).safeParse({ productId, isActive });
+  if (!parsed.success) return;
+
+  const product = await db.product.findUnique({
+    where: { id: parsed.data.productId },
+    select: { id: true, isActive: true },
+  });
+  if (!product) return;
+
+  const list = `/admin/products/${product.id}/variants`;
+
+  // Same rule as for one variant: unpublish the product itself first.
+  if (!parsed.data.isActive && product.isActive) redirect(`${list}?notice=all-last`);
+
+  const changed = await db.productVariant.updateMany({
+    where: { productId: product.id, isActive: !parsed.data.isActive },
+    data: { isActive: parsed.data.isActive },
+  });
+
+  if (changed.count > 0) {
+    await recordAudit({
+      userId: user.id,
+      action: parsed.data.isActive ? 'reactivate' : 'deactivate',
+      entityType: 'Product',
+      entityId: product.id,
+      before: { variantsPublished: !parsed.data.isActive, variantsChanged: changed.count },
+      after: { variantsPublished: parsed.data.isActive, variantsChanged: changed.count },
+    });
+  }
+
+  if (product.isActive) revalidatePath('/', 'layout');
+  revalidatePath('/admin/products');
+  revalidatePath(`/admin/products/${product.id}`, 'layout');
+  redirect(`${list}?notice=${parsed.data.isActive ? 'all-published' : 'all-unpublished'}`);
 }

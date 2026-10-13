@@ -5,10 +5,8 @@ import { requireCatalogueAccess } from '@/lib/session';
 import { isStorageConfigured } from '@/lib/storage';
 import { ImageCard } from '../../../images/image-card';
 import { ImageUploader } from '../../../images/image-uploader';
-
-function variantLabel(variant: { variantName: string | null; format: string | null; size: string }) {
-  return [variant.variantName, variant.format, variant.size].filter(Boolean).join(' · ');
-}
+import { variantLabel } from '../../variant-notice';
+import { VariantPublishCard } from '../../variant-publish-card';
 
 /*
   One variant's own photos. Every variant gets this page, so adding a photo for
@@ -21,20 +19,24 @@ function variantLabel(variant: { variantName: string | null; format: string | nu
 */
 export default async function VariantPhotosPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ productId: string; variantId: string }>;
+  searchParams: Promise<{ notice?: string }>;
 }) {
   await requireCatalogueAccess();
   const { productId, variantId } = await params;
+  const { notice } = await searchParams;
 
   const product = await db.product.findUnique({
     where: { id: productId },
     select: {
       id: true,
       name: true,
+      isActive: true,
       variants: {
         orderBy: [{ variantName: 'asc' }, { format: 'asc' }, { size: 'asc' }],
-        select: { id: true, variantName: true, format: true, size: true },
+        select: { id: true, isActive: true, variantName: true, format: true, size: true },
       },
     },
   });
@@ -137,6 +139,16 @@ export default async function VariantPhotosPage({
           ))}
         </div>
       )}
+
+      <VariantPublishCard
+        productId={product.id}
+        productName={product.name}
+        productIsActive={product.isActive}
+        variant={variant}
+        label={label}
+        returnTo="photos"
+        noticeKind={notice}
+      />
 
       <p className="mt-12 type-body">
         <Link href={`/admin/products/${product.id}/images#variant-photos`} className="text-signal underline">
