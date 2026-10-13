@@ -64,9 +64,18 @@ function supabaseHostname(): string | null {
   }
 }
 
+/**
+ * Cloudflare Web Analytics. Cloudflare adds its beacon script to every page it
+ * serves for this domain, and the script reports to cloudflareinsights.com.
+ * Without these two hosts the browser blocks it and logs a CSP error on every
+ * page (seen on the live site, 13 October 2026).
+ */
+const CLOUDFLARE_BEACON_SCRIPT = 'https://static.cloudflareinsights.com';
+const CLOUDFLARE_BEACON_REPORT = 'https://cloudflareinsights.com';
+
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT} ${RAZORPAY_CDN}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT} ${RAZORPAY_CDN} ${CLOUDFLARE_BEACON_SCRIPT}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: ${SUPABASE_ANY} ${RAZORPAY_ANY}`,
   "font-src 'self' data:",
@@ -74,7 +83,7 @@ const CSP = [
   // Supabase Storage (src/app/admin/(panel)/products/[productId]/images/image-uploader.tsx)
   // rather than through this app's server, so the request itself needs an exception —
   // alongside Razorpay's own connect-src needs above.
-  `connect-src 'self' ${SUPABASE_ANY} ${RAZORPAY_API} ${RAZORPAY_ANY}`,
+  `connect-src 'self' ${SUPABASE_ANY} ${RAZORPAY_API} ${RAZORPAY_ANY} ${CLOUDFLARE_BEACON_REPORT}`,
   `frame-src ${RAZORPAY_CHECKOUT} ${RAZORPAY_API} ${RAZORPAY_ANY}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",

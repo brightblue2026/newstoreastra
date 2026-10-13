@@ -3,24 +3,23 @@
 import { useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ALLOWED_IMAGE_FORMATS,
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_UPLOAD_BYTES,
-  MIN_LONG_EDGE_PX,
   PHOTOGRAPHY_CHECKLIST,
 } from '@/lib/storage-shared';
-import { saveProductImageAction, signProductImageUploadAction } from './actions';
+import { checkPhotoFile, sendPhoto } from './send-photo';
 
 /*
   The upload itself never touches this app's server: the browser asks for a
   short-lived signed URL, PUTs the file straight to Supabase Storage, and only
   the *path* comes back here to be written into `ProductImage`. That keeps a
-  multi-megabyte product photo off the Next.js server entirely.
+  multi-megabyte product photo off the Next.js server entirely. The sending is
+  in `send-photo.ts`, shared with the one-press button on the variants list.
 
-  The long-edge and format checks run twice — once here, against the file the
+  The format and file-size checks run twice — once here, against the file the
   browser can already see, so a bad upload is never even attempted; once more
   in `saveProductImageAction`, which re-reads them from the stored object
-  rather than believing anything sent from here.
+  rather than believing anything sent from here. There is no pixel-size rule.
 
   Several photos can be chosen at once. Each is checked the moment it is
   chosen, gets its own description, its own progress and its own outcome, so
@@ -69,41 +68,6 @@ async function readImage(
   return { width, height, preview };
 }
 
-/**
- * `fetch` gives no upload progress at all — the response promise only
- * resolves once the whole round trip is done — so the upload specifically
- * goes through `XMLHttpRequest` instead, purely for its `upload.onprogress`
- * event. A multi-megabyte photo over a slow uplink is the normal case here,
- * not the exception, so silence for the whole duration is a real gap, not a
- * cosmetic one.
- *
- * A signed Storage URL takes the raw file as the request body with `PUT`, not
- * a multipart form — the token is already in the URL, so there is nothing else
- * to send. The response body is not parsed: the status is the whole answer,
- * and the server re-reads the object anyway.
- */
-function uploadWithProgress(
-  url: string,
-  file: File,
-  onProgress: (percent: number) => void,
-): Promise<{ ok: boolean; status: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Type', file.type);
-    // Never overwrite: the server signs a fresh, random path per upload, so a
-    // collision means something is wrong rather than something to paper over.
-    xhr.setRequestHeader('x-upsert', 'false');
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    xhr.onload = () =>
-      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, body: xhr.responseText });
-    xhr.onerror = () => reject(new Error('Network error while uploading the photo. Check the connection and try again.'));
-    xhr.send(file);
-  });
-}
-
 type QueueStatus = 'ready' | 'uploading' | 'refused' | 'failed';
 
 interface QueuedPhoto {
@@ -128,30 +92,12 @@ function countPhotos(count: number): string {
 
 /** Everything that can be known about a file before it is sent anywhere. */
 async function inspect(file: File): Promise<Pick<QueuedPhoto, 'preview' | 'status' | 'message'>> {
-  const format = file.type.split('/')[1]?.toLowerCase() ?? '';
-  if (!(ALLOWED_IMAGE_FORMATS as readonly string[]).includes(format)) {
-    return { preview: null, status: 'refused', message: 'Unsupported format — use PNG, JPEG, WebP or AVIF.' };
-  }
-  // A courtesy check. The bucket enforces its own size limit, and
-  // `saveProductImageAction` re-reads the stored object's real size before
-  // writing a row, so this only saves the user a pointless upload.
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return {
-      preview: null,
-      status: 'refused',
-      message: `File is too large — must be under ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.`,
-    };
-  }
+  const refusal = checkPhotoFile(file);
+  if (refusal) return { preview: null, status: 'refused', message: refusal };
   try {
-    const { width, height, preview } = await readImage(file);
-    const longEdge = Math.max(width, height);
-    if (longEdge < MIN_LONG_EDGE_PX) {
-      return {
-        preview,
-        status: 'refused',
-        message: `Image must be at least ${MIN_LONG_EDGE_PX}px on the long edge (this one is ${longEdge}px).`,
-      };
-    }
+    // Any pixel size is accepted; decoding it is only to prove it is an image
+    // and to make the thumbnail.
+    const { preview } = await readImage(file);
     return { preview, status: 'ready', message: null };
   } catch (error) {
     return {
@@ -162,7 +108,32 @@ async function inspect(file: File): Promise<Pick<QueuedPhoto, 'preview' | 'statu
   }
 }
 
-export function ImageUploader({ productId, defaultAlt }: { productId: string; defaultAlt: string }) {
+/** The other variants one photo can be shared with: the other sizes of a fragrance. */
+export interface PhotoSiblings {
+  /** "the other 3 sizes of Lemon" */
+  label: string;
+  variantIds: string[];
+}
+
+/**
+ * Adds photos to one thing: the product as a whole, or — when `variantId` is
+ * given — that one variant. Each variant has its own page with its own
+ * uploader, so nothing here asks which variant a photo is for.
+ */
+export function ImageUploader({
+  productId,
+  defaultAlt,
+  variantId,
+  siblings,
+}: {
+  productId: string;
+  defaultAlt: string;
+  variantId?: string;
+  siblings?: PhotoSiblings;
+}) {
+  // A fragrance's photo is usually the same picture for every size of it, so
+  // sharing is one tick rather than the same upload repeated per size.
+  const [share, setShare] = useState(false);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const idPrefix = useId();
@@ -205,44 +176,18 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
     }
 
     patch(photo.id, { status: 'uploading', progress: 0, message: null });
-    try {
-      const signResult = await signProductImageUploadAction(productId, photo.file.type);
-      if (!signResult.ok) {
-        patch(photo.id, { status: 'failed', message: signResult.error });
-        return false;
-      }
-      const { uploadUrl, path } = signResult.ticket;
-
-      const uploadResult = await uploadWithProgress(uploadUrl, photo.file, (progress) =>
-        patch(photo.id, { progress }),
-      );
-      if (!uploadResult.ok) {
-        patch(photo.id, {
-          status: 'failed',
-          message:
-            uploadResult.status === 409
-              ? 'That photo was already uploaded. Refresh and check the saved photos below.'
-              : 'The photo could not be uploaded. Try again.',
-        });
-        return false;
-      }
-
-      // Only the path and the alt text. Everything else about the file is read
-      // back from storage by the server — it does not take this page's word
-      // for the size, the format or the dimensions.
-      const saveResult = await saveProductImageAction(productId, { path, alt });
-      if (!saveResult.ok) {
-        patch(photo.id, { status: 'failed', message: saveResult.error ?? 'Could not save that image.' });
-        return false;
-      }
-      return true;
-    } catch (error) {
-      patch(photo.id, {
-        status: 'failed',
-        message: error instanceof Error ? error.message : 'Something went wrong uploading that file.',
-      });
+    const result = await sendPhoto({
+      productId,
+      file: photo.file,
+      alt,
+      variantIds: variantId ? [variantId, ...(share && siblings ? siblings.variantIds : [])] : [],
+      onProgress: (progress) => patch(photo.id, { progress }),
+    });
+    if (!result.ok) {
+      patch(photo.id, { status: 'failed', message: result.message });
       return false;
     }
+    return true;
   }
 
   async function handleUpload() {
@@ -315,7 +260,7 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
           or drag them onto this box. You can pick several at once.
         </span>
         <span className="type-caption normal-case text-ink-soft">
-          PNG, JPEG, WebP or AVIF · at least {MIN_LONG_EDGE_PX}px · up to{' '}
+          PNG, JPEG, WebP or AVIF · any size · up to{' '}
           {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB each
         </span>
         <input
@@ -328,6 +273,25 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
           className="sr-only"
         />
       </label>
+
+      {siblings && (
+        <label className="mt-6 flex items-start gap-3 type-body">
+          <input
+            type="checkbox"
+            id="sharePhotos"
+            checked={share}
+            disabled={uploading}
+            onChange={(event) => setShare(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            Also use these photos for {siblings.label}
+            <span className="block type-caption normal-case text-ink-soft">
+              Leave this off when each size has a different photo.
+            </span>
+          </span>
+        </label>
+      )}
 
       {queue.length > 0 && (
         <ul className="mt-6 grid grid-cols-1 gap-4">

@@ -7,7 +7,7 @@ const complete = {
   isFoodProduct: false,
   foodLabel: null,
   images: [{}],
-  variants: [{ images: [] }],
+  variants: [{ isActive: true, images: [] }],
 };
 
 describe('publishBlockers', () => {
@@ -22,7 +22,31 @@ describe('publishBlockers', () => {
   });
 
   it('accepts a photo on a variant in place of one on the product', () => {
-    expect(publishBlockers({ ...complete, images: [], variants: [{ images: [{}] }] })).toEqual([]);
+    expect(publishBlockers({ ...complete, images: [], variants: [{ isActive: true, images: [{}] }] })).toEqual([]);
+  });
+
+  it('asks for a published variant when every variant is a draft', () => {
+    expect(
+      publishBlockers({
+        ...complete,
+        variants: [
+          { isActive: false, images: [] },
+          { isActive: false, images: [] },
+        ],
+      }),
+    ).toEqual(['a published variant']);
+  });
+
+  it('needs only one of several variants to be published', () => {
+    expect(
+      publishBlockers({
+        ...complete,
+        variants: [
+          { isActive: false, images: [] },
+          { isActive: true, images: [] },
+        ],
+      }),
+    ).toEqual([]);
   });
 
   it('treats a nil GST rate as entered', () => {

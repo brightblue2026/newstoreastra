@@ -50,7 +50,7 @@ export default async function ProductsPage({
     include: {
       brand: true,
       category: true,
-      variants: { select: { id: true, images: { select: { id: true } } } },
+      variants: { select: { id: true, isActive: true, images: { select: { id: true } } } },
       images: true,
     },
   });
@@ -158,7 +158,7 @@ export default async function ProductsPage({
                         href={`/admin/products/${product.id}/images`}
                         className="type-body text-signal"
                       >
-                        Images ({product.images.length})
+                        Images ({new Set(product.images.map((image) => image.publicId)).size})
                       </Link>
                       <Link href={`/admin/products/${product.id}`} className="type-body text-signal">
                         Edit

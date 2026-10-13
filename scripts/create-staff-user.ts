@@ -147,7 +147,16 @@ async function main(): Promise<void> {
   const user = await prisma.user.upsert({
     where: { email },
     create: { email, name, role, passwordHash, isActive: true },
-    update: { name: name ?? existing?.name ?? null, role, passwordHash, isActive: true },
+    // A reset also lifts a sign-in pause and ends every existing session.
+    update: {
+      name: name ?? existing?.name ?? null,
+      role,
+      passwordHash,
+      isActive: true,
+      failedLoginCount: 0,
+      lockedUntil: null,
+      sessionVersion: { increment: 1 },
+    },
     select: { id: true, name: true, email: true, role: true, isActive: true },
   });
 

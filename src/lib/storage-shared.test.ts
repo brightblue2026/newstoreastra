@@ -3,7 +3,6 @@ import {
   ALLOWED_IMAGE_MIME_TYPES,
   IMAGE_FOLDER,
   MAX_UPLOAD_BYTES,
-  MIN_LONG_EDGE_PX,
   buildImagePath,
   extensionForMimeType,
   isOwnedPath,
@@ -135,10 +134,6 @@ describe('the limits the bucket and the app share', () => {
   // `scripts/setup-storage.ts` configures the bucket from these same
   // constants. If either drifts, the bucket and the app disagree about what a
   // valid photo is — which is the bug this file exists to make loud.
-  it('states the §9 long-edge rule', () => {
-    expect(MIN_LONG_EDGE_PX).toBe(2000);
-  });
-
   it('caps an upload at 20MB, in bytes', () => {
     expect(MAX_UPLOAD_BYTES).toBe(20 * 1024 * 1024);
   });

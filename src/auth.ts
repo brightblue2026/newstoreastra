@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { authConfig } from '@/auth.config';
 import { db } from '@/lib/db';
 import { fetchVerifiedGitHubEmails, isGitHubSignInConfigured } from '@/lib/github-staff';
+import { clearFailedLogins, isLockedOut, recordFailedLogin } from '@/lib/login-lockout';
 import { canAccessAdmin } from '@/lib/roles';
 import { verifyPassword } from '@/lib/password';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -51,7 +52,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const matches = await db.user.findMany({
         where: { email: { in: emails, mode: 'insensitive' } },
-        select: { id: true, name: true, email: true, role: true, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          sessionVersion: true,
+        },
         take: 2,
       });
       // Two staff rows matching one GitHub account is a data problem, not a
@@ -66,6 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       user.email = staff.email;
       user.role = staff.role;
       user.isActive = staff.isActive;
+      user.sessionVersion = staff.sessionVersion;
       return true;
     },
 
@@ -107,6 +116,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: true,
             isActive: true,
             passwordHash: true,
+            failedLoginCount: true,
+            lockedUntil: true,
+            sessionVersion: true,
           },
         });
 
@@ -116,8 +128,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const hash = user?.passwordHash ?? DUMMY_HASH;
         const passwordMatches = await verifyPassword(password, hash);
 
-        if (!user || !user.passwordHash || !passwordMatches) return null;
+        if (!user || !user.passwordHash) return null;
+        // A paused account refuses the right password too — otherwise the
+        // pause would only slow a guesser down, not stop the guess that lands.
+        if (isLockedOut(user.lockedUntil)) return null;
+        if (!passwordMatches) {
+          await recordFailedLogin(user.id);
+          return null;
+        }
         if (!user.isActive) return null;
+
+        if (user.failedLoginCount > 0 || user.lockedUntil) await clearFailedLogins(user.id);
 
         return {
           id: user.id,
@@ -125,6 +146,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           role: user.role,
           isActive: user.isActive,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),

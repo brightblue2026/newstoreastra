@@ -39,9 +39,13 @@ export async function currentUser(): Promise<SessionUser | null> {
 
   const row = await db.user.findUnique({
     where: { id: tokenUser.id },
-    select: { name: true, email: true, role: true, isActive: true },
+    select: { name: true, email: true, role: true, isActive: true, sessionVersion: true },
   });
   if (!row || !row.isActive) return null;
+  // A password change raises `sessionVersion`, which signs out every token
+  // issued before it — a stolen cookie stops working the moment the password
+  // is changed, not twelve hours later.
+  if (row.sessionVersion !== (tokenUser.sessionVersion ?? 0)) return null;
 
   return {
     id: tokenUser.id,

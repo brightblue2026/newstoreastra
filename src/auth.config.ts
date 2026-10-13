@@ -28,6 +28,7 @@ export const authConfig = {
         token.id = user.id as string;
         token.role = user.role;
         token.isActive = user.isActive;
+        token.sessionVersion = user.sessionVersion ?? 0;
       }
       return token;
     },
@@ -37,6 +38,8 @@ export const authConfig = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.isActive = token.isActive;
+        // Tokens issued before this field existed count as version 0.
+        session.user.sessionVersion = token.sessionVersion ?? 0;
       }
       return session;
     },

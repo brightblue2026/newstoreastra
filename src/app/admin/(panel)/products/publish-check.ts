@@ -1,9 +1,9 @@
 import { foodLabelIncomplete, readFoodLabel } from './format';
 
 /**
- * The Phase 1 publish guard, as a list of what is still missing: a variant, an
- * image somewhere on the product or one of its variants, an HSN code, a GST
- * rate, and — for food — a complete label.
+ * The Phase 1 publish guard, as a list of what is still missing: a published
+ * variant, an image somewhere on the product or one of its variants, an HSN
+ * code, a GST rate, and — for food — a complete label.
  *
  * One function for the action that enforces it and the screens that explain
  * it, so the admin is never told a product is ready when publishing would
@@ -15,13 +15,16 @@ export interface PublishCheckInput {
   isFoodProduct: boolean;
   foodLabel: unknown;
   images: unknown[];
-  variants: { images?: unknown[] }[];
+  variants: { isActive: boolean; images?: unknown[] }[];
 }
 
 export function publishBlockers(product: PublishCheckInput): string[] {
   const missing: string[] = [];
 
   if (product.variants.length === 0) missing.push('at least one variant');
+  // A product on the store with every variant switched off is a page nobody
+  // can choose a size on.
+  else if (!product.variants.some((variant) => variant.isActive)) missing.push('a published variant');
   const hasImage =
     product.images.length > 0 || product.variants.some((variant) => (variant.images?.length ?? 0) > 0);
   if (!hasImage) missing.push('a photo');

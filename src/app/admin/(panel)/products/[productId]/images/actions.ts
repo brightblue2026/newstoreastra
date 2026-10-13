@@ -17,7 +17,6 @@ import {
 import {
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_UPLOAD_BYTES,
-  MIN_LONG_EDGE_PX,
   buildImagePath,
   extensionForMimeType,
   isOwnedPath,
@@ -118,6 +117,8 @@ const saveSchema = z.object({
   productId: idSchema,
   path: z.string().trim().min(1),
   alt: z.string().trim().min(1, 'Alt text is required.').max(200),
+  // Empty: a photo of the product as a whole. Otherwise the variants it shows.
+  variantIds: z.array(idSchema).max(500).default([]),
 });
 
 /**
@@ -139,7 +140,7 @@ const saveSchema = z.object({
  */
 export async function saveProductImageAction(
   productId: string,
-  upload: { path: string; alt: string },
+  upload: { path: string; alt: string; variantIds?: string[] },
 ): Promise<SaveImageResult> {
   const user = await requireCatalogueAccess();
 
@@ -167,6 +168,21 @@ export async function saveProductImageAction(
     return { ok: false, error: 'That product no longer exists.' };
   }
 
+  // A photo can only be attached to this product's own variants.
+  const variantIds = [...new Set(parsed.data.variantIds)];
+  if (variantIds.length > 0) {
+    const owned = await db.productVariant.count({
+      where: { id: { in: variantIds }, productId: product.id },
+    });
+    if (owned !== variantIds.length) {
+      await discard();
+      return {
+        ok: false,
+        error: 'A variant chosen for this photo no longer exists. Refresh the page and choose again.',
+      };
+    }
+  }
+
   const facts = await statObject(parsed.data.path);
   if (!facts) {
     return { ok: false, error: 'That upload did not arrive. Try again.' };
@@ -184,20 +200,11 @@ export async function saveProductImageAction(
 
   // `null` here means the header did not parse as any format the uploader
   // accepts — a renamed PDF, a truncated file, an SVG. Refused, never waved
-  // through: an unreadable header is exactly the case a size rule would
-  // otherwise be trivially bypassed by.
+  // through: the content type is only what the uploader claimed. Any pixel
+  // size is accepted; the dimensions are read to prove the file is an image.
   if (!facts.dimensions) {
     await discard();
     return { ok: false, error: 'That file is not a readable image.' };
-  }
-
-  const longEdge = Math.max(facts.dimensions.width, facts.dimensions.height);
-  if (longEdge < MIN_LONG_EDGE_PX) {
-    await discard();
-    return {
-      ok: false,
-      error: `Image must be at least ${MIN_LONG_EDGE_PX}px on the long edge (this one is ${longEdge}px).`,
-    };
   }
 
   const created = await db.$transaction(async (tx) => {
@@ -213,16 +220,23 @@ export async function saveProductImageAction(
       _max: { sortOrder: true },
     });
 
-    return tx.productImage.create({
-      data: {
-        productId,
-        url: publicUrlFor(parsed.data.path),
-        // `publicId` keeps its column name and now holds the storage path —
-        // the same role it always had: the handle the object is deleted by.
-        publicId: parsed.data.path,
-        alt: parsed.data.alt,
-        sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
-      },
+    const data = {
+      productId,
+      url: publicUrlFor(parsed.data.path),
+      // `publicId` keeps its column name and now holds the storage path —
+      // the same role it always had: the handle the object is deleted by.
+      publicId: parsed.data.path,
+      alt: parsed.data.alt,
+      sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+    };
+
+    if (variantIds.length === 0) return [await tx.productImage.create({ data })];
+
+    // One stored photo, one row per variant it shows: a fragrance's photo is
+    // the same picture for every size of it. The rows share `publicId`;
+    // `deleteProductImageAction` removes the file with the last of them.
+    return tx.productImage.createManyAndReturn({
+      data: variantIds.map((variantId) => ({ ...data, variantId })),
     });
   });
 
@@ -230,12 +244,12 @@ export async function saveProductImageAction(
     userId: user.id,
     action: 'create',
     entityType: 'ProductImage',
-    entityId: created.id,
+    entityId: created[0].id,
     before: null,
-    after: created,
+    after: { ...created[0], variantIds },
   });
 
-  revalidatePath(`/admin/products/${productId}/images`);
+  revalidatePath(`/admin/products/${productId}`, 'layout');
   return { ok: true };
 }
 
@@ -264,8 +278,10 @@ export async function moveProductImageAction(
     // same product's images at once must serialise, not interleave.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${productId}))`;
 
+    // Only the product's general photos have an order to change; a variant's
+    // photo is shown when that variant is chosen.
     const images = await tx.productImage.findMany({
-      where: { productId },
+      where: { productId, variantId: null },
       orderBy: { sortOrder: 'asc' },
       select: { id: true, sortOrder: true },
     });
@@ -308,7 +324,7 @@ export async function moveProductImageAction(
     }),
   ]);
 
-  revalidatePath(`/admin/products/${productId}/images`);
+  revalidatePath(`/admin/products/${productId}`, 'layout');
 }
 
 export async function deleteProductImageAction(productId: string, imageId: string): Promise<void> {
@@ -318,8 +334,12 @@ export async function deleteProductImageAction(productId: string, imageId: strin
   const existing = await db.productImage.findUnique({ where: { id: imageId } });
   if (!existing || existing.productId !== productId) return;
 
+  // A photo shared by several variants is several rows over one stored
+  // object. Deleting takes it off the one variant it was deleted from; the
+  // object goes only once nothing points at it.
   await db.productImage.delete({ where: { id: imageId } });
-  await safeRemove(existing.publicId);
+  const stillLinked = await db.productImage.count({ where: { publicId: existing.publicId } });
+  if (stillLinked === 0) await safeRemove(existing.publicId);
 
   // No dedicated "delete" audit action exists yet (PROGRESS.md, "Known gaps
   // found during review") — `deactivate` with `after: null` is the same
@@ -333,5 +353,5 @@ export async function deleteProductImageAction(productId: string, imageId: strin
     after: null,
   });
 
-  revalidatePath(`/admin/products/${productId}/images`);
+  revalidatePath(`/admin/products/${productId}`, 'layout');
 }

@@ -8,6 +8,7 @@ import { PublishButton } from '../../publish-button';
 import { joinList, publishBlockers } from '../../publish-check';
 import { ImageCard } from './image-card';
 import { ImageUploader } from './image-uploader';
+import { variantLabel } from '../variants/variant-notice';
 
 export default async function ProductImagesPage({
   params,
@@ -23,13 +24,26 @@ export default async function ProductImagesPage({
   const product = await db.product.findUnique({
     where: { id: productId },
     include: {
-      images: { orderBy: { sortOrder: 'asc' } },
-      variants: { select: { id: true, images: { select: { id: true } } } },
+      // The product's general photos. A variant's own photos are listed apart.
+      images: { where: { variantId: null }, orderBy: { sortOrder: 'asc' } },
+      variants: {
+        orderBy: [{ variantName: 'asc' }, { format: 'asc' }, { size: 'asc' }],
+        select: {
+          id: true,
+          isActive: true,
+          variantName: true,
+          format: true,
+          size: true,
+          images: { select: { id: true } },
+        },
+      },
     },
   });
   if (!product) notFound();
 
   const missing = publishBlockers(product);
+
+  const variantPhotoCount = product.variants.reduce((sum, variant) => sum + variant.images.length, 0);
 
   return (
     <div>
@@ -40,6 +54,15 @@ export default async function ProductImagesPage({
         / {product.name}
       </p>
       <h1 className="mt-4 type-display-sm">Photos</h1>
+      {product.variants.length > 0 && (
+        <p className="mt-4 max-w-2xl type-body text-ink-soft">
+          These are photos of the product as a whole. Each variant also has its own photo page:{' '}
+          <a href="#variant-photos" className="text-signal underline">
+            photos for each variant
+          </a>
+          .
+        </p>
+      )}
 
       {/* Arriving here straight from "Save and add photos": say the save
           happened before asking for anything else. */}
@@ -78,7 +101,9 @@ export default async function ProductImagesPage({
       <h2 className="mt-12 type-heading">Saved photos ({product.images.length})</h2>
       {product.images.length === 0 ? (
         <p className="mt-4 type-body text-ink-soft">
-          No photos saved yet. This product cannot be published without at least one.
+          {variantPhotoCount === 0
+            ? 'No photos saved yet. This product cannot be published without at least one.'
+            : 'No photo of the product as a whole yet. Cards and search results use a variant photo until there is one.'}
         </p>
       ) : (
         <>
@@ -98,6 +123,38 @@ export default async function ProductImagesPage({
               />
             ))}
           </div>
+        </>
+      )}
+
+      {product.variants.length > 0 && (
+        <>
+          <h2 id="variant-photos" className="mt-12 scroll-mt-6 type-heading">
+            Photos for each variant
+          </h2>
+          <p className="mt-4 max-w-2xl type-caption text-ink-soft">
+            A variant&apos;s own photo leads the product page when a customer picks that variant,
+            and is the picture shown in the cart. A variant without one uses the photos above.
+          </p>
+          <ul className="mt-4 max-w-2xl border-t border-line">
+            {product.variants.map((variant) => (
+              <li
+                key={variant.id}
+                className="flex items-center justify-between gap-4 border-b border-line py-3"
+              >
+                <span className="min-w-0 type-body">{variantLabel(variant)}</span>
+                <Link
+                  href={`/admin/products/${product.id}/variants/${variant.id}/photos`}
+                  className="shrink-0 type-body text-signal underline"
+                >
+                  {variant.images.length === 0
+                    ? 'Add photos'
+                    : variant.images.length === 1
+                      ? '1 photo'
+                      : `${variant.images.length} photos`}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </>
       )}
 
