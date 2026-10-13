@@ -17,7 +17,6 @@ import {
 import {
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_UPLOAD_BYTES,
-  MIN_LONG_EDGE_PX,
   buildImagePath,
   extensionForMimeType,
   isOwnedPath,
@@ -184,20 +183,11 @@ export async function saveProductImageAction(
 
   // `null` here means the header did not parse as any format the uploader
   // accepts — a renamed PDF, a truncated file, an SVG. Refused, never waved
-  // through: an unreadable header is exactly the case a size rule would
-  // otherwise be trivially bypassed by.
+  // through: the content type is only what the uploader claimed. Any pixel
+  // size is accepted; the dimensions are read to prove the file is an image.
   if (!facts.dimensions) {
     await discard();
     return { ok: false, error: 'That file is not a readable image.' };
-  }
-
-  const longEdge = Math.max(facts.dimensions.width, facts.dimensions.height);
-  if (longEdge < MIN_LONG_EDGE_PX) {
-    await discard();
-    return {
-      ok: false,
-      error: `Image must be at least ${MIN_LONG_EDGE_PX}px on the long edge (this one is ${longEdge}px).`,
-    };
   }
 
   const created = await db.$transaction(async (tx) => {

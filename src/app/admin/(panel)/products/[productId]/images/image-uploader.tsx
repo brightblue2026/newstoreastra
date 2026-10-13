@@ -6,7 +6,6 @@ import {
   ALLOWED_IMAGE_FORMATS,
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_UPLOAD_BYTES,
-  MIN_LONG_EDGE_PX,
   PHOTOGRAPHY_CHECKLIST,
 } from '@/lib/storage-shared';
 import { saveProductImageAction, signProductImageUploadAction } from './actions';
@@ -17,10 +16,10 @@ import { saveProductImageAction, signProductImageUploadAction } from './actions'
   the *path* comes back here to be written into `ProductImage`. That keeps a
   multi-megabyte product photo off the Next.js server entirely.
 
-  The long-edge and format checks run twice — once here, against the file the
+  The format and file-size checks run twice — once here, against the file the
   browser can already see, so a bad upload is never even attempted; once more
   in `saveProductImageAction`, which re-reads them from the stored object
-  rather than believing anything sent from here.
+  rather than believing anything sent from here. There is no pixel-size rule.
 
   Several photos can be chosen at once. Each is checked the moment it is
   chosen, gets its own description, its own progress and its own outcome, so
@@ -143,15 +142,9 @@ async function inspect(file: File): Promise<Pick<QueuedPhoto, 'preview' | 'statu
     };
   }
   try {
-    const { width, height, preview } = await readImage(file);
-    const longEdge = Math.max(width, height);
-    if (longEdge < MIN_LONG_EDGE_PX) {
-      return {
-        preview,
-        status: 'refused',
-        message: `Image must be at least ${MIN_LONG_EDGE_PX}px on the long edge (this one is ${longEdge}px).`,
-      };
-    }
+    // Any pixel size is accepted; decoding it is only to prove it is an image
+    // and to make the thumbnail.
+    const { preview } = await readImage(file);
     return { preview, status: 'ready', message: null };
   } catch (error) {
     return {
@@ -315,7 +308,7 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
           or drag them onto this box. You can pick several at once.
         </span>
         <span className="type-caption normal-case text-ink-soft">
-          PNG, JPEG, WebP or AVIF · at least {MIN_LONG_EDGE_PX}px · up to{' '}
+          PNG, JPEG, WebP or AVIF · any size · up to{' '}
           {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB each
         </span>
         <input
