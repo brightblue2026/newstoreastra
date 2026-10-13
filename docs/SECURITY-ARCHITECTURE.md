@@ -26,7 +26,7 @@ Keep the application as a modular Next.js/TypeScript application with PostgreSQL
 
 ## Verified versus deployment-dependent
 
-All four GitHub CI jobs passed for commit `c477d7c` before this additional hardening. Those database tests use a disposable PostgreSQL service, not the merchant's Supabase project. The additional hardening has its own boundary regression tests and must pass the same CI gates.
+All four GitHub CI jobs passed for commit `c477d7c` before this additional hardening. Those database tests use a disposable PostgreSQL service, not the merchant's Supabase project. The additional hardening in `e9356a3` passed all four CI jobs, including 649 unit tests, native production startup/HTTP smoke, Cloudflare build and disposable PostgreSQL integration.
 
 Actual Supabase credentials, storage policy/permissions, Razorpay test-mode Checkout and hosted admin browser flows remain unverified from this workspace. Infrastructure controls cannot be established just by changing application source.
 
@@ -41,7 +41,7 @@ Before opening live sales, configure and verify:
 
 ## Remaining architecture work
 
-Durable checkout-request idempotency and a transactional outbox are still required before promising reliable automatic retries at higher volume. Out-for-delivery courier notifications retain their existing deduplication mechanism; this change does not introduce a durable webhook event ledger. Nonce CSP requires browser/payment compatibility testing. Customer order URLs remain bearer links; protect their logs and plan revocation/expiry when introducing customer accounts. Capacity must be measured against representative database-backed customer/admin workloads.
+Durable checkout-request idempotency and a transactional outbox are still required before promising reliable automatic retries at higher volume. Out-for-delivery courier scans can still repeat notifications; a durable webhook event ledger remains to be implemented. Nonce CSP requires browser/payment compatibility testing. Customer order URLs remain bearer links; protect their logs and plan revocation/expiry when introducing customer accounts. Capacity must be measured against representative database-backed customer/admin workloads.
 
 ## Reference guidance
 
