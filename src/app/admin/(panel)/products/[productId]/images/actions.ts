@@ -233,8 +233,8 @@ export async function saveProductImageAction(
     if (variantIds.length === 0) return [await tx.productImage.create({ data })];
 
     // One stored photo, one row per variant it shows: a fragrance's photo is
-    // the same picture for every size of it. The rows share `publicId`, and
-    // `deleteProductImageAction` removes them together.
+    // the same picture for every size of it. The rows share `publicId`;
+    // `deleteProductImageAction` removes the file with the last of them.
     return tx.productImage.createManyAndReturn({
       data: variantIds.map((variantId) => ({ ...data, variantId })),
     });
@@ -249,7 +249,7 @@ export async function saveProductImageAction(
     after: { ...created[0], variantIds },
   });
 
-  revalidatePath(`/admin/products/${productId}/images`);
+  revalidatePath(`/admin/products/${productId}`, 'layout');
   return { ok: true };
 }
 
@@ -324,7 +324,7 @@ export async function moveProductImageAction(
     }),
   ]);
 
-  revalidatePath(`/admin/products/${productId}/images`);
+  revalidatePath(`/admin/products/${productId}`, 'layout');
 }
 
 export async function deleteProductImageAction(productId: string, imageId: string): Promise<void> {
@@ -334,12 +334,10 @@ export async function deleteProductImageAction(productId: string, imageId: strin
   const existing = await db.productImage.findUnique({ where: { id: imageId } });
   if (!existing || existing.productId !== productId) return;
 
-  // A photo attached to several variants is several rows over one stored
-  // object. They go together, and the object goes only once nothing points
-  // at it.
-  const removed = await db.productImage.deleteMany({
-    where: { productId, publicId: existing.publicId },
-  });
+  // A photo shared by several variants is several rows over one stored
+  // object. Deleting takes it off the one variant it was deleted from; the
+  // object goes only once nothing points at it.
+  await db.productImage.delete({ where: { id: imageId } });
   const stillLinked = await db.productImage.count({ where: { publicId: existing.publicId } });
   if (stillLinked === 0) await safeRemove(existing.publicId);
 
@@ -351,9 +349,9 @@ export async function deleteProductImageAction(productId: string, imageId: strin
     action: 'deactivate',
     entityType: 'ProductImage',
     entityId: imageId,
-    before: { ...existing, rowsRemoved: removed.count },
+    before: existing,
     after: null,
   });
 
-  revalidatePath(`/admin/products/${productId}/images`);
+  revalidatePath(`/admin/products/${productId}`, 'layout');
 }

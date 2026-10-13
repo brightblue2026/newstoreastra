@@ -17,15 +17,19 @@ export function ImageCard({
   isCover,
   isFirst,
   isLast,
-  shownFor,
+  variantPhoto,
 }: {
   productId: string;
   image: { id: string; url: string; alt: string };
   isCover: boolean;
   isFirst: boolean;
   isLast: boolean;
-  /** Set on a variant's photo: which variants it belongs to. Such a photo has no order to change. */
-  shownFor?: string;
+  /**
+   * Set on a variant's own page. Such a photo has no order to change, and
+   * deleting it takes it off this variant only. `alsoShownFor` names the other
+   * variants sharing the same picture, if any.
+   */
+  variantPhoto?: { alsoShownFor: string | null };
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -44,7 +48,12 @@ export function ImageCard({
     // finish unwinding the dialog's own event handling first, so the
     // transition starts in a clean task instead of the one `confirm` just
     // suspended.
-    if (!window.confirm('Delete this image? This cannot be undone.')) return;
+    const question = variantPhoto
+      ? variantPhoto.alsoShownFor
+        ? 'Remove this photo from this variant? The other variants keep it.'
+        : 'Delete this photo from this variant? This cannot be undone.'
+      : 'Delete this image? This cannot be undone.';
+    if (!window.confirm(question)) return;
     setTimeout(() => {
       startTransition(async () => {
         await deleteProductImageAction(productId, image.id);
@@ -70,10 +79,14 @@ export function ImageCard({
       </div>
 
       <p className="mt-2 type-caption text-ink-soft">{image.alt}</p>
-      {shownFor && <p className="mt-1 type-caption normal-case text-ink">{shownFor}</p>}
+      {variantPhoto?.alsoShownFor && (
+        <p className="mt-1 type-caption normal-case text-ink-soft">
+          Also used for {variantPhoto.alsoShownFor}
+        </p>
+      )}
 
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2">
-        <div className={shownFor ? 'hidden' : 'flex gap-1'}>
+        <div className={variantPhoto ? 'hidden' : 'flex gap-1'}>
           <button
             type="button"
             onClick={() => move('up')}

@@ -15,7 +15,9 @@ export default async function VariantsPage({
 
   const product = await db.product.findUnique({
     where: { id: productId },
-    include: { variants: { orderBy: { sku: 'asc' } } },
+    include: {
+      variants: { orderBy: { sku: 'asc' }, include: { _count: { select: { images: true } } } },
+    },
   });
   if (!product) notFound();
 
@@ -83,6 +85,12 @@ export default async function VariantsPage({
                         className="type-body text-signal"
                       >
                         Edit
+                      </Link>
+                      <Link
+                        href={`/admin/products/${product.id}/variants/${variant.id}/photos`}
+                        className="type-body text-signal"
+                      >
+                        Photos ({variant._count.images})
                       </Link>
                       <form
                         action={setVariantActiveAction.bind(
