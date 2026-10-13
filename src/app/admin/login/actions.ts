@@ -41,7 +41,12 @@ export async function signInAction(
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      return { error: 'That email and password do not match an active staff account.' };
+      // The pause is mentioned every time, not only when it applies, so the
+      // message still says nothing about which addresses exist.
+      return {
+        error:
+          'That email and password do not match an active staff account. After five wrong passwords, sign-in pauses for 15 minutes.',
+      };
     }
     // signIn throws a redirect on success; it must reach Next.js untouched.
     throw error;

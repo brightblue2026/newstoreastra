@@ -1876,3 +1876,6 @@ Reverses "Hosting on Vercel + Supabase" of 28 September. Supabase stays for Post
 - **The contact email is still the Gmail inbox.** A domain address was asked for, but none is known to exist, and price enquiries go to this address.
 - **Checkout requires agreeing to the terms and privacy policy.** UI only; the order and payment code is untouched.
 - **Five nullable label columns on `Product`:** country of origin, manufacturer name and address, shelf life, safety warnings. MRP, net quantity (variant size), ingredients, how to use, best before and FSSAI already existed and are reused, not duplicated. An empty manufacturer shows "Marketed by" the seller rather than claiming the seller manufactures it; cleaning and car-care products show a standard caution.
+- **Staff sign-in pauses for 15 minutes after five wrong passwords, counted on the `User` row,** because the Upstash limiter allows everything when unconfigured. Someone who knows a staff address can keep it paused; `pnpm user:create` lifts it.
+- **A password change raises `User.sessionVersion` and ends every session for that account.** `currentUser()` compares it with the JWT; the middleware layer cannot, so a stale token gets as far as the layout and is sent to sign-in.
+- **Staff change their own password at /admin/account,** current password required, 12 characters minimum (the `user:create` floor).
