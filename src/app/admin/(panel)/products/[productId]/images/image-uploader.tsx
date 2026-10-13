@@ -109,6 +109,8 @@ interface QueuedPhoto {
   id: string;
   file: File;
   alt: string;
+  /** A `PhotoTarget.value`: '' is the product as a whole. */
+  target: string;
   preview: string | null;
   status: QueueStatus;
   progress: number;
@@ -155,7 +157,66 @@ async function inspect(file: File): Promise<Pick<QueuedPhoto, 'preview' | 'statu
   }
 }
 
-export function ImageUploader({ productId, defaultAlt }: { productId: string; defaultAlt: string }) {
+export interface UploaderVariant {
+  id: string;
+  /** Fragrance or grade, when the product has one. */
+  name: string | null;
+  /** "Lemon · Liquid · 900 ml" */
+  label: string;
+}
+
+/** What a photo can be a picture of: the product, a whole fragrance, or one variant. */
+interface PhotoTarget {
+  value: string;
+  label: string;
+  variantIds: string[];
+}
+
+/**
+ * A fragrance's photo is the same picture for every size of it, so each
+ * variant name shared by more than one variant is offered as a single choice.
+ */
+function photoTargets(variants: UploaderVariant[]): { groups: PhotoTarget[]; singles: PhotoTarget[] } {
+  const byName = new Map<string, UploaderVariant[]>();
+  for (const variant of variants) {
+    if (!variant.name) continue;
+    byName.set(variant.name, [...(byName.get(variant.name) ?? []), variant]);
+  }
+  const groups = [...byName.entries()]
+    .filter(([, members]) => members.length > 1)
+    .map(([name, members]) => ({
+      value: `name:${name}`,
+      label: `${name}, all ${members.length} variants`,
+      variantIds: members.map((member) => member.id),
+    }));
+  const singles = variants.map((variant) => ({
+    value: `id:${variant.id}`,
+    label: variant.label,
+    variantIds: [variant.id],
+  }));
+  return { groups, singles };
+}
+
+export function ImageUploader({
+  productId,
+  defaultAlt,
+  variants,
+}: {
+  productId: string;
+  defaultAlt: string;
+  variants: UploaderVariant[];
+}) {
+  const { groups, singles } = photoTargets(variants);
+  const targets = [...groups, ...singles];
+
+  /** The description a photo starts with, for the target it is aimed at. */
+  function suggestedAlt(target: string): string {
+    const chosen = targets.find((entry) => entry.value === target);
+    if (!chosen) return defaultAlt;
+    const subject = target.startsWith('name:') ? target.slice('name:'.length) : chosen.label;
+    return `${defaultAlt}, ${subject}`;
+  }
+
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const idPrefix = useId();
@@ -180,6 +241,7 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
         // The product's name is a true description of its photo and a better
         // start than an empty box; the person refines it ("…, back label").
         alt: defaultAlt,
+        target: '',
         ...(await inspect(file)),
         progress: 0,
       });
@@ -223,7 +285,8 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
       // Only the path and the alt text. Everything else about the file is read
       // back from storage by the server — it does not take this page's word
       // for the size, the format or the dimensions.
-      const saveResult = await saveProductImageAction(productId, { path, alt });
+      const variantIds = targets.find((entry) => entry.value === photo.target)?.variantIds ?? [];
+      const saveResult = await saveProductImageAction(productId, { path, alt, variantIds });
       if (!saveResult.ok) {
         patch(photo.id, { status: 'failed', message: saveResult.error ?? 'Could not save that image.' });
         return false;
@@ -326,6 +389,7 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
         <ul className="mt-6 grid grid-cols-1 gap-4">
           {queue.map((photo, index) => {
             const altId = index === 0 ? 'imageAlt' : `imageAlt-${index}`;
+            const targetId = index === 0 ? 'imageTarget' : `imageTarget-${index}`;
             return (
               <li key={photo.id} className="flex min-w-0 gap-4 rounded-control border border-line p-3">
                 {photo.preview ? (
@@ -358,6 +422,47 @@ export function ImageUploader({ productId, defaultAlt }: { productId: string; de
 
                   {photo.status !== 'refused' && (
                     <>
+                      {targets.length > 0 && (
+                        <>
+                          <label htmlFor={targetId} className="mt-2 block type-caption text-ink-soft">
+                            What is this a photo of?
+                          </label>
+                          <select
+                            id={targetId}
+                            value={photo.target}
+                            disabled={photo.status === 'uploading'}
+                            onChange={(event) => {
+                              const target = event.target.value;
+                              // Follow the choice only while the description is
+                              // still the one suggested, never over typed words.
+                              const untouched = photo.alt === suggestedAlt(photo.target);
+                              patch(photo.id, {
+                                target,
+                                ...(untouched ? { alt: suggestedAlt(target) } : {}),
+                              });
+                            }}
+                            className="mt-1 w-full rounded-control border border-line bg-white px-3 py-2 type-body"
+                          >
+                            <option value="">The product as a whole (all variants)</option>
+                            {groups.length > 0 && (
+                              <optgroup label="Every size of one kind">
+                                {groups.map((entry) => (
+                                  <option key={entry.value} value={entry.value}>
+                                    {entry.label}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            <optgroup label="One variant only">
+                              {singles.map((entry) => (
+                                <option key={entry.value} value={entry.value}>
+                                  {entry.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        </>
+                      )}
                       <label htmlFor={altId} className="mt-2 block type-caption text-ink-soft">
                         Describe this photo (alt text)
                       </label>

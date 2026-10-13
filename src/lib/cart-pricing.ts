@@ -109,6 +109,13 @@ const variantCoreSelect = {
       categoryId: true,
       hsnCode: true,
       gstRate: true,
+      // The product's general photo, for a variant with none of its own.
+      images: {
+        where: { variantId: null },
+        take: 1,
+        orderBy: { sortOrder: 'asc' },
+        select: { url: true },
+      },
     },
   },
 } as const;
@@ -235,7 +242,7 @@ export async function resolveCartLines(
         name: variantLabel(variant),
         slug: variant.product.slug,
         sku: variant.sku,
-        imageUrl: variant.images[0]?.url ?? null,
+        imageUrl: variant.images[0]?.url ?? variant.product.images[0]?.url ?? null,
       };
       lines.push({
         kind: 'VARIANT',
@@ -254,7 +261,7 @@ export async function resolveCartLines(
         comboId: null,
         nameSnapshot: variantLabel(variant),
         skuSnapshot: variant.sku,
-        imageSnapshot: variant.images[0]?.url ?? null,
+        imageSnapshot: variant.images[0]?.url ?? variant.product.images[0]?.url ?? null,
         choiceSnapshot: null,
         quantity: cartLine.quantity,
         hsnCode: variant.product.hsnCode,

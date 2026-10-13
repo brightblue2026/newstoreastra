@@ -1,6 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/db';
 import type { Segment } from '@/generated/prisma/enums';
+import type { Prisma } from '@/generated/prisma/client';
 import type { NavBrand } from '@/components/Nav';
 import type { ProductCardData } from '@/components/ProductCard';
 
@@ -153,6 +154,15 @@ export async function getFeaturedCombos(take = 8): Promise<ComboCard[]> {
 /* ---------------------------------------------------------------- browse -- */
 
 /**
+ * A product's general photos ahead of any variant's own. Typed apart from the
+ * `as const` selects below, which would make it a readonly tuple Prisma refuses.
+ */
+const GENERAL_PHOTOS_FIRST: Prisma.ProductImageOrderByWithRelationInput[] = [
+  { variantId: { sort: 'asc', nulls: 'first' } },
+  { sortOrder: 'asc' },
+];
+
+/**
  * The card projection, shared by every listing surface.
  *
  * Written once because /shop, /brands/[slug], /categories/[slug] and /search
@@ -163,8 +173,10 @@ const productCardSelect = {
   name: true,
   slug: true,
   brand: { select: { name: true, accentHex: true } },
+  // General photos lead. A product with only per-variant photos still gets a
+  // card image rather than an empty box.
   images: {
-    orderBy: { sortOrder: 'asc' },
+    orderBy: GENERAL_PHOTOS_FIRST,
     take: 2,
     select: { url: true, alt: true },
   },
@@ -736,7 +748,11 @@ export async function getComboBySlug(slug: string): Promise<ComboPage | null> {
                     name: true,
                     slug: true,
                     brand: { select: { name: true, accentHex: true } },
-                    images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } },
+                    images: {
+                      orderBy: GENERAL_PHOTOS_FIRST,
+                      take: 1,
+                      select: { url: true },
+                    },
                     variants: {
                       where: { isActive: true },
                       orderBy: { variantName: 'asc' },
