@@ -92,7 +92,13 @@ async function main() {
       try {
         const count = await client.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'");
         if (count.rows[0].n !== 0) throw new Error('Restore target must be empty; existing data will never be dropped');
-        await run('pg_restore', ['--exit-on-error', '--single-transaction', '--no-owner', '--no-privileges', '--dbname', decodeURIComponent(new URL(target).pathname.slice(1)), path.join(root, 'database.dump')], pgEnv(target));
+        // A freshly created PostgreSQL database already has public. Omit only
+        // its CREATE SCHEMA entry; never use --clean or ignore restore errors.
+        const dump = path.join(root, 'database.dump');
+        const contents = await run('pg_restore', ['--list', dump], pgEnv(target));
+        const restoreList = path.join(temp, 'restore.list');
+        await writeFile(restoreList, contents.split('\n').filter((line) => !/^\d+; \d+ \d+ SCHEMA - public(?:\s|$)/.test(line)).join('\n'), { mode: 0o600 });
+        await run('pg_restore', ['--exit-on-error', '--single-transaction', '--no-owner', '--no-privileges', '--use-list', restoreList, '--dbname', decodeURIComponent(new URL(target).pathname.slice(1)), dump], pgEnv(target));
         const result = await client.query('SELECT count(*)::int AS products FROM "Product"');
         console.log(JSON.stringify({ restored: true, productRows: result.rows[0].products, verifiedFiles: Object.keys(actual).length }));
       } finally { await client.end(); }

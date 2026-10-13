@@ -1579,9 +1579,10 @@ function assertSafeTarget() {
   if (READ_ONLY) return;
   const url = new URL(process.env.DATABASE_URL ?? '');
   const local = ['localhost', '127.0.0.1', 'bbtc-postgres'].includes(url.hostname);
-  if (!local) {
+  const browserLocal = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(BASE).hostname);
+  if (!local || !/_test$/.test(url.pathname) || !browserLocal) {
     throw new Error(
-      `Refusing to run: this writes test rows, and DATABASE_URL points at ${url.hostname}. Use --read-only for a hosted site.`,
+      `Refusing to run: write tests require a local _test database and a local browser target. Use --read-only for a hosted site.`,
     );
   }
 }
