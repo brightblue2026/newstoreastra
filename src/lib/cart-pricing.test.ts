@@ -33,6 +33,7 @@ function variant(gstRate: number | null, hsnCode: string | null = '3402') {
       categoryId: 'c1',
       hsnCode,
       gstRate,
+      images: [],
     },
   };
 }

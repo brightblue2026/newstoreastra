@@ -17,12 +17,15 @@ export function ImageCard({
   isCover,
   isFirst,
   isLast,
+  shownFor,
 }: {
   productId: string;
   image: { id: string; url: string; alt: string };
   isCover: boolean;
   isFirst: boolean;
   isLast: boolean;
+  /** Set on a variant's photo: which variants it belongs to. Such a photo has no order to change. */
+  shownFor?: string;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -67,9 +70,10 @@ export function ImageCard({
       </div>
 
       <p className="mt-2 type-caption text-ink-soft">{image.alt}</p>
+      {shownFor && <p className="mt-1 type-caption normal-case text-ink">{shownFor}</p>}
 
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2">
-        <div className="flex gap-1">
+        <div className={shownFor ? 'hidden' : 'flex gap-1'}>
           <button
             type="button"
             onClick={() => move('up')}

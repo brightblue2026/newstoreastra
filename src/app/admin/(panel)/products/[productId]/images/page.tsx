@@ -23,13 +23,48 @@ export default async function ProductImagesPage({
   const product = await db.product.findUnique({
     where: { id: productId },
     include: {
-      images: { orderBy: { sortOrder: 'asc' } },
-      variants: { select: { id: true, images: { select: { id: true } } } },
+      // The product's general photos. A variant's own photos are listed apart.
+      images: { where: { variantId: null }, orderBy: { sortOrder: 'asc' } },
+      variants: {
+        orderBy: [{ variantName: 'asc' }, { format: 'asc' }, { size: 'asc' }],
+        select: {
+          id: true,
+          variantName: true,
+          format: true,
+          size: true,
+          images: { select: { id: true } },
+        },
+      },
     },
   });
   if (!product) notFound();
 
   const missing = publishBlockers(product);
+
+  const variantLabel = (variant: { variantName: string | null; format: string | null; size: string }) =>
+    [variant.variantName, variant.format, variant.size].filter(Boolean).join(' · ');
+  const labels = new Map(product.variants.map((variant) => [variant.id, variantLabel(variant)]));
+
+  // One stored photo can belong to several variants (one row each, sharing
+  // `publicId`), so the rows are folded back into photos for display.
+  const variantRows = await db.productImage.findMany({
+    where: { productId: product.id, variantId: { not: null } },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    select: { id: true, url: true, alt: true, publicId: true, variantId: true },
+  });
+  const variantPhotos = new Map<
+    string,
+    { image: { id: string; url: string; alt: string }; variants: string[] }
+  >();
+  for (const row of variantRows) {
+    const photo = variantPhotos.get(row.publicId) ?? { image: row, variants: [] };
+    photo.variants.push(labels.get(row.variantId ?? '') ?? 'a removed variant');
+    variantPhotos.set(row.publicId, photo);
+  }
+  const shownFor = (variants: string[]) =>
+    variants.length <= 3
+      ? `Shown for ${variants.join(', ')}`
+      : `Shown for ${variants.slice(0, 2).join(', ')} and ${variants.length - 2} more`;
 
   return (
     <div>
@@ -57,7 +92,15 @@ export default async function ProductImagesPage({
       {/* Told before a file is chosen, not after. The uploader used to render
           as though it worked and only failed once the photo had been picked. */}
       {isStorageConfigured() ? (
-        <ImageUploader productId={product.id} defaultAlt={product.name} />
+        <ImageUploader
+          productId={product.id}
+          defaultAlt={product.name}
+          variants={product.variants.map((variant) => ({
+            id: variant.id,
+            name: variant.variantName,
+            label: variantLabel(variant),
+          }))}
+        />
       ) : (
         <div className="mt-8 rounded-card border border-warning p-6">
           <p className="type-body text-warning">Photo uploads are not set up yet.</p>
@@ -78,7 +121,9 @@ export default async function ProductImagesPage({
       <h2 className="mt-12 type-heading">Saved photos ({product.images.length})</h2>
       {product.images.length === 0 ? (
         <p className="mt-4 type-body text-ink-soft">
-          No photos saved yet. This product cannot be published without at least one.
+          {variantPhotos.size === 0
+            ? 'No photos saved yet. This product cannot be published without at least one.'
+            : 'No photo of the product as a whole yet. Cards and search results use a variant photo until there is one.'}
         </p>
       ) : (
         <>
@@ -95,6 +140,29 @@ export default async function ProductImagesPage({
                 isCover={index === 0}
                 isFirst={index === 0}
                 isLast={index === product.images.length - 1}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {variantPhotos.size > 0 && (
+        <>
+          <h2 className="mt-12 type-heading">Photos for specific variants ({variantPhotos.size})</h2>
+          <p className="mt-4 type-caption text-ink-soft">
+            Each of these leads the product page when a customer picks that variant, and is the
+            picture shown in the cart.
+          </p>
+          <div className="mt-4 grid gap-6 sm:grid-cols-3">
+            {[...variantPhotos.values()].map(({ image, variants }) => (
+              <ImageCard
+                key={image.id}
+                productId={product.id}
+                image={image}
+                isCover={false}
+                isFirst
+                isLast
+                shownFor={shownFor(variants)}
               />
             ))}
           </div>
