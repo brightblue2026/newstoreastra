@@ -39,6 +39,8 @@ dev.log
 !.env.example
 # Public build-time values only (site URL, publishable key ids). No secrets.
 !.env.production
+# Razorpay key downloads from the dashboard.
+rzp-key*.csv
 
 # vercel
 .vercel
