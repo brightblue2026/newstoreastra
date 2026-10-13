@@ -1,5 +1,6 @@
 /** Synthetic data for disposable LOCAL integration databases only. Never production seeds. */
 import { db } from '../src/lib/db';
+import { hashPassword } from '../src/lib/password';
 async function main() {
   const url = new URL(process.env.DATABASE_URL ?? 'postgres://unset');
   if (!['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || !url.pathname.endsWith('_test')) throw new Error('Use a local database with a name ending in _test.');
@@ -14,6 +15,11 @@ async function main() {
     checkout_cod: { enabled: true, feePaise: 0, minOrderPaise: 0, maxOrderPaise: 10000000, pincodeAllowlist: ['682'] },
     shipping_rates: { slabs: [{ uptoGrams: 100000, pricePaise: 0 }], overflowPricePaise: 0, defaultUnitGrams: 550, serviceablePincodePrefixes: ['682'], originPincode: '682001', preferLiveRates: false, autoPushOrders: false },
   })) await db.setting.upsert({ where: { key }, update: { data }, create: { key, data } });
+  const passwordHash = await hashPassword(process.env.SEED_STAFF_PASSWORD ?? 'ChangeMe!Dev1');
+  for (const role of ['STAFF', 'MANAGER', 'ADMIN'] as const) {
+    const email = `${role.toLowerCase()}@dev.bbtc.local`;
+    await db.user.upsert({ where: { email }, update: { role, passwordHash, isActive: true }, create: { email, name: `Integration ${role}`, role, passwordHash } });
+  }
   console.log('Created synthetic local fixture.');
 }
 main().finally(() => db.$disconnect()).catch((e: unknown) => { console.error(e instanceof Error ? e.message : 'Fixture failed'); process.exitCode = 1; });

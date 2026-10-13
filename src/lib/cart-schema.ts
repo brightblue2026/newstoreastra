@@ -98,6 +98,11 @@ export const placeOrderInputSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
+// The browser must explicitly acknowledge the displayed policies; never infer consent.
+export const checkoutSubmissionSchema = placeOrderInputSchema.extend({
+  acceptedTerms: z.literal(true, { error: 'Please agree to the terms and privacy notice before placing your order.' }),
+});
+
 export type QuoteInput = z.infer<typeof quoteInputSchema>;
 export type PlaceOrderFormInput = z.infer<typeof placeOrderInputSchema>;
 export type AddressInput = z.infer<typeof addressSchema>;

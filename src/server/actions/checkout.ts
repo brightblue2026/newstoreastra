@@ -3,7 +3,7 @@
 import { logServerFailure } from '@/lib/security-log';
 import { headers } from 'next/headers';
 import { after } from 'next/server';
-import { placeOrderInputSchema, quoteInputSchema } from '@/lib/cart-schema';
+import { checkoutSubmissionSchema, quoteInputSchema } from '@/lib/cart-schema';
 import { CONTACT } from '@/lib/contact';
 import { orderAccessToken } from '@/lib/order-access';
 import { isRazorpayConfigured } from '@/lib/razorpay';
@@ -95,7 +95,7 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
     return { ok: false, error: 'Too many orders placed too quickly. Please wait a few minutes and try again.' };
   }
 
-  const parsed = placeOrderInputSchema.safeParse(input);
+  const parsed = checkoutSubmissionSchema.safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const issue of parsed.error.issues) {

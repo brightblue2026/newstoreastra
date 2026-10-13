@@ -306,6 +306,7 @@ export default function CheckoutForm({
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (submitting) return;
+    if (!agreed) { setFormError('Please agree to the terms and privacy notice before placing your order.'); return; }
     setFormError(null);
     setFieldErrors({});
     setSubmitting(true);
@@ -317,6 +318,7 @@ export default function CheckoutForm({
 
     try {
       const result = await submitOrder({
+        acceptedTerms: agreed,
         lines,
         ...(discountCode ? { discountCode } : {}),
         ...(email ? { email } : {}),

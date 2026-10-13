@@ -89,3 +89,8 @@ qa/perf-*.txt
 # Machine-specific validation evidence and local server logs.
 qa/*.log
 qa/*.json
+
+# Customer backups belong in encrypted off-site storage, never source control.
+backups/
+*.dump
+*.backup

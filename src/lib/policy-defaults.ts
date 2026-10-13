@@ -131,7 +131,7 @@ function privacy(): PolicyDocument {
       '# 11. Complaints and the Grievance Officer',
       `If you have a question or a complaint about how your data is handled, contact:`,
       grievanceBlock(),
-      `Complaints are acknowledged within 48 hours and resolved within 30 days of receipt. If you are not satisfied with our response, you have the right to complain to the Data Protection Board of India.`,
+      `Complaints are acknowledged within 48 hours and redressed within one month of receipt. We will explain the escalation options available under applicable law.`,
 
       '# 12. Changes to this policy',
       `We may update this policy as the store or the law changes. The date at the top of this page shows when it was last changed. A significant change will be made clear on the store before it takes effect.`,
@@ -254,7 +254,7 @@ function shipping(): PolicyDocument {
       `When your order is dispatched we send you a tracking link by email or SMS. You can also open your order page from the link in your confirmation message.`,
 
       '# Damaged or tampered parcels',
-      `If a parcel arrives visibly damaged or opened, you may refuse it. If you only find the damage after accepting it, tell us within 48 hours of delivery with photographs, and we will replace or refund it under our Refund and cancellation policy at /refund-policy.`,
+      `If a parcel arrives visibly damaged or opened, you may refuse it. If you only find the damage after accepting it, tell us promptly, preferably within 48 hours of delivery, with photographs where available. We will assess replacement or refund under our Refund and cancellation policy at /refund-policy. This reporting request does not limit your statutory rights.`,
 
       '# Delays',
       `Deliveries can be delayed by the courier, by weather, strikes, public holidays or other events outside our control. If your order is running late, contact us and we will find out where it is.`,

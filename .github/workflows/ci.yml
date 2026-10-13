@@ -73,7 +73,7 @@ jobs:
 
   postgres-integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16
@@ -104,6 +104,29 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:deploy
       - run: node --conditions=react-server --import tsx scripts/seed-test-fixture.ts
+      - name: Install backup and browser test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y restic postgresql-client-16
+          pnpm exec playwright install --with-deps chromium
+      - name: Verify encrypted backup and restore
+        env:
+          BACKUP_DATABASE_URL: postgresql://bbtc:local-integration-only@localhost:5432/bbtc_test
+          RESTORE_DATABASE_URL: postgresql://bbtc:local-integration-only@localhost:5432/bbtc_restore_test
+          RESTIC_REPOSITORY: /tmp/brightblue-backup-repository
+          RESTIC_PASSWORD: isolated-ci-backup-not-a-production-key
+          BACKUP_STORAGE_DIR: /tmp/brightblue-test-storage
+          PGPASSWORD: local-integration-only
+        run: |
+          export PATH="/usr/lib/postgresql/16/bin:$PATH"
+          mkdir -p "$BACKUP_STORAGE_DIR/products/fixture"
+          printf 'synthetic object bytes' > "$BACKUP_STORAGE_DIR/products/fixture/image.txt"
+          restic init
+          node --import tsx scripts/backup.ts create > /tmp/backup-result.json
+          export BACKUP_SNAPSHOT_ID=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/backup-result.json','utf8')).snapshotId")
+          createdb -h localhost -U bbtc bbtc_restore_test
+          pnpm backup:verify
+          restic check --read-data
       - run: node --conditions=react-server --import tsx scripts/e2e-stock-race.ts
       - name: Start isolated test server
         run: |
@@ -115,6 +138,8 @@ jobs:
           exit 1
       - run: node --conditions=react-server --import tsx scripts/e2e-razorpay.ts
       - run: node --conditions=react-server --import tsx scripts/e2e-shiprocket.ts
+      - name: Admin browser journeys and role enforcement
+        run: node --conditions=react-server --import tsx scripts/e2e-admin.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
