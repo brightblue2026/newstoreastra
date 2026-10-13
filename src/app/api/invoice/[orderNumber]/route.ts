@@ -1,3 +1,4 @@
+import { logServerFailure } from '@/lib/security-log';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { buildInvoiceData, InvoiceError } from '@/lib/invoice';
@@ -81,7 +82,7 @@ export async function GET(
         'Content-Disposition': `inline; filename="${filename}"`,
         // A tax invoice never changes once raised, but it must never be cached
         // by a shared proxy — it is one customer's document.
-        'Cache-Control': 'private, max-age=3600',
+        'Cache-Control': 'private, no-store',
       },
     });
   } catch (error) {
@@ -89,7 +90,7 @@ export async function GET(
       console.warn('[invoice]', orderNumber, error.message);
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
-    console.error('[invoice] could not render', orderNumber, error);
+    logServerFailure('invoice.render', error);
     return NextResponse.json({ error: 'Could not generate the invoice.' }, { status: 500 });
   }
 }

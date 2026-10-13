@@ -7,6 +7,7 @@ const home = await request('/');
 assert.equal(home.status, 200);
 assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
 assert.equal(home.headers.get('x-frame-options'), 'DENY');
+assert.equal(home.headers.get('referrer-policy'), 'no-referrer');
 assert.ok(home.headers.get('content-security-policy')?.includes("object-src 'none'"));
 const html = await home.text();
 assert.ok(html.includes('Find your kind of care.'));

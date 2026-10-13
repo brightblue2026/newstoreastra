@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { after, NextResponse } from 'next/server';
 import { OrderStatus } from '@/generated/prisma/enums';
 import { db } from '@/lib/db';
+import { readBoundedBody, RequestBodyTooLarge } from '@/lib/request-body';
 import { transitionOrder } from '@/lib/orders';
 import { parseTrackingWebhook, trackingUrlFor } from '@/lib/shiprocket';
 import { notifyOrderEvent } from '@/lib/notifications';
@@ -63,9 +64,9 @@ export async function POST(request: Request) {
 
   let payload: unknown;
   try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Malformed body' }, { status: 400 });
+    payload = JSON.parse(await readBoundedBody(request));
+  } catch (error) {
+    return NextResponse.json({ error: 'Malformed body' }, { status: error instanceof RequestBodyTooLarge ? 413 : 400 });
   }
 
   const event = parseTrackingWebhook(payload);
@@ -76,12 +77,20 @@ export async function POST(request: Request) {
   // Find the order by AWB first — it is the identifier Shiprocket owns and
   // cannot be confused with anything else — then by the order number that was
   // pushed as `order_id`.
-  const order = await db.order.findFirst({
-    where: event.awbNumber
-      ? { OR: [{ awbNumber: event.awbNumber }, { orderNumber: event.orderNumber ?? '' }] }
-      : { orderNumber: event.orderNumber ?? '' },
-    select: { id: true, orderNumber: true, status: true, awbNumber: true },
-  });
+  const select = { id: true, orderNumber: true, status: true, awbNumber: true } as const;
+  // Resolve identifiers in order, never an ambiguous OR across two orders.
+  let order = event.awbNumber
+    ? await db.order.findFirst({ where: { awbNumber: event.awbNumber }, select })
+    : null;
+  if (!order && event.orderNumber) {
+    order = await db.order.findFirst({ where: { orderNumber: event.orderNumber }, select });
+  }
+  if (order && (
+    (event.orderNumber && event.orderNumber !== order.orderNumber) ||
+    (event.awbNumber && order.awbNumber && event.awbNumber !== order.awbNumber)
+  )) {
+    return NextResponse.json({ error: 'Conflicting shipment identifiers' }, { status: 409 });
+  }
 
   if (!order) {
     console.error('[shiprocket] no order matches', event.awbNumber ?? event.orderNumber);
@@ -91,14 +100,17 @@ export async function POST(request: Request) {
   // Record what the courier told us even when the scan does not move the
   // order's status — an AWB arriving before the first status change is normal.
   if (event.awbNumber && event.awbNumber !== order.awbNumber) {
-    await db.order.update({
-      where: { id: order.id },
+    const assigned = await db.order.updateMany({
+      where: { id: order.id, awbNumber: null },
       data: {
         awbNumber: event.awbNumber,
         trackingUrl: trackingUrlFor(event.awbNumber),
         ...(event.courierName ? { courierName: event.courierName } : {}),
       },
     });
+    if (assigned.count !== 1) {
+      return NextResponse.json({ error: 'Shipment changed; retry the event' }, { status: 409 });
+    }
   }
 
   if (event.status === null) {
@@ -148,6 +160,9 @@ export async function POST(request: Request) {
         order: order.orderNumber,
         ignored: result.error,
       });
+    }
+    if (!result.changed && !isOutForDeliveryScan) {
+      return NextResponse.json({ received: true, status: 'already handled' });
     }
   } else if (!isOutForDeliveryScan) {
     // Genuinely nothing new to do or say — e.g. a duplicate SHIPPED scan.

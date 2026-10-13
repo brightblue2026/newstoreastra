@@ -1,5 +1,6 @@
 'use server';
 
+import { logServerFailure } from '@/lib/security-log';
 import { headers } from 'next/headers';
 import { after } from 'next/server';
 import { placeOrderInputSchema, quoteInputSchema } from '@/lib/cart-schema';
@@ -64,7 +65,7 @@ export async function quoteCheckout(input: unknown): Promise<QuoteResult> {
     });
     return { ok: true, quote };
   } catch (error) {
-    console.error('[checkout] could not quote:', error);
+    logServerFailure('checkout.quote', error);
     return { ok: false, error: 'We could not price your cart just now. Please try again.' };
   }
 }
@@ -145,7 +146,7 @@ export async function submitOrder(input: unknown): Promise<SubmitOrderResult> {
         error: 'A discount on this order just ran out. Remove the code and try again.',
       };
     }
-    console.error('[checkout] could not place the order:', error);
+    logServerFailure('checkout.place', error);
     return {
       ok: false,
       error: 'Something went wrong placing your order. Nothing has been charged — please try again.',
