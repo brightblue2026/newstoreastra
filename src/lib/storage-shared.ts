@@ -20,7 +20,7 @@ export const IMAGE_FOLDER = 'products';
 export const PHOTOGRAPHY_CHECKLIST = [
   'One product, centred, on a flat colour field matching its accent',
   'No lifestyle clutter, no hands, no kitchen sinks',
-  'At least 2000px on the long edge',
+  'Any size is accepted. Larger photos look sharper on the product page',
   '1:1 for cards, 4:5 for the product hero',
   'No stock photography',
 ] as const;
@@ -35,9 +35,6 @@ export const ALLOWED_IMAGE_MIME_TYPES = [
   'image/webp',
   'image/avif',
 ] as const;
-
-/** Long edge below which an upload is rejected, per the photography rules. */
-export const MIN_LONG_EDGE_PX = 2000;
 
 /** 20 MB — comfortably above any real product photo, well below "someone parked a video here". */
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;

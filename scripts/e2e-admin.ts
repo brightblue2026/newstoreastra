@@ -1417,8 +1417,8 @@ async function imagesSection(page: Page) {
   const upload = async (name: string, file: Buffer, alt: string) => {
     await open(page, `/admin/products/${product.id}/images`);
     await page.setInputFiles('#imageFile', { name, mimeType: 'image/png', buffer: file });
-    // A photo that fails the size rule is refused as it is chosen and never gets a
-    // description box; one that passes is pre-filled with the product's name.
+    // A file that cannot be used is refused as it is chosen and never gets a
+    // description box; one that can is pre-filled with the product's name.
     const altBox = page.locator('#imageAlt');
     // Scoped to the queue: Next's route announcer is also an alert.
     await page.locator('#imageAlt, li p[role="alert"]').first().waitFor({ timeout: 15_000 });
@@ -1427,18 +1427,14 @@ async function imagesSection(page: Page) {
     await page.getByRole('button', { name: /^upload/i }).first().click();
   };
 
-  await upload('small.png', solidPng(800, 800), `${P} too small`);
-  await page.waitForTimeout(2500);
-  check('an image under 2000px is refused', (await db.productImage.count({ where: { productId: product.id } })) === 0);
-  check('...and the admin is told the size rule', await sees(page, /at least 2000px/i), await excerpt(page));
-
-  await upload('good.png', solidPng(2000, 2000), '');
+  await upload('good.png', solidPng(800, 800), '');
   await page.waitForTimeout(1500);
   check('an image with no alt text is refused', (await db.productImage.count({ where: { productId: product.id } })) === 0);
 
-  await upload('good.png', solidPng(2000, 2000), `${P} product, front`);
+  // There is no pixel-size rule: a small photo is as acceptable as a large one.
+  await upload('good.png', solidPng(800, 800), `${P} product, front`);
   const image = await eventually(() => db.productImage.findFirst({ where: { productId: product.id } }), 45_000);
-  check('a 2000px image uploads', Boolean(image), await excerpt(page));
+  check('a small image uploads', Boolean(image), await excerpt(page));
   if (!image) return;
   const served = await fetch(image.url);
   check('...and is served from storage', served.status === 200 && (served.headers.get('content-type') ?? '').startsWith('image/'), served.status);

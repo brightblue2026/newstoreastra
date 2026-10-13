@@ -1,13 +1,14 @@
 /**
  * Pixel dimensions read straight out of an image file's header bytes.
  *
- * Why this exists: Cloudinary used to hand back authoritative `width` and
- * `height` with every upload, so `saveProductImageAction` could re-check the
- * §9 photography rule ("at least 2000px on the long edge") against a number
- * the client could not forge. Supabase Storage is a plain object store — it
- * reports size and content type, and nothing about pixels. Without this, the
- * long-edge rule would have to trust whatever the browser claimed, which is
- * not a check at all.
+ * Why this exists: Supabase Storage is a plain object store — it reports
+ * size and a content type the uploader chose, and nothing about what the
+ * bytes are. `saveProductImageAction` uses a header that parses here as its
+ * proof that a stored object really is an image in an accepted format.
+ *
+ * It was first written to enforce §9's "at least 2000px on the long edge"
+ * rule against a number the client could not forge. That rule was removed on
+ * 13 October 2026; any pixel size is accepted now.
  *
  * Every format here declares its dimensions within the first few hundred
  * bytes, so the caller fetches a small Range of the uploaded object rather
