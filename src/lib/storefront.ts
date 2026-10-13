@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { db } from '@/lib/db';
 import type { Segment } from '@/generated/prisma/enums';
 import type { Prisma } from '@/generated/prisma/client';
@@ -28,7 +29,7 @@ export type HouseBrand = NavBrand & {
 };
 
 /** The eight houses, in their configured order. */
-export async function getBrands(): Promise<HouseBrand[]> {
+export const getBrands = cache(async function getBrands(): Promise<HouseBrand[]> {
   try {
     const brands = await db.brand.findMany({
       where: { isActive: true },
@@ -57,7 +58,7 @@ export async function getBrands(): Promise<HouseBrand[]> {
     console.warn('[storefront] brands unavailable:', error);
     return [];
   }
-}
+});
 
 /**
  * Featured products for the homepage grid.
@@ -182,10 +183,12 @@ const productCardSelect = {
   },
   variants: {
     where: { isActive: true },
-    orderBy: { pricePaise: 'asc' },
+    orderBy: [{ pricePaise: 'asc' }, { id: 'asc' }],
+    // A listing card uses only the cheapest variant, not all 96 MX-3 packs.
+    take: 1,
     select: { size: true, pricePaise: true, mrpPaise: true },
   },
-} as const;
+} satisfies Prisma.ProductSelect;
 
 type ProductCardRow = {
   name: string;

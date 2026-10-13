@@ -19,8 +19,10 @@ await Promise.all(Array.from({ length: concurrency }, async () => {
     const now = performance.now();
     try {
       const response = await fetch(new URL(routes[index % routes.length], base), { signal: AbortSignal.timeout(15000) });
-      await response.arrayBuffer();
-      if (!response.ok) failed++;
+      const body = await response.text();
+      const expected = process.env.LOAD_EXPECT_PRODUCT;
+      const listingMissing = routes[index % routes.length] === '/shop' && expected && !body.includes(`/products/${expected}`);
+      if (!response.ok || listingMissing) failed++;
     } catch { failed++; }
     latencies.push(performance.now() - now);
   }

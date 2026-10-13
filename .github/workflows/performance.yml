@@ -1,0 +1,104 @@
+name: Browser performance verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/browser-performance.ts'
+      - 'src/middleware.ts'
+      - 'src/lib/storefront.ts'
+      - '.github/workflows/performance.yml'
+permissions:
+  contents: read
+jobs:
+  hosted-measurement:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Bounded public browsing measurements
+        run: node --import tsx scripts/browser-performance.ts
+        env:
+          QA_BASE_URL: https://brightbluefmcg.com
+          QA_PRODUCT_PATH: /products/mx-3-dish-wash-liquid
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hosted-browser-performance
+          path: qa/performance-hosted.json
+          retention-days: 14
+  isolated-performance:
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bbtc
+          POSTGRES_PASSWORD: isolated-performance-only
+          POSTGRES_DB: bbtc_performance_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bbtc -d bbtc_performance_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://bbtc:isolated-performance-only@localhost:5432/bbtc_performance_test
+      PERFORMANCE_REVISION: ${{ matrix.revision }}
+      AUTH_SECRET: isolated-performance-only-not-production
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve the same measurement tools for both revisions
+        run: |
+          mkdir -p "$RUNNER_TEMP/performance-tools"
+          cp scripts/browser-performance.ts scripts/seed-performance-fixture.ts scripts/load-test.ts "$RUNNER_TEMP/performance-tools/"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.revision == 'baseline' && 'c311cebb87a2d459b874feefabc5e01d07c9b7e0' || github.sha }}
+      - run: cp "$RUNNER_TEMP/performance-tools/"*.ts scripts/
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:deploy
+      - run: node --conditions=react-server --import tsx scripts/seed-test-fixture.ts
+      - run: node --conditions=react-server --import tsx scripts/seed-performance-fixture.ts
+      - run: pnpm build:next
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Measure production build and exercise database-backed reads
+        run: |
+          pnpm exec next start -H 127.0.0.1 > /tmp/performance-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3000/api/health && break
+            sleep 1
+          done
+          QA_BASE_URL=http://127.0.0.1:3000 QA_PRODUCT_PATH=/products/integration-test node --import tsx scripts/browser-performance.ts
+          LOAD_BASE_URL=http://127.0.0.1:3000 LOAD_REQUESTS=400 LOAD_CONCURRENCY=20 LOAD_EXPECT_PRODUCT=integration-test pnpm test:load | tee qa/performance-load.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-performance-${{ matrix.revision }}
+          path: |
+            qa/performance-isolated.json
+            qa/performance-load.txt
+            /tmp/performance-server.log
+          retention-days: 14

@@ -5,6 +5,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(base.hostname)) throw new Erro
 const request = (path: string, options?: RequestInit) => fetch(new URL(path, base), { signal: AbortSignal.timeout(20000), ...options });
 const home = await request('/');
 assert.equal(home.status, 200);
+assert.equal(home.headers.get('set-cookie'), null, 'Anonymous browsing must not create authentication cookies');
 assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
 assert.equal(home.headers.get('x-frame-options'), 'DENY');
 assert.equal(home.headers.get('referrer-policy'), 'same-origin');
