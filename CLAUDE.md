@@ -16,8 +16,10 @@ MAKAFA (Premium Perfume & Fragrance).
 
 MAKAFA is the eighth brand — confirmed real 22 August 2026 (found on bbtcglobal.com,
 absent from the original brochure and master brief). It now has a `FRAGRANCE` segment,
-a seed row and a **provisional** accent colour; products and licences are still
-unseeded, and catalogue work remains MX-3 only. See `docs/bbtcglobal-catalogue.md` and
+a seed row and a **provisional** accent colour; its products and licences are still
+unseeded. The other six brands have draft products with no prices, from the client's
+brochure brief of 13 October 2026 (`prisma/seed-catalogue.ts`); only MX-3 has prices.
+See `docs/bbtcglobal-catalogue.md` and
 DECISIONS.md. **This is not a fragrance store**: the 24 fragrances are MX-3 *dishwash*
 variants, and MAKAFA perfume is one brand of eight.
 
