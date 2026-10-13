@@ -1342,9 +1342,10 @@ async function layoutSection(browser: Browser) {
   ] as const) {
     const context = await browser.newContext({ viewport });
     const page = await newPage(context);
-    await signIn(page, 'ADMIN');
+    if (!(await signIn(page, 'ADMIN'))) throw new Error(`Layout checks require an authenticated ${label} session`);
     for (const route of routes) {
-      await open(page, route.path);
+      const status = await open(page, route.path);
+      check(`${label} ${route.path}: intended page loaded`, status === 200 && new URL(page.url()).pathname === route.path);
       const overflow = (await page.evaluate(
         '(() => { const el = document.documentElement; return el.scrollWidth - el.clientWidth; })()',
       )) as number;

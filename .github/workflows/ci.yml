@@ -141,6 +141,12 @@ jobs:
       - name: Admin browser journeys and role enforcement
         run: node --conditions=react-server --import tsx scripts/e2e-admin.ts
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admin-browser-screenshots
+          path: qa/screenshots/admin
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: integration-server-log
