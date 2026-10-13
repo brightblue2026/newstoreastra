@@ -50,7 +50,7 @@ export default async function ProductsPage({
     include: {
       brand: true,
       category: true,
-      variants: { select: { id: true, images: { select: { id: true } } } },
+      variants: { select: { id: true, isActive: true, images: { select: { id: true } } } },
       images: true,
     },
   });

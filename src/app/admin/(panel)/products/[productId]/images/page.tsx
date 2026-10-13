@@ -8,6 +8,7 @@ import { PublishButton } from '../../publish-button';
 import { joinList, publishBlockers } from '../../publish-check';
 import { ImageCard } from './image-card';
 import { ImageUploader } from './image-uploader';
+import { variantLabel } from '../variants/variant-notice';
 
 export default async function ProductImagesPage({
   params,
@@ -29,6 +30,7 @@ export default async function ProductImagesPage({
         orderBy: [{ variantName: 'asc' }, { format: 'asc' }, { size: 'asc' }],
         select: {
           id: true,
+          isActive: true,
           variantName: true,
           format: true,
           size: true,
@@ -41,8 +43,6 @@ export default async function ProductImagesPage({
 
   const missing = publishBlockers(product);
 
-  const variantLabel = (variant: { variantName: string | null; format: string | null; size: string }) =>
-    [variant.variantName, variant.format, variant.size].filter(Boolean).join(' · ');
   const variantPhotoCount = product.variants.reduce((sum, variant) => sum + variant.images.length, 0);
 
   return (

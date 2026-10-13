@@ -5,14 +5,19 @@ import { requireCatalogueAccess } from '@/lib/session';
 import { VariantForm, type VariantFormValues } from '../variant-form';
 import { updateVariantAction } from '../actions';
 import { boxSizeInput } from '../../../../box-size';
+import { variantLabel } from '../variant-notice';
+import { VariantPublishCard } from '../variant-publish-card';
 
 export default async function EditVariantPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ productId: string; variantId: string }>;
+  searchParams: Promise<{ notice?: string }>;
 }) {
   await requireCatalogueAccess();
   const { productId, variantId } = await params;
+  const { notice } = await searchParams;
 
   const [product, variant] = await Promise.all([
     db.product.findUnique({ where: { id: productId } }),
@@ -42,6 +47,15 @@ export default async function EditVariantPage({
       <p className="type-caption text-ink-soft">{product.name}</p>
       <h1 className="type-display-sm">Edit variant</h1>
       <VariantForm action={boundAction} initialValues={initialValues} submitLabel="Save changes" />
+      <VariantPublishCard
+        productId={product.id}
+        productName={product.name}
+        productIsActive={product.isActive}
+        variant={variant}
+        label={variantLabel(variant)}
+        returnTo="edit"
+        noticeKind={notice}
+      />
     </div>
   );
 }
