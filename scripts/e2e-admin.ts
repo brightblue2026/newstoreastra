@@ -235,6 +235,7 @@ async function adminRoutes(): Promise<{ routes: Route[]; skipped: string[] }> {
     { path: '/admin/retailers/new', minimum: 'MANAGER' },
     { path: '/admin/retailers/import', minimum: 'MANAGER' },
     { path: '/admin/settings', minimum: 'ADMIN' },
+    { path: '/admin/readiness', minimum: 'ADMIN' },
   ];
   const skipped: string[] = [];
 

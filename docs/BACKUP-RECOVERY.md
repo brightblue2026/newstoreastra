@@ -1,6 +1,6 @@
 # Backup and recovery
 
-Status: tooling and a disposable-database recovery drill are implemented. Production backup is **not activated**: no backup repository, encryption key, database credential or Supabase S3 credential is available in this workspace/repository. A checked-in workflow is not evidence of a successful production backup.
+Status: tooling is implemented, and the disposable-database recovery drill passed in CI run [38371631339](https://github.com/brightblue2026/newstoreastra/actions/runs/38371631339) for commit `900129d`. This included archive restoration, file-hash verification and `restic check --read-data`. Production backup is **not activated**: no backup repository, encryption key, database credential or Supabase S3 credential is available in this workspace/repository. A checked-in workflow is not evidence of a successful production backup.
 
 ## What is protected
 

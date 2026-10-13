@@ -19,7 +19,7 @@ Keep the application as a modular Next.js/TypeScript application with PostgreSQL
 - Existing PostgreSQL RLS migration denies public Supabase API access to application tables; application database credentials remain privileged and must stay secret.
 - HMAC verification of raw Razorpay payloads, bounded request bodies, amount/currency/capture checks and conditional state writes.
 - Courier token verification before parsing; 256 KiB payload limit; ordered AWB/order lookup; reject conflicting identifiers; conditional first-AWB assignment prevents concurrent overwrite; only a winning state transition schedules its ordinary notification.
-- HTTPS/HSTS, frame denial, MIME sniffing protection and a baseline CSP. Referrer policy is `no-referrer`, including same-origin navigation, to reduce leakage of order-access query tokens.
+- HTTPS/HSTS, frame denial, MIME sniffing protection and a baseline CSP. Referrer policy is `same-origin`: cross-origin destinations receive no referrer. This retains same-origin form compatibility with Next Server Actions; `no-referrer` caused native browser form POSTs to send an opaque Origin and fail. Same-origin access logs must still redact order-access query tokens.
 - Invoice PDFs use `private, no-store`. This does not erase files deliberately downloaded by customers.
 - Checkout quote/place, payment webhook and invoice-render exception logs omit raw error messages, stacks and attached objects. This is targeted hardening, not a claim that all external platform logs have been audited.
 - Production dependency audit, unit tests, native build/start smoke, Cloudflare build and disposable PostgreSQL integration gates in CI.
