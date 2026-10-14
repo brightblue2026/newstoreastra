@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { MAX_IMPORT_ROWS, RETAILER_CSV_HEADER } from '@/lib/retailer';
 import { requireCatalogueAccess } from '@/lib/session';
 import { importRetailersAction } from '../actions';

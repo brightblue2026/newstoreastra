@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 
 /**
  * Shown when a signed-in user reaches something their role does not cover —

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import CountUp from '@/components/CountUp';
 import PinnedSteps from '@/components/PinnedSteps';

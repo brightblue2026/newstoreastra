@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/Link';
 
 /**
  * Catches anything unexpected thrown while rendering a storefront page —

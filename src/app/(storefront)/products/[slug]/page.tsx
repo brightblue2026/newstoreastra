@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import ProductDetail from '@/components/ProductDetail';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid from '@/components/ProductGrid';

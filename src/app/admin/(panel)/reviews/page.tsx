@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import type { Prisma } from '@/generated/prisma/client';
 import { db } from '@/lib/db';
 import { formatReviewDate, looksLikeSpam } from '@/lib/reviews';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import MotionProvider from '@/components/MotionProvider';
 import Ticker from '@/components/Ticker';
 import StorefrontChrome from '@/components/StorefrontChrome';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 import { flattenTree } from '@/lib/category-tree';

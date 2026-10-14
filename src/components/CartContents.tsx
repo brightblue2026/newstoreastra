@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { AnimatePresence } from 'motion/react';
 import { CartLine } from '@/components/CartDrawer';
 import { cartLineKey } from '@/lib/cart-line';

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { lastUpdatedLabel } from '@/lib/business';
 import { getPolicy } from '@/lib/content';
 import { policyBlocks, type PolicySlug } from '@/lib/content-schema';
