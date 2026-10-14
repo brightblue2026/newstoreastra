@@ -1471,10 +1471,11 @@ async function imagesSection(page: Page) {
   }
 
   await open(page, `/admin/products/${product.id}/images`);
-  page.once('dialog', (dialog) => dialog.accept());
-  const remove = page.getByRole('button', { name: /delete|remove/i }).first();
+  // Delete opens a question inside the card; its own Delete button confirms.
+  const remove = page.getByRole('button', { name: /^delete$/i }).first();
   if (await remove.count()) {
-    await act(page, () => remove.click());
+    await remove.click();
+    await act(page, () => page.getByRole('alertdialog').getByRole('button', { name: /^delete$/i }).click());
     const gone = await eventually(async () => ((await db.productImage.findUnique({ where: { id: image.id } })) ? null : true));
     check('an image can be deleted', Boolean(gone), await excerpt(page));
     await new Promise((resolve) => setTimeout(resolve, 1500));

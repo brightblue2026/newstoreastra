@@ -39,6 +39,7 @@ export function navFor(role: UserRole): NavGroup[] {
       title: 'Catalogue',
       items: [
         { href: '/admin/products', label: 'Products' },
+        { href: '/admin/photos', label: 'Photos' },
         { href: '/admin/inventory', label: 'Stock' },
         { href: '/admin/combos', label: 'Combos' },
         { href: '/admin/discounts', label: 'Offers' },
