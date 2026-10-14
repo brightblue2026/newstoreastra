@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCartDrawer, useCartStore } from '@/lib/cart-store';
 
 /**
@@ -26,6 +26,8 @@ export default function AddToCartButton({
   const openCart = useCartDrawer((state) => state.setOpen);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -51,6 +53,7 @@ export default function AddToCartButton({
 
       <button
         type="button"
+        disabled={!ready}
         onClick={() => {
           addLine({ kind, id, quantity });
           setAdded(true);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCartDrawer, useCartStore, type ComboChoice } from '@/lib/cart-store';
 
 /*
@@ -42,6 +42,8 @@ export default function ComboChoices({
 
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [picks, setPicks] = useState<Record<string, string[]>>(() =>
     Object.fromEntries(
       slots.map((slot) => [
@@ -163,6 +165,7 @@ export default function ComboChoices({
         ) : (
           <button
             type="button"
+            disabled={!ready}
             onClick={handleAdd}
             className="flex-1 btn btn-primary px-8 py-4"
           >

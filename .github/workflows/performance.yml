@@ -1,6 +1,11 @@
 name: Browser performance verification
 on:
   workflow_dispatch:
+    inputs:
+      measure_hosted:
+        description: 'Measure the public site only when access is available'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -12,6 +17,7 @@ permissions:
   contents: read
 jobs:
   hosted-measurement:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.measure_hosted }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

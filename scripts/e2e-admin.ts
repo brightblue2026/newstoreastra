@@ -217,6 +217,7 @@ async function adminRoutes(): Promise<{ routes: Route[]; skipped: string[] }> {
     { path: '/admin/orders', minimum: 'STAFF' },
     { path: '/admin/reports', minimum: 'MANAGER' },
     { path: '/admin/products', minimum: 'MANAGER' },
+    { path: '/admin/photos', minimum: 'MANAGER' },
     { path: '/admin/products/new', minimum: 'MANAGER' },
     { path: '/admin/products/quick-add', minimum: 'MANAGER' },
     { path: '/admin/inventory', minimum: 'MANAGER' },
@@ -1450,6 +1451,34 @@ async function imagesSection(page: Page) {
   check('...and is served from storage', served.status === 200 && (served.headers.get('content-type') ?? '').startsWith('image/'), served.status);
   check('...with its alt text', image.alt === `${P} product, front`, image.alt);
   checkQuiet(page, 'image upload');
+
+  await open(page, `/admin/products/${product.id}/images`);
+  await page.getByRole('button', { name: 'Edit description', exact: true }).first().click();
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill(`${P} edited photo`);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const described = await eventually(async () => {
+    const row = await db.productImage.findUnique({ where: { id: image.id } });
+    return row?.alt === `${P} edited photo` ? row : null;
+  });
+  check('a saved photo description can be edited', Boolean(described));
+
+  await open(page, `/admin/products/${product.id}/images`);
+  await page.getByLabel('Replace photo', { exact: true }).setInputFiles({
+    name: 'replacement.png', mimeType: 'image/png', buffer: solidPng(640, 640),
+  });
+  const replaced = await eventually(async () => {
+    const row = await db.productImage.findUnique({ where: { id: image.id } });
+    return row && row.publicId !== image.publicId ? row : null;
+  }, 45_000);
+  check('replacement preserves the photo row and changes its stored file', Boolean(replaced), await excerpt(page));
+  if (replaced) {
+    check('replacement preserves the edited description', replaced.alt === `${P} edited photo`);
+    check('replacement is served from storage', (await fetch(replaced.url)).status === 200);
+    const removed = await eventually(async () => (await fetch(image.url)).status === 404 ? true : null);
+    check('replacement removes the unreferenced old file', Boolean(removed));
+    image.url = replaced.url;
+    image.publicId = replaced.publicId;
+  }
 
   // Everything the publish guard asks for is now present.
   await open(page, '/admin/products');
