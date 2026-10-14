@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { brandLine, brandLogoSrc } from '@/lib/brand-art';
+import { productCountLabel } from '@/lib/product-count';
 
 export type SpectrumBrand = {
   name: string;
@@ -117,7 +118,7 @@ export default function HouseSpectrum({ brands }: { brands: SpectrumBrand[] }) {
                 >
                   {line && <span className="block type-body text-ink-soft">{line}</span>}
                   <span className="block type-caption text-ink-soft">
-                    {brand.productCount} {brand.productCount === 1 ? 'product' : 'products'}
+                    {productCountLabel(brand.productCount)}
                   </span>
                 </span>
               </span>

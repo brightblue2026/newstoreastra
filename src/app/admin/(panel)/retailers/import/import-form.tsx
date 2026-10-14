@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { useActionState, useState } from 'react';
 import { MAX_IMPORT_BYTES } from '@/lib/retailer';
 import type { ImportState } from '../actions';

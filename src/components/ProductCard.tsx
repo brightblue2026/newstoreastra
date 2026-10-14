@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { m, useReducedMotion } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
 import { formatPrice, isPurchasable } from '@/lib/money';

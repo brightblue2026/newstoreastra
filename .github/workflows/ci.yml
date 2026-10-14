@@ -131,6 +131,7 @@ jobs:
           restic check --read-data
       - run: node --conditions=react-server --import tsx scripts/e2e-stock-race.ts
       - name: Start isolated test server
+        id: server
         run: |
           node --import tsx scripts/storage-test-server.ts > /tmp/storage-test-server.log 2>&1 &
           pnpm dev > /tmp/store-test-server.log 2>&1 &
@@ -144,12 +145,13 @@ jobs:
       - name: Customer checkout browser journey
         run: node --conditions=react-server --import tsx scripts/e2e-customer.ts
       - name: Admin browser journeys and role enforcement
+        if: ${{ !cancelled() && steps.server.outcome == 'success' }}
         run: node --conditions=react-server --import tsx scripts/e2e-admin.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: admin-browser-screenshots
-          path: qa/screenshots/admin
+          path: qa/screenshots
           retention-days: 7
       - uses: actions/upload-artifact@v4
         if: failure()

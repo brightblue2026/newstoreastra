@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Nav, { type NavBrand } from '@/components/Nav';
 import CartDrawer from '@/components/CartDrawer';
@@ -32,8 +32,10 @@ export default function StorefrontChrome({ brands }: { brands: NavBrand[] }) {
   // this "Checkout" (a link inside the drawer) opened /checkout with the cart
   // still covering it and the form unreachable until someone found Close.
   const pathname = usePathname();
+  const previousPath = useRef(pathname);
   useEffect(() => {
-    setCartOpen(false);
+    if (previousPath.current !== pathname) setCartOpen(false);
+    previousPath.current = pathname;
   }, [pathname, setCartOpen]);
 
   const cartCount = mounted

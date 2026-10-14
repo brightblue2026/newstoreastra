@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { buildHref, type QueryValues } from '@/lib/query';
 import { PRODUCT_SORTS, type ProductSort } from '@/lib/storefront';
 

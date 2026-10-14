@@ -1,5 +1,6 @@
 /** Real browser checkout on the disposable database. No live payments or notifications. */
 import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, expect } from '@playwright/test';
 import { db } from '../src/lib/db';
 
@@ -54,6 +55,12 @@ async function main() {
     await expect(page.locator('main')).toContainText(/cart is empty/i);
     assert.deepEqual(errors, []);
     console.log('PASS: product → cart → delivery → COD → affirmative consent → confirmation; server totals, stock, unpaid COD status, order privacy and cleared cart.');
+  } catch (error) {
+    await mkdir('qa/screenshots/customer', { recursive: true });
+    await page.screenshot({ path: 'qa/screenshots/customer/failure.png', fullPage: true });
+    await writeFile('qa/screenshots/customer/failure.html', await page.content());
+    console.error('Browser errors:', errors);
+    throw error;
   } finally { await context.close(); await browser.close(); }
 }
 main().finally(() => db.$disconnect()).catch((error: unknown) => { console.error(error instanceof Error ? error.message : 'Customer journey failed'); process.exitCode = 1; });

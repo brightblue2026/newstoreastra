@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import ProductGrid, { EmptyListing } from '@/components/ProductGrid';
 import { firstValue } from '@/lib/query';

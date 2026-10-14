@@ -71,6 +71,8 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
   const [selectedId, setSelectedId] = useState<string | null>(initial?.id ?? null);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   const selected = variants.find((v) => v.id === selectedId) ?? initial;
 
@@ -422,6 +424,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
             {/* The CTA is --bb-signal on every brand. Never the accent. */}
             <button
               type="button"
+              disabled={!ready}
               onClick={handleAdd}
               className="flex-1 btn btn-primary px-8 py-4"
             >
@@ -468,6 +471,7 @@ export default function ProductDetail({ product }: { product: ProductPage }) {
             </div>
             <button
               type="button"
+              disabled={!ready}
               onClick={handleAdd}
               className="ml-auto btn btn-primary"
             >

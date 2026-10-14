@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 import { setProductActiveAction } from './actions';
@@ -156,9 +156,11 @@ export default async function ProductsPage({
                       </Link>
                       <Link
                         href={`/admin/products/${product.id}/images`}
-                        className="type-body text-signal"
+                        className={product.images.length === 0 ? 'type-body text-warning' : 'type-body text-signal'}
                       >
-                        Images ({new Set(product.images.map((image) => image.publicId)).size})
+                        {product.images.length === 0
+                          ? 'No photo'
+                          : `Photos (${new Set(product.images.map((image) => image.publicId)).size})`}
                       </Link>
                       <Link href={`/admin/products/${product.id}`} className="type-body text-signal">
                         Edit

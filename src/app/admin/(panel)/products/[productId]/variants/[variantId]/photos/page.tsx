@@ -1,9 +1,11 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { requireCatalogueAccess } from '@/lib/session';
 import { isStorageConfigured } from '@/lib/storage';
-import { ImageCard } from '../../../images/image-card';
+import { PhotoGrid } from '../../../images/photo-grid';
+import { PHOTO_ORDER, photosIn } from '../../../images/photo-data';
+import { PublishedNote } from '../../../images/published-note';
 import { ImageUploader } from '../../../images/image-uploader';
 import { variantLabel } from '../../variant-notice';
 import { VariantPublishCard } from '../../variant-publish-card';
@@ -33,6 +35,7 @@ export default async function VariantPhotosPage({
     select: {
       id: true,
       name: true,
+      slug: true,
       isActive: true,
       variants: {
         orderBy: [{ variantName: 'asc' }, { format: 'asc' }, { size: 'asc' }],
@@ -43,8 +46,12 @@ export default async function VariantPhotosPage({
   const variant = product?.variants.find((entry) => entry.id === variantId);
   if (!product || !variant) notFound();
 
-  const labels = new Map(product.variants.map((entry) => [entry.id, variantLabel(entry)]));
   const label = variantLabel(variant);
+  const variantOptions = product.variants.map((entry) => ({
+    id: entry.id,
+    label: variantLabel(entry),
+    group: entry.variantName,
+  }));
 
   // The other variants with the same name: the other sizes of this fragrance.
   const sameName = variant.variantName
@@ -53,28 +60,14 @@ export default async function VariantPhotosPage({
       )
     : [];
 
-  const photos = await db.productImage.findMany({
-    where: { productId: product.id, variantId: variant.id },
-    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-    select: { id: true, url: true, alt: true, publicId: true },
+  // Every photo row of the product, so each card knows where else its picture
+  // is used and a delete can say what it leaves.
+  const rows = await db.productImage.findMany({
+    where: { productId: product.id },
+    orderBy: PHOTO_ORDER,
+    select: { id: true, url: true, alt: true, publicId: true, variantId: true },
   });
-  const shared = await db.productImage.findMany({
-    where: {
-      productId: product.id,
-      publicId: { in: photos.map((photo) => photo.publicId) },
-      variantId: { not: variant.id },
-    },
-    select: { publicId: true, variantId: true },
-  });
-  const alsoShownFor = (publicId: string): string | null => {
-    const others = shared
-      .filter((row) => row.publicId === publicId && row.variantId)
-      .map((row) => labels.get(row.variantId!) ?? 'a removed variant');
-    if (others.length === 0) return null;
-    return others.length <= 3
-      ? others.join(', ')
-      : `${others.slice(0, 2).join(', ')} and ${others.length - 2} more`;
-  };
+  const photos = photosIn(rows, variant.id);
 
   return (
     <div>
@@ -89,6 +82,7 @@ export default async function VariantPhotosPage({
         / {label}
       </p>
       <h1 className="mt-4 type-display-sm">Photos of {label}</h1>
+      <PublishedNote isActive={product.isActive} slug={product.slug} />
       <p className="mt-4 max-w-2xl type-body text-ink-soft">
         These photos are for this variant only. The first one leads the product page when a
         customer picks {label}, and is the picture shown in the cart.
@@ -125,19 +119,14 @@ export default async function VariantPhotosPage({
           general photos.
         </p>
       ) : (
-        <div className="mt-4 grid gap-6 sm:grid-cols-3">
-          {photos.map((photo) => (
-            <ImageCard
-              key={photo.id}
-              productId={product.id}
-              image={photo}
-              isCover={false}
-              isFirst
-              isLast
-              variantPhoto={{ alsoShownFor: alsoShownFor(photo.publicId) }}
-            />
-          ))}
-        </div>
+        <PhotoGrid
+          productId={product.id}
+          productIsActive={product.isActive}
+          photos={photos}
+          hereVariantId={variant.id}
+          allRows={rows}
+          variants={variantOptions}
+        />
       )}
 
       <VariantPublishCard

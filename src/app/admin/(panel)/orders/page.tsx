@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { OrderStatus } from '@/generated/prisma/enums';
 import { formatINR } from '@/lib/money';
 import { ORDER_STATUS_LABELS } from '@/lib/order-status';

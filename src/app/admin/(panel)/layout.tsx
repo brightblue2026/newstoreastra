@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { requireAdminAccess } from '@/lib/session';
 import { ROLE_LABELS, canSeePricing } from '@/lib/roles';
 import { navFor } from './nav';

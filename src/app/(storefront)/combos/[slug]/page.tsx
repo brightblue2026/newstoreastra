@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import AddToCartButton from '@/components/AddToCartButton';
 import ComboChoices, { type ChoiceSlot } from '@/components/ComboChoices';
 import { getComboBySlug } from '@/lib/storefront';
