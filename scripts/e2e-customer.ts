@@ -48,7 +48,10 @@ async function main() {
     assert.equal(stock.reduce((sum, row) => sum + row.quantity, 0), quantity - 1);
     const outsider = await browser.newContext();
     const locked = await outsider.newPage();
-    await locked.goto(`http://localhost:3000/order/${orderNumber}`, { waitUntil: 'domcontentloaded' });
+    const lockedResponse = await locked.goto(`http://localhost:3000/order/${orderNumber}`, { waitUntil: 'domcontentloaded' });
+    assert.equal(lockedResponse?.status(), 200);
+    await expect(locked.getByRole('heading', { name: 'Look up your order', exact: true })).toBeVisible();
+    await expect(locked.getByRole('button', { name: 'Show my order', exact: true })).toBeVisible();
     await expect(locked.locator('main')).not.toContainText('Synthetic Checkout Customer');
     await outsider.close();
     await page.goto('http://localhost:3000/checkout', { waitUntil: 'domcontentloaded' });
