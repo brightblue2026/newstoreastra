@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { OrderStatus } from '@/generated/prisma/client';
 import { db } from '@/lib/db';
 import { formatINR } from '@/lib/money';

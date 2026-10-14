@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/Link';
 
 /**
  * Catches anything unexpected thrown inside the admin panel. Next redacts a

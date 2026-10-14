@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { notFound } from 'next/navigation';
 import { isStorageConfigured } from '@/lib/storage';
 import { db } from '@/lib/db';

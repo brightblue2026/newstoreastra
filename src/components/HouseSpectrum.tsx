@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { brandLine, brandLogoSrc } from '@/lib/brand-art';
 
 export type SpectrumBrand = {

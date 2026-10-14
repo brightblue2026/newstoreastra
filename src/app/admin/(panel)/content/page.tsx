@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import {
   CONTENT_META,
   EDITABLE_CONTENT_KEYS,

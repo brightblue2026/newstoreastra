@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { Reveal, RevealItem } from '@/components/Reveal';
 import CountUp from '@/components/CountUp';
 import RecordSeal from '@/components/art/RecordSeal';

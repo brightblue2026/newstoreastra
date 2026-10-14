@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 
 /**
  * The last-resort 404, for a URL that matches no route at all.

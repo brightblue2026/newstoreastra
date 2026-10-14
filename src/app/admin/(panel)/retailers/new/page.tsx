@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { requireCatalogueAccess } from '@/lib/session';
 import { createRetailerAction } from '../actions';
 import { RetailerForm } from '../retailer-form';
