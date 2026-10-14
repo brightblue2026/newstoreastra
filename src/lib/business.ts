@@ -36,11 +36,12 @@ export const BUSINESS = {
   /** `tel:` needs the digits unpunctuated. */
   tollFreeDigits: '18001230621',
   /**
-   * Still the Gmail inbox. It should become an address on the store's own
-   * domain, but only once that mailbox exists and is read: this is where price
-   * enquiries land, and a made-up address would bounce every one of them.
+   * The owner's own Gmail inbox, which they read (confirmed 14 October 2026;
+   * the earlier `store-` address was not it). It should become an address on
+   * the store's own domain once that mailbox exists: price enquiries land here,
+   * and a made-up address would bounce every one of them.
    */
-  email: 'store-brightbluefmcg@gmail.com',
+  email: 'brightbluefmcg@gmail.com',
   supportHours: null as string | null,
   /** Company-wide FSSAI licence. Each food brand also carries its own in the admin. */
   fssaiLicense: null as string | null,
