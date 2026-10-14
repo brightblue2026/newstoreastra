@@ -1426,7 +1426,9 @@ async function imagesSection(page: Page) {
     // Scoped to the queue: Next's route announcer is also an alert.
     await page.locator('#imageAlt, li p[role="alert"]').first().waitFor({ timeout: 15_000 });
     if (await altBox.count()) await altBox.fill(alt);
-    if (!(await page.getByRole('button', { name: /^upload/i }).isEnabled())) return;
+    const uploadButton = page.getByRole('button', { name: /^upload/i }).first();
+    const ready = await eventually(async () => (await uploadButton.isEnabled()) ? true : null, 15_000);
+    if (!ready) throw new Error('Upload did not leave preview preparation');
     await page.getByRole('button', { name: /^upload/i }).first().click();
   };
 
