@@ -27,15 +27,11 @@ export type HouseBrand = NavBrand & {
   logoUrl: string | null;
 };
 
-/**
- * The houses with something on sale, in their configured order. A brand with
- * no published product is left out of the menu, the home grid and the brands
- * page rather than shown as "0 products"; its own page still opens.
- */
+/** The eight houses, in their configured order. */
 export async function getBrands(): Promise<HouseBrand[]> {
   try {
     const brands = await db.brand.findMany({
-      where: { isActive: true, products: { some: { isActive: true } } },
+      where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       select: {
         name: true,

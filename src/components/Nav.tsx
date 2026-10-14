@@ -10,6 +10,7 @@ import {
   useScroll,
 } from 'motion/react';
 import { dur, ease } from '@/lib/motion';
+import { productCountLabel } from '@/lib/product-count';
 
 export type NavBrand = {
   name: string;
@@ -230,8 +231,7 @@ export default function Nav({
                       {brand.segmentLabel}
                     </span>
                     <span className="mt-1 block type-caption text-ink-soft">
-                      {brand.productCount}{' '}
-                      {brand.productCount === 1 ? 'product' : 'products'}
+                      {productCountLabel(brand.productCount)}
                     </span>
                   </Link>
                 </li>
