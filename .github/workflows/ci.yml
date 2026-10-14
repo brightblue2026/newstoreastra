@@ -141,6 +141,8 @@ jobs:
           exit 1
       - run: node --conditions=react-server --import tsx scripts/e2e-razorpay.ts
       - run: node --conditions=react-server --import tsx scripts/e2e-shiprocket.ts
+      - name: Customer checkout browser journey
+        run: node --conditions=react-server --import tsx scripts/e2e-customer.ts
       - name: Admin browser journeys and role enforcement
         run: node --conditions=react-server --import tsx scripts/e2e-admin.ts
       - uses: actions/upload-artifact@v4
