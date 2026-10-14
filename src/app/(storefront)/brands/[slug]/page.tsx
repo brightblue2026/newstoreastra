@@ -12,6 +12,7 @@ import {
   listProducts,
   type ProductSort,
 } from '@/lib/storefront';
+import { productCountLabel } from '@/lib/product-count';
 
 export const revalidate = 60;
 
@@ -97,8 +98,7 @@ export default async function BrandPage({
           )}
           <RevealItem>
             <p className="mt-8 type-caption text-ink-soft">
-              <span className="tabular-nums">{brand.productCount}</span>{' '}
-              {brand.productCount === 1 ? 'product' : 'products'}
+              <span className="tabular-nums">{productCountLabel(brand.productCount)}</span>
             </p>
           </RevealItem>
         </Reveal>
