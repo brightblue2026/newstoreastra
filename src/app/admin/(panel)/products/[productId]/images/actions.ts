@@ -158,7 +158,7 @@ export async function saveProductImageAction(
     return { ok: false, error: 'Not a recognised upload.' };
   }
   const alreadyLinked = await db.productImage.count({ where: { publicId: parsed.data.path } });
-  if (alreadyLinked > 0) return { ok: false, error: 'That photo is already saved.' };
+  if (alreadyLinked > 0) { refreshPhotos(productId); return { ok: true }; }
 
   const discard = () => discardUnsavedUpload(parsed.data.path, parsed.data.productId);
 
@@ -215,6 +215,11 @@ export async function saveProductImageAction(
     // Transaction-scoped — released automatically on commit or rollback.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${productId}))`;
 
+    // A retry can arrive before the original save commits. Recheck while
+    // holding the same lock, so lost responses cannot create duplicate rows.
+    const existing = await tx.productImage.findMany({ where: { publicId: parsed.data.path, productId } });
+    if (existing.length > 0) return null;
+
     const maxSort = await tx.productImage.aggregate({
       where: { productId },
       _max: { sortOrder: true },
@@ -240,6 +245,8 @@ export async function saveProductImageAction(
     });
   });
 
+  if (!created) { refreshPhotos(productId); return { ok: true }; }
+
   await recordAudit({
     userId: user.id,
     action: 'create',
@@ -249,7 +256,7 @@ export async function saveProductImageAction(
     after: { ...created[0], variantIds },
   });
 
-  revalidatePath(`/admin/products/${productId}`, 'layout');
+  refreshPhotos(productId);
   return { ok: true };
 }
 
@@ -324,7 +331,7 @@ export async function moveProductImageAction(
     }),
   ]);
 
-  revalidatePath(`/admin/products/${productId}`, 'layout');
+  refreshPhotos(productId);
 }
 
 export async function deleteProductImageAction(productId: string, imageId: string): Promise<void> {
@@ -353,5 +360,15 @@ export async function deleteProductImageAction(productId: string, imageId: strin
     after: null,
   });
 
+  refreshPhotos(productId);
+}
+
+/** Saved, reordered and removed photos must also update cached customer pages. */
+function refreshPhotos(productId: string): void {
   revalidatePath(`/admin/products/${productId}`, 'layout');
+  revalidatePath('/');
+  revalidatePath('/shop');
+  revalidatePath('/products/[slug]', 'page');
+  revalidatePath('/brands/[slug]', 'page');
+  revalidatePath('/categories/[slug]', 'page');
 }

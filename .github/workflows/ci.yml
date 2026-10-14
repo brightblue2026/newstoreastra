@@ -90,6 +90,8 @@ jobs:
       AUTH_SECRET: local-integration-only-not-a-production-secret
       RAZORPAY_WEBHOOK_SECRET: local-integration-webhook
       SHIPROCKET_WEBHOOK_TOKEN: local-integration-courier
+      SUPABASE_URL: http://localhost:54322
+      SUPABASE_SERVICE_ROLE_KEY: isolated-storage-only
       NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_isolated
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
     steps:
@@ -130,6 +132,7 @@ jobs:
       - run: node --conditions=react-server --import tsx scripts/e2e-stock-race.ts
       - name: Start isolated test server
         run: |
+          node --import tsx scripts/storage-test-server.ts > /tmp/storage-test-server.log 2>&1 &
           pnpm dev > /tmp/store-test-server.log 2>&1 &
           for attempt in $(seq 1 45); do
             curl --fail --silent http://localhost:3000/api/health && exit 0

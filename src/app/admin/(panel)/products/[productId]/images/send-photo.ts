@@ -51,6 +51,9 @@ function uploadWithProgress(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
+    xhr.timeout = 120_000;
+    xhr.ontimeout = () => reject(new Error('upload-timeout'));
+    xhr.onabort = () => reject(new Error('upload-aborted'));
     xhr.setRequestHeader('Content-Type', file.type);
     // Never overwrite: the server signs a fresh, random path per upload, so a
     // collision means something is wrong rather than something to paper over.
@@ -66,6 +69,16 @@ function uploadWithProgress(
 
 const ATTEMPTS = 3;
 
+// A missing server-action response must not leave the editor busy forever.
+async function bounded<T>(run: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([run(), new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('server-timeout')), 30_000);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
 /**
  * Runs a server call, trying again when it throws. A server action that
  * *answers* — even with a refusal — is returned as it is; only a call that
@@ -76,11 +89,13 @@ async function withRetry<T>(run: () => Promise<T>, onRetry?: () => void): Promis
   let lastError: unknown;
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     try {
-      return await run();
+      return await bounded(run);
     } catch (error) {
       lastError = error;
-      onRetry?.();
-      await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+      if (attempt < ATTEMPTS - 1) {
+        onRetry?.();
+        await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+      }
     }
   }
   throw lastError;
@@ -97,6 +112,7 @@ export async function sendPhoto({
   alt,
   variantIds,
   onProgress,
+  onStage,
 }: {
   productId: string;
   file: File;
@@ -104,13 +120,19 @@ export async function sendPhoto({
   /** Empty for a photo of the product as a whole. */
   variantIds: string[];
   onProgress: (percent: number) => void;
+  onStage?: (stage: 'Preparing upload…' | 'Uploading…' | 'Checking and saving…') => void;
 }): Promise<SendResult> {
   try {
+    const refusal = checkPhotoFile(file);
+    if (refusal) return { ok: false, message: refusal };
+    if (!alt.trim() || alt.trim().length > 200) return { ok: false, message: 'Describe the photo using 1–200 characters.' };
+    onStage?.('Preparing upload…');
     // Signing again is harmless: an unused signed URL stores nothing.
     const signResult = await withRetry(() => signProductImageUploadAction(productId, file.type));
     if (!signResult.ok) return { ok: false, message: signResult.error };
     const { uploadUrl, path } = signResult.ticket;
 
+    onStage?.('Uploading…');
     const uploadResult = await uploadWithProgress(uploadUrl, file, onProgress);
     if (!uploadResult.ok) {
       return {
@@ -125,6 +147,7 @@ export async function sendPhoto({
     // Only the path, the description and the variants. Everything else about
     // the file is read back from storage by the server — it does not take
     // this page's word for the size, the format or the dimensions.
+    onStage?.('Checking and saving…');
     let answerLost = false;
     const saveResult = await withRetry(
       () => saveProductImageAction(productId, { path, alt, variantIds }),

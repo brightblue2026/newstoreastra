@@ -81,7 +81,7 @@ export async function createSignedUpload(path: string): Promise<SignedUpload> {
 
   const response = await fetch(
     `${url}/storage/v1/object/upload/sign/${IMAGE_BUCKET}/${path}`,
-    { method: 'POST', headers: { ...serviceHeaders(), 'Content-Type': 'application/json' }, body: '{}' },
+    { method: 'POST', signal: AbortSignal.timeout(15_000), headers: { ...serviceHeaders(), 'Content-Type': 'application/json' }, body: '{}' },
   );
 
   if (!response.ok) {
@@ -116,22 +116,44 @@ export async function statObject(path: string): Promise<ObjectFacts | null> {
   if (!isOwnedPath(path)) return null;
 
   const response = await fetch(publicUrlFor(path), {
+    signal: AbortSignal.timeout(15_000),
+    cache: 'no-store',
     headers: { ...serviceHeaders(), Range: `bytes=0-${HEADER_BYTES - 1}` },
   });
   if (!response.ok) return null;
 
-  const buffer = new Uint8Array(await response.arrayBuffer());
+  // Stop reading after the header even when a proxy ignores Range. Never
+  // buffer a 20MB photo in a Worker just to inspect its dimensions.
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const buffer = new Uint8Array(HEADER_BYTES);
+  let length = 0;
+  let ended = false;
+  try {
+    while (length < HEADER_BYTES) {
+      const chunk = await reader.read();
+      if (chunk.done) { ended = true; break; }
+      const part = chunk.value.subarray(0, HEADER_BYTES - length);
+      buffer.set(part, length);
+      length += part.byteLength;
+    }
+  } finally { await reader.cancel(); reader.releaseLock(); }
 
   // A 206 reports the range in Content-Range ("bytes 0-65535/2400123"); a 200
   // means the whole object came back and its length is what was read.
   const contentRange = response.headers.get('content-range');
   const total = contentRange?.split('/')[1];
-  const bytes = total && /^\d+$/.test(total) ? Number(total) : buffer.byteLength;
+  const declared = response.headers.get('content-length');
+  const bytes = total && /^\d+$/.test(total) ? Number(total)
+    : response.status === 200 && declared && /^\d+$/.test(declared) ? Number(declared)
+    : ended && response.status === 200 ? length : null;
+  // An incomplete range cannot prove the size; never treat header length as file size.
+  if (bytes === null || !Number.isSafeInteger(bytes) || bytes <= 0) return null;
 
   return {
     bytes,
     mimeType: (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase(),
-    dimensions: readImageDimensions(buffer),
+    dimensions: readImageDimensions(buffer.subarray(0, length)),
   };
 }
 
@@ -146,6 +168,7 @@ export async function removeObject(path: string): Promise<void> {
   try {
     await fetch(`${url}/storage/v1/object/${IMAGE_BUCKET}/${path}`, {
       method: 'DELETE',
+      signal: AbortSignal.timeout(15_000),
       headers: serviceHeaders(),
     });
   } catch {

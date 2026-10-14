@@ -45,6 +45,7 @@ export function QuickPhotoButton({
         file,
         alt,
         variantIds: [variantId],
+        onStage: (stage) => setBusy(`${stage}${position}`),
         onProgress: (percent) =>
           setBusy(percent < 100 ? `Uploading${position}… ${percent}%` : `Saving${position}…`),
       });

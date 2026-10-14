@@ -213,6 +213,7 @@ async function adminRoutes(): Promise<{ routes: Route[]; skipped: string[] }> {
 
   const routes: Route[] = [
     { path: '/admin', minimum: 'STAFF' },
+    { path: '/admin/account', minimum: 'STAFF' },
     { path: '/admin/orders', minimum: 'STAFF' },
     { path: '/admin/reports', minimum: 'MANAGER' },
     { path: '/admin/products', minimum: 'MANAGER' },
@@ -1434,6 +1435,11 @@ async function imagesSection(page: Page) {
   check('an image with no alt text is refused', (await db.productImage.count({ where: { productId: product.id } })) === 0);
 
   // There is no pixel-size rule: a small photo is as acceptable as a large one.
+  await upload('not-an-image.png', Buffer.from('%PDF fake image'), `${P} invalid image`);
+  const refused = await eventually(async () => /not a readable image/i.test(await pageText(page)) ? true : null);
+  check('renamed non-image bytes are refused by the server', Boolean(refused));
+  check('invalid image creates no database row', (await db.productImage.count({ where: { productId: product.id } })) === 0);
+
   await upload('good.png', solidPng(800, 800), `${P} product, front`);
   const image = await eventually(() => db.productImage.findFirst({ where: { productId: product.id } }), 45_000);
   check('a small image uploads', Boolean(image), await excerpt(page));

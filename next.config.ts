@@ -53,6 +53,9 @@ const RAZORPAY_ANY = 'https://*.razorpay.com';
  * environment, so the CSP allows the wildcard rather than hard-coding a ref
  * that would silently break every image on a different project.
  */
+// Local Supabase-compatible development storage; never permitted in production.
+const localStorageOrigin = process.env.NODE_ENV === 'development' &&
+  process.env.SUPABASE_URL === 'http://localhost:54322' ? 'http://localhost:54322' : '';
 const SUPABASE_ANY = 'https://*.supabase.co';
 
 /** The project host, when one is configured — used for next/image. */
@@ -77,13 +80,13 @@ const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' ${RAZORPAY_CHECKOUT} ${RAZORPAY_CDN} ${CLOUDFLARE_BEACON_SCRIPT}${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: ${SUPABASE_ANY} ${RAZORPAY_ANY}`,
+  `img-src 'self' data: ${localStorageOrigin} ${SUPABASE_ANY} ${RAZORPAY_ANY}`,
   "font-src 'self' data:",
   // The admin image uploader PUTs the file straight from the browser to
   // Supabase Storage (src/app/admin/(panel)/products/[productId]/images/image-uploader.tsx)
   // rather than through this app's server, so the request itself needs an exception —
   // alongside Razorpay's own connect-src needs above.
-  `connect-src 'self' ${SUPABASE_ANY} ${RAZORPAY_API} ${RAZORPAY_ANY} ${CLOUDFLARE_BEACON_REPORT}`,
+  `connect-src 'self' ${localStorageOrigin} ${SUPABASE_ANY} ${RAZORPAY_API} ${RAZORPAY_ANY} ${CLOUDFLARE_BEACON_REPORT}`,
   `frame-src ${RAZORPAY_CHECKOUT} ${RAZORPAY_API} ${RAZORPAY_ANY}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -135,6 +138,7 @@ const nextConfig: NextConfig = {
     // Pinned to the configured host where there is one, so a stray URL from
     // another project is not optimised and served as if it were ours.
     remotePatterns: [
+      ...(localStorageOrigin ? [{ protocol: 'http' as const, hostname: 'localhost', port: '54322', pathname: '/storage/v1/object/public/**' }] : []),
       { protocol: 'https', hostname: supabaseHostname() ?? '**.supabase.co', pathname: '/storage/v1/object/public/**' },
     ],
     formats: ['image/avif', 'image/webp'],

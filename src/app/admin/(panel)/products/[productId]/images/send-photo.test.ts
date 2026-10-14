@@ -16,9 +16,14 @@ class FakeXhr {
   upload: { onprogress: ((event: unknown) => void) | null } = { onprogress: null };
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  timeout = 0;
   open() {}
   setRequestHeader() {}
   send() {
+    if (putStatus === -1) { this.ontimeout?.(); return; }
+    if (putStatus === -2) { this.onabort?.(); return; }
     this.status = putStatus;
     this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 5 });
     this.onload?.();
@@ -117,5 +122,24 @@ describe('sendPhoto', () => {
 
     expect(await settle(send())).toEqual({ ok: false, message: expect.stringMatching(/could not be uploaded/) });
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe('upload failure recovery', () => {
+  it.each([-1, -2])('releases the uploader after timeout or abort (%s)', async (status) => {
+    sign.mockResolvedValue(ticket); putStatus = status;
+    expect((await settle(send())).ok).toBe(false);
+    expect(save).not.toHaveBeenCalled();
+  });
+  it('bounds a server action that never answers', async () => {
+    sign.mockImplementation(() => new Promise(() => {}));
+    expect((await settle(send())).ok).toBe(false);
+    expect(sign).toHaveBeenCalledTimes(3);
+  });
+  it('shows signing, transfer and save as distinct stages', async () => {
+    sign.mockResolvedValue(ticket); save.mockResolvedValue({ ok: true });
+    const stage = vi.fn();
+    await settle(sendPhoto({ productId: 'p1', file, alt: 'Photo', variantIds: [], onProgress: () => {}, onStage: stage }));
+    expect(stage.mock.calls.flat()).toEqual(['Preparing upload…', 'Uploading…', 'Checking and saving…']);
   });
 });

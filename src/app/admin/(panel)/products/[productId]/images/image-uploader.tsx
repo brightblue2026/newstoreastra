@@ -48,7 +48,17 @@ async function readImage(
 ): Promise<{ width: number; height: number; preview: string | null }> {
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file);
+    // Preview decoding is optional. A browser that cannot decode AVIF should
+    // still allow the server's authoritative header validation.
+    const decoding = createImageBitmap(file);
+    let expired = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    decoding.then((result) => { if (expired) result.close(); }, () => {});
+    try {
+      bitmap = await Promise.race([decoding, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => { expired = true; reject(new Error('preview-timeout')); }, 10_000);
+      })]);
+    } finally { clearTimeout(timer); }
   } catch {
     throw new Error('This file could not be read as an image.');
   }
@@ -68,7 +78,7 @@ async function readImage(
   return { width, height, preview };
 }
 
-type QueueStatus = 'ready' | 'uploading' | 'refused' | 'failed';
+type QueueStatus = 'checking' | 'ready' | 'uploading' | 'refused' | 'failed';
 
 interface QueuedPhoto {
   id: string;
@@ -77,6 +87,7 @@ interface QueuedPhoto {
   preview: string | null;
   status: QueueStatus;
   progress: number;
+  stage?: string;
   /** Why it was refused or failed, in words the person can act on. */
   message: string | null;
 }
@@ -99,12 +110,8 @@ async function inspect(file: File): Promise<Pick<QueuedPhoto, 'preview' | 'statu
     // and to make the thumbnail.
     const { preview } = await readImage(file);
     return { preview, status: 'ready', message: null };
-  } catch (error) {
-    return {
-      preview: null,
-      status: 'refused',
-      message: error instanceof Error ? error.message : 'This file could not be read as an image.',
-    };
+  } catch {
+    return { preview: null, status: 'ready', message: 'Preview unavailable. The file will be checked when uploaded.' };
   }
 }
 
@@ -150,19 +157,13 @@ export function ImageUploader({
     if (files.length === 0) return;
     setSuccess(null);
     const stamp = Date.now();
-    const added: QueuedPhoto[] = [];
-    for (const [index, file] of files.entries()) {
-      added.push({
-        id: `${idPrefix}${stamp}-${index}`,
-        file,
-        // The product's name is a true description of its photo and a better
-        // start than an empty box; the person refines it ("…, back label").
-        alt: defaultAlt,
-        ...(await inspect(file)),
-        progress: 0,
-      });
-    }
+    // Show every selection immediately; decoding must not hide the entire queue.
+    const added: QueuedPhoto[] = files.map((file, index) => ({
+      id: `${idPrefix}${stamp}-${index}`, file, alt: defaultAlt,
+      preview: null, status: 'checking', message: null, progress: 0,
+    }));
     setQueue((current) => [...current, ...added]);
+    for (const photo of added) patch(photo.id, await inspect(photo.file));
     // So choosing the same file again still fires `change`.
     if (inputRef.current) inputRef.current.value = '';
   }
@@ -182,6 +183,7 @@ export function ImageUploader({
       alt,
       variantIds: variantId ? [variantId, ...(share && siblings ? siblings.variantIds : [])] : [],
       onProgress: (progress) => patch(photo.id, { progress }),
+      onStage: (stage) => patch(photo.id, { stage }),
     });
     if (!result.ok) {
       patch(photo.id, { status: 'failed', message: result.message });
@@ -320,13 +322,14 @@ export function ImageUploader({
                     <button
                       type="button"
                       onClick={() => setQueue((current) => current.filter((entry) => entry.id !== photo.id))}
-                      disabled={photo.status === 'uploading'}
+                      disabled={uploading}
                       className="shrink-0 type-caption text-ink-soft underline disabled:opacity-40"
                     >
                       Remove
                     </button>
                   </div>
 
+                  {photo.status === 'checking' && <p role="status" className="mt-2 type-body">Preparing preview…</p>}
                   {photo.status !== 'refused' && (
                     <>
                       <label htmlFor={altId} className="mt-2 block type-caption text-ink-soft">
@@ -335,8 +338,9 @@ export function ImageUploader({
                       <input
                         id={altId}
                         value={photo.alt}
+                        maxLength={200}
                         onChange={(event) => patch(photo.id, { alt: event.target.value })}
-                        disabled={photo.status === 'uploading'}
+                        disabled={uploading}
                         placeholder="MX Three Dish Wash Liquid, Lemon, 450 ml"
                         className="mt-1 w-full rounded-control border border-line bg-white px-3 py-2 type-body"
                       />
@@ -346,7 +350,7 @@ export function ImageUploader({
                   {photo.status === 'uploading' && (
                     <>
                       <p role="status" className="mt-2 type-caption normal-case text-ink-soft">
-                        {photo.progress < 100 ? `Uploading… ${photo.progress}%` : 'Saving…'}
+                        {photo.stage === 'Uploading…' ? `Uploading… ${photo.progress}%` : photo.stage ?? 'Preparing upload…'}
                       </p>
                       <div
                         role="progressbar"
@@ -363,7 +367,7 @@ export function ImageUploader({
 
                   {photo.message && (
                     <p role="alert" className="mt-2 type-caption normal-case text-warning">
-                      {photo.status === 'refused' ? 'Cannot be used. ' : 'Not saved. '}
+                      {photo.status === 'refused' ? 'Cannot be used. ' : photo.status === 'failed' ? 'Not saved. ' : ''}
                       {photo.message}
                     </p>
                   )}
@@ -384,7 +388,7 @@ export function ImageUploader({
         <button
           type="button"
           onClick={handleUpload}
-          disabled={uploading || sendable === 0}
+          disabled={uploading || sendable === 0 || queue.some((photo) => photo.status === 'checking')}
           className="mt-6 rounded-control bg-signal px-6 py-3 type-body font-medium text-white disabled:opacity-60"
         >
           {uploading ? 'Uploading…' : `Upload ${countPhotos(sendable)}`}
