@@ -135,6 +135,11 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: supabaseHostname() ?? '**.supabase.co', pathname: '/storage/v1/object/public/**' },
     ],
     formats: ['image/avif', 'image/webp'],
+    // Every upload is stored at a new random path and never overwritten, so a
+    // resized photo can be kept for a month. At Next's default of 60 seconds
+    // the browser asked the Worker again on most page views, and photo
+    // resizing was two thirds of all Worker requests (14 October 2026).
+    minimumCacheTTL: 2678400,
   },
 
   // The Prisma client is generated into src/generated and must not be bundled
