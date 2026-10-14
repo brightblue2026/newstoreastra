@@ -1,5 +1,10 @@
 import { ALLOWED_IMAGE_FORMATS, MAX_UPLOAD_BYTES } from '@/lib/storage-shared';
-import { saveProductImageAction, signProductImageUploadAction } from './actions';
+import {
+  replaceProductImageAction,
+  saveProductImageAction,
+  signProductImageUploadAction,
+} from './actions';
+import { PHOTO_ALREADY_REPLACED } from './photo-messages';
 
 /*
   Sending one photo, shared by the full uploader and the one-press "Add photo"
@@ -90,6 +95,52 @@ export type SendResult = { ok: true } | { ok: false; message: string };
 
 const TRY_AGAIN = 'The photo could not be saved. Check the connection and try again.';
 
+/**
+ * Signs and uploads one file to storage, without recording it anywhere.
+ * Answers with the stored path, or a sentence saying why not. Throws only when
+ * every signing attempt went unanswered.
+ */
+async function uploadFile(
+  productId: string,
+  file: File,
+  onProgress: (percent: number) => void,
+): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
+  // Signing again is harmless: an unused signed URL stores nothing.
+  const signResult = await withRetry(() => signProductImageUploadAction(productId, file.type));
+  if (!signResult.ok) return { ok: false, message: signResult.error };
+  const { uploadUrl, path } = signResult.ticket;
+
+  const uploadResult = await uploadWithProgress(uploadUrl, file, onProgress);
+  if (!uploadResult.ok) {
+    return {
+      ok: false,
+      message:
+        uploadResult.status === 409
+          ? 'That photo was already uploaded. Refresh and check the saved photos.'
+          : 'The photo could not be uploaded. Try again.',
+    };
+  }
+  return { ok: true, path };
+}
+
+/**
+ * Runs a save-type server call with retries. An attempt whose answer never
+ * arrived may still have done the work; the repeat is then told it is already
+ * done (`doneAlready`), which is the outcome wanted.
+ */
+async function saveWithRetry(
+  run: () => Promise<{ ok: boolean; error?: string }>,
+  doneAlready: string,
+): Promise<SendResult> {
+  let answerLost = false;
+  const result = await withRetry(run, () => {
+    answerLost = true;
+  });
+  if (result.ok) return { ok: true };
+  if (answerLost && result.error === doneAlready) return { ok: true };
+  return { ok: false, message: result.error ?? 'Could not save that photo.' };
+}
+
 /** Signs, sends and records one photo. Never throws. */
 export async function sendPhoto({
   productId,
@@ -106,37 +157,43 @@ export async function sendPhoto({
   onProgress: (percent: number) => void;
 }): Promise<SendResult> {
   try {
-    // Signing again is harmless: an unused signed URL stores nothing.
-    const signResult = await withRetry(() => signProductImageUploadAction(productId, file.type));
-    if (!signResult.ok) return { ok: false, message: signResult.error };
-    const { uploadUrl, path } = signResult.ticket;
-
-    const uploadResult = await uploadWithProgress(uploadUrl, file, onProgress);
-    if (!uploadResult.ok) {
-      return {
-        ok: false,
-        message:
-          uploadResult.status === 409
-            ? 'That photo was already uploaded. Refresh and check the saved photos.'
-            : 'The photo could not be uploaded. Try again.',
-      };
-    }
+    const upload = await uploadFile(productId, file, onProgress);
+    if (!upload.ok) return upload;
 
     // Only the path, the description and the variants. Everything else about
     // the file is read back from storage by the server — it does not take
     // this page's word for the size, the format or the dimensions.
-    let answerLost = false;
-    const saveResult = await withRetry(
-      () => saveProductImageAction(productId, { path, alt, variantIds }),
-      () => {
-        answerLost = true;
-      },
+    return await saveWithRetry(
+      () => saveProductImageAction(productId, { path: upload.path, alt, variantIds }),
+      'That photo is already saved.',
     );
-    if (saveResult.ok) return { ok: true };
-    // An attempt whose answer never arrived may still have saved the photo;
-    // the repeat is then told it is already there, which is the outcome wanted.
-    if (answerLost && saveResult.error === 'That photo is already saved.') return { ok: true };
-    return { ok: false, message: saveResult.error ?? 'Could not save that photo.' };
+  } catch {
+    return { ok: false, message: TRY_AGAIN };
+  }
+}
+
+/**
+ * Swaps the picture of a saved photo for a new file. The photo keeps its
+ * place, its description and every variant it is shown for. Never throws.
+ */
+export async function replacePhoto({
+  productId,
+  imageId,
+  file,
+  onProgress,
+}: {
+  productId: string;
+  imageId: string;
+  file: File;
+  onProgress: (percent: number) => void;
+}): Promise<SendResult> {
+  try {
+    const upload = await uploadFile(productId, file, onProgress);
+    if (!upload.ok) return upload;
+    return await saveWithRetry(
+      () => replaceProductImageAction(productId, imageId, { path: upload.path }),
+      PHOTO_ALREADY_REPLACED,
+    );
   } catch {
     return { ok: false, message: TRY_AGAIN };
   }
