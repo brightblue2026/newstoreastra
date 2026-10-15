@@ -1,0 +1,10 @@
+{
+  "requests": 400,
+  "concurrency": 20,
+  "failed": 0,
+  "p50Ms": 47,
+  "p95Ms": 564,
+  "p99Ms": 616,
+  "requestsPerSecond": 122.3
+}
+This measures local HTTP serving only; database contention, payment settlement and production capacity require staging tests.

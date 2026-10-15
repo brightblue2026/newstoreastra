@@ -18,7 +18,8 @@
   --color-ink-soft: #3c4f6b;
   --color-paper: #faf7f2;
   --color-line: #e3e0d8;
-  --color-signal: #0f9cd6;
+  /* Action/link blue: >=4.5:1 against paper, white and sky. */
+  --color-signal: #086e96;
   --color-success: #2e7d5b;
   --color-warning: #b4501c;
 

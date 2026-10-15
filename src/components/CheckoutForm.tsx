@@ -281,7 +281,7 @@ export default function CheckoutForm({
         contact: phone,
       },
       notes: { orderNumber },
-      theme: { color: '#0f9cd6' },
+      theme: { color: '#086e96' },
       timeout: RAZORPAY_TIMEOUT_SECONDS,
       handler: () => {
         // Deliberately does not mark anything paid — §10. The confirmation
