@@ -80,7 +80,7 @@ export default function ProductCard({
       }}
       animate={{ y: hover && !reduced ? -2 : 0 }}
       transition={{ duration: dur.lift, ease }}
-      className="group relative flex h-full flex-col rounded-card border bg-paper p-4 transition-[border-color,box-shadow] duration-(--bb-duration-accent) ease-(--bb-ease-out) hover:shadow-bb focus-within:shadow-bb"
+      className="group relative flex h-full flex-col rounded-card border bg-paper p-3 sm:p-4 transition-[border-color,box-shadow] duration-(--bb-duration-accent) ease-(--bb-ease-out) hover:shadow-bb focus-within:shadow-bb"
       style={{ borderColor: hover ? accentHex : 'var(--color-line)' }}
     >
       <div
@@ -99,7 +99,7 @@ export default function ProductCard({
                 alt={imageAlt ?? name}
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-contain p-6"
+                className="object-contain p-3 sm:p-6"
               />
             </m.div>
 
@@ -116,7 +116,7 @@ export default function ProductCard({
                   alt=""
                   fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-contain p-6"
+                  className="object-contain p-3 sm:p-6"
                 />
               </m.div>
             )}
@@ -125,6 +125,10 @@ export default function ProductCard({
           // No stock photography and no placeholder art: an image-less product
           // gets an empty accent field, not a grey box with a camera glyph.
           <span className="sr-only">No photograph available</span>
+        )}
+
+        {showMrp && (
+          <span className="absolute left-2 top-2 rounded-full bg-paper px-3 py-1 text-xs font-medium text-ink">Save {formatPrice((mrpPaise as number) - (pricePaise as number))}</span>
         )}
 
         {purchasable && onQuickAdd && (
@@ -141,7 +145,7 @@ export default function ProductCard({
             // keyboard users don't tab into an offscreen control.
             tabIndex={hover ? 0 : -1}
             aria-hidden={!hover && !reduced}
-            className="btn btn-primary absolute inset-x-3 bottom-3"
+            className="btn btn-primary absolute z-10 inset-x-3 bottom-3"
           >
             Quick add
           </m.button>
@@ -151,7 +155,7 @@ export default function ProductCard({
       {/* Ink, not accent — this is body text. */}
       <p className="mt-4 type-caption text-ink-soft">{brandName}</p>
 
-      <h3 className="mt-1 type-subhead">
+      <h3 className="mt-1 type-subhead text-base sm:text-lg [overflow-wrap:anywhere]">
         <Link
           href={`/products/${slug}`}
           className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-signal"
@@ -174,6 +178,9 @@ export default function ProductCard({
           <span className="text-ink-soft">{formatPrice(null)}</span>
         )}
       </p>
+      <div aria-hidden="true" className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-3 text-xs font-medium text-signal">
+        <span>View product</span><span className="arrow-nudge">↗</span>
+      </div>
     </m.article>
   );
 }

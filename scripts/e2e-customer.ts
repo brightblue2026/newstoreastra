@@ -18,6 +18,20 @@ async function main() {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
+    // Exercise the redesigned shopping surfaces at phone and desktop widths.
+    await mkdir('qa/screenshots/customer', { recursive: true });
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const route of ['/', '/shop']) {
+        const response = await page.goto(`http://localhost:3000${route}`, { waitUntil: 'networkidle', timeout: 60_000 });
+        assert.equal(response?.status(), 200);
+        await expect(page.locator('main h1')).toHaveCount(1);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        assert.ok(overflow <= 1, `${route} overflows by ${overflow}px at ${width}px`);
+        await page.screenshot({ path: `qa/screenshots/customer/${width}-${route === '/' ? 'home' : 'shop'}.png`, fullPage: true });
+      }
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('http://localhost:3000/products/integration-test', { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.getByRole('button', { name: 'Add to cart', exact: true }).filter({ visible: true }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible();

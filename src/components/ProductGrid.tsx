@@ -11,7 +11,7 @@ import ProductCard, { type ProductCardData } from '@/components/ProductCard';
 */
 export default function ProductGrid({ products }: { products: ProductCardData[] }) {
   return (
-    <Reveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4" gap={0.04}>
+    <Reveal className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6" gap={0.04}>
       {products.map((product) => (
         <RevealItem key={product.slug}>
           <ProductCard product={product} />

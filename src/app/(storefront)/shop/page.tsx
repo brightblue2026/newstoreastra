@@ -65,7 +65,7 @@ export default async function ShopPage({
   const filtered = knownBrand !== undefined || knownCategory !== undefined;
 
   return (
-    <div className="mx-auto max-w-(--container-page) px-6 py-24">
+    <div className="mx-auto max-w-(--container-page) px-6 py-12 lg:py-16">
       <Reveal>
         <RevealItem>
           <p className="type-caption text-ink-soft">Catalogue</p>
@@ -80,7 +80,7 @@ export default async function ShopPage({
         </RevealItem>
       </Reveal>
 
-      <div className="mt-16">
+      <div className="mt-10">
         <FilterBar
           pathname="/shop"
           current={current}
@@ -108,7 +108,7 @@ export default async function ShopPage({
         />
       </div>
 
-      <div className="mt-16">
+      <div className="mt-10">
         {products.length > 0 ? (
           <>
             <p className="mb-8 type-caption text-ink-soft">

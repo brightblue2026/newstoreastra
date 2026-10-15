@@ -30,9 +30,8 @@ export const revalidate = 60;
 /*
   The homepage.
 
-  Structure follows the Cleancult teardown: belief before catalogue. No product
-  grid above the fold, no prices in the hero, no reviews carousel. The homepage
-  sells the company; /shop sells the SKU.
+  Editorial hero, live collection discovery and featured products first;
+  the record and manufacturing story follow the shopping paths.
 
   Every section guards its own data, and a section with nothing to show renders
   nothing rather than an empty frame. That is what lets this page be correct
@@ -101,45 +100,16 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* 01 — brand pills. One swipeable row on a phone: nine pills wrapped
-          into five rows pushed the headline half a screen down, and a wrapped
-          row re-flowed — jolting everything below it — when the brand font
-          arrived a second or two after first paint. */}
-      {brands.length > 0 && (
-        <Reveal
-          className="mx-auto flex max-w-(--container-page) gap-3 overflow-x-auto px-6 pt-16 [scrollbar-width:none] *:shrink-0 sm:flex-wrap sm:overflow-visible"
-          gap={0.04}
-        >
-          {brands.map((brand) => (
-            <RevealItem key={brand.slug}>
-              <Link
-                href={`/brands/${brand.slug}`}
-                className="group flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink hover:bg-ink hover:text-paper"
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-2 rounded-full transition-transform duration-(--bb-duration-accent) ease-(--bb-ease-out) group-hover:scale-150"
-                  style={{ backgroundColor: brand.accentHex }}
-                />
-                {brand.name}
-              </Link>
-            </RevealItem>
-          ))}
-        </Reveal>
-      )}
-
       {/* 04 — hero */}
       <div
-        className={`mx-auto grid max-w-(--container-page) items-center gap-12 px-6 pb-24 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] ${
-          brands.length > 0 ? 'pt-16' : 'pt-24'
-        }`}
+        className="store-editorial-hero mx-auto grid max-w-(--container-page) items-center gap-8 px-6 py-12 lg:grid-cols-2 lg:gap-16 lg:py-16"
       >
       <Reveal>
         <RevealItem>
           <p className="type-caption text-ink-soft">{hero.eyebrow}</p>
         </RevealItem>
         <RevealItem>
-          <h1 className="mt-6 max-w-4xl type-display-lg">
+          <h1 className="mt-6 max-w-4xl type-display-lg [text-wrap:balance]">
             {hero.before}{' '}
             {/*
               The second type register, for real: Instrument Serif italic
@@ -167,14 +137,63 @@ export default async function HomePage() {
         </RevealItem>
       </Reveal>
         {/* Decorative: a Kerala counter with 24 bubbles, one per fragrance. */}
-        <div className="relative rounded-card border border-line bg-sky/60 p-8 lg:p-12">
+        <div className="store-hero-stage relative overflow-hidden rounded-card border border-line bg-sky p-6 lg:p-8">
           <div className="flex items-center justify-between gap-4"><span className="type-caption">The MX-3 collection</span><span className="rounded-full border border-ink/20 px-3 py-1 text-xs">Dish care</span></div>
-          <Image src="/collection/dishwash-cutout.webp" alt="Original MX-3 dishwashing liquid bottles from the Bright Blue collection" width={800} height={800} priority sizes="(max-width: 1024px) 90vw, 500px" className="mx-auto aspect-square w-full object-contain" />
+          <Image src="/collection/dishwash-cutout.webp" alt="Original MX-3 dishwashing liquid bottles from the Bright Blue collection" width={800} height={800} priority sizes="(max-width: 1024px) 90vw, 500px" className="relative mx-auto aspect-square w-full object-contain" />
           <div className="flex items-end justify-between border-t border-ink/15 pt-6"><div><span className="type-display-sm">24</span><p className="mt-1 type-body text-ink-soft">Signature fragrances</p></div><Link href="/shop?brand=mx-3" aria-label="Explore MX-3 dish care" className="flex size-12 items-center justify-center rounded-full bg-ink text-paper">↗</Link></div>
         </div>
       </div>
 
-      <HomeCollections />
+      {/* 01 — brand pills. One swipeable row on a phone: nine pills wrapped
+          into five rows pushed the headline half a screen down, and a wrapped
+          row re-flowed — jolting everything below it — when the brand font
+          arrived a second or two after first paint. */}
+      {brands.length > 0 && (
+        <Reveal
+          className="mx-auto flex max-w-(--container-page) gap-3 overflow-x-auto px-6 py-8 [scrollbar-width:none] *:shrink-0 sm:flex-wrap sm:overflow-visible"
+          gap={0.04}
+        >
+          {brands.map((brand) => (
+            <RevealItem key={brand.slug}>
+              <Link
+                href={`/brands/${brand.slug}`}
+                className="group flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink hover:bg-ink hover:text-paper"
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-2 rounded-full transition-transform duration-(--bb-duration-accent) ease-(--bb-ease-out) group-hover:scale-150"
+                  style={{ backgroundColor: brand.accentHex }}
+                />
+                {brand.name}
+              </Link>
+            </RevealItem>
+          ))}
+        </Reveal>
+      )}
+
+      <HomeCollections brands={brands} />
+
+      {/* 09 — best sellers */}
+      {products.length > 0 && (
+        <section className="border-t border-line">
+          <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
+            <RevealItem>
+              <div className="flex flex-wrap items-end justify-between gap-6"><div><p className="mb-4 type-caption text-ink-soft">The Bright Blue edit</p><h2 className="type-display-sm">Everyday favourites</h2></div><Link href="/shop" className="btn btn-secondary">Shop all products <span aria-hidden="true">↗</span></Link></div>
+            </RevealItem>
+            <div className="mt-12 grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+              {products.map((product) => (
+                <RevealItem key={product.slug}>
+                  {/*
+                    No `onQuickAdd` until the cart exists in Phase 4. The card
+                    supports it; shipping a button that does nothing does not.
+                  */}
+                  <ProductCard product={product} />
+                </RevealItem>
+              ))}
+            </div>
+          </Reveal>
+        </section>
+      )}
 
       {/* 05 — the record */}
       <section className="bg-sky">
@@ -241,28 +260,6 @@ export default async function HomePage() {
 
       {/* 08 — how it's made */}
       {showSteps && <PinnedSteps steps={steps} eyebrow={stepsBlock.eyebrow} />}
-
-      {/* 09 — best sellers */}
-      {products.length > 0 && (
-        <section className="border-t border-line">
-          <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
-            <RevealItem>
-              <h2 className="type-display-sm">Best sellers</h2>
-            </RevealItem>
-            <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {products.map((product) => (
-                <RevealItem key={product.slug}>
-                  {/*
-                    No `onQuickAdd` until the cart exists in Phase 4. The card
-                    supports it; shipping a button that does nothing does not.
-                  */}
-                  <ProductCard product={product} />
-                </RevealItem>
-              ))}
-            </div>
-          </Reveal>
-        </section>
-      )}
 
       {/* 10 — combos */}
       {combos.length > 0 && (
