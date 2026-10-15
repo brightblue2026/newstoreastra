@@ -1351,7 +1351,8 @@ async function layoutSection(browser: Browser) {
       const overflow = (await page.evaluate(
         '(() => { const el = document.documentElement; return el.scrollWidth - el.clientWidth; })()',
       )) as number;
-      check(`${label} ${route.path}: no horizontal overflow`, overflow <= 1, `${overflow}px wider than the screen`);
+      const outside = overflow > 1 ? await page.evaluate(() => [...document.querySelectorAll('input, button, label, table, main')].filter((el) => el.getBoundingClientRect().right > innerWidth).map((el) => ({ tag: el.tagName, className: el.className, right: Math.round(el.getBoundingClientRect().right) }))) : [];
+      check(`${label} ${route.path}: no horizontal overflow`, overflow <= 1, { overflow, outside });
       const name = route.path.replace(/^\/admin\/?/, '').replace(/[^a-z0-9]+/gi, '-') || 'dashboard';
       await page.screenshot({ path: path.join(SHOTS, `${label}-${name.slice(0, 60)}.png`), fullPage: true }).catch(() => null);
     }

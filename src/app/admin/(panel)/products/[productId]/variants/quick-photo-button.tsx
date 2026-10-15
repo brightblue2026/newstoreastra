@@ -67,7 +67,7 @@ export function QuickPhotoButton({
     <div className="flex flex-col items-start gap-1">
       <label
         htmlFor={inputId}
-        className={`rounded-control border border-line px-3 py-2 type-body text-ink focus-within:outline-2 focus-within:outline-signal ${
+        className={`relative rounded-control border border-line px-3 py-2 type-body text-ink focus-within:outline-2 focus-within:outline-signal ${
           busy ? 'opacity-60' : 'cursor-pointer hover:bg-sky'
         }`}
       >
