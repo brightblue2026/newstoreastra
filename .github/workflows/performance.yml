@@ -21,11 +21,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.18.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
@@ -36,7 +38,7 @@ jobs:
         env:
           QA_BASE_URL: https://brightbluefmcg.com
           QA_PRODUCT_PATH: /products/mx-3-dish-wash-liquid
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: hosted-browser-performance
@@ -66,19 +68,22 @@ jobs:
       AUTH_SECRET: isolated-performance-only-not-production
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Preserve the same measurement tools for both revisions
         run: |
           mkdir -p "$RUNNER_TEMP/performance-tools"
           cp scripts/browser-performance.ts scripts/seed-performance-fixture.ts scripts/load-test.ts "$RUNNER_TEMP/performance-tools/"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
           ref: ${{ matrix.revision == 'baseline' && 'c311cebb87a2d459b874feefabc5e01d07c9b7e0' || github.sha }}
       - run: cp "$RUNNER_TEMP/performance-tools/"*.ts scripts/
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.18.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
@@ -99,7 +104,7 @@ jobs:
           done
           QA_BASE_URL=http://127.0.0.1:3000 QA_PRODUCT_PATH=/products/integration-test node --import tsx scripts/browser-performance.ts
           LOAD_BASE_URL=http://127.0.0.1:3000 LOAD_REQUESTS=400 LOAD_CONCURRENCY=20 LOAD_EXPECT_PRODUCT=integration-test pnpm test:load | tee qa/performance-load.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: isolated-performance-${{ matrix.revision }}

@@ -8,7 +8,7 @@ assert.equal(home.status, 200);
 assert.equal(home.headers.get('set-cookie'), null, 'Anonymous browsing must not create authentication cookies');
 assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
 assert.equal(home.headers.get('x-frame-options'), 'DENY');
-assert.equal(home.headers.get('referrer-policy'), 'same-origin');
+assert.equal(home.headers.get('referrer-policy'), 'strict-origin');
 assert.ok(home.headers.get('content-security-policy')?.includes("object-src 'none'"));
 const html = await home.text();
 assert.ok(html.includes('Find your kind of care.'));

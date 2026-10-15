@@ -9,26 +9,31 @@ concurrency:
   group: application-backup
   cancel-in-progress: false
 jobs:
+  configuration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require backup activation
+        env:
+          BACKUP_ENABLED: ${{ vars.BACKUP_ENABLED }}
+        run: |
+          if [ "$BACKUP_ENABLED" != 'true' ]; then
+            echo '::error::Production backups are disabled. Configure backup credentials and BACKUP_ENABLED before relying on this schedule.'
+            exit 1
+          fi
   backup:
+    needs: configuration
     if: vars.BACKUP_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: backups
-    env:
-      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
-      RESTIC_REPOSITORY: ${{ secrets.RESTIC_REPOSITORY }}
-      RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-      RCLONE_S3_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
-      RCLONE_S3_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
-      RCLONE_S3_ENDPOINT: ${{ secrets.SUPABASE_S3_ENDPOINT }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.18.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
@@ -43,7 +48,28 @@ jobs:
             printf '%s' "$BACKUP_DB_CA_PEM" > "$RUNNER_TEMP/database-ca.pem"
             echo "PGSSLROOTCERT=$RUNNER_TEMP/database-ca.pem" >> "$GITHUB_ENV"
           fi
-      - run: pnpm backup:create
-      - run: restic check
+      - name: Create encrypted database and image backup
+        run: pnpm backup:create
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          RESTIC_REPOSITORY: ${{ secrets.RESTIC_REPOSITORY }}
+          RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          RCLONE_S3_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          RCLONE_S3_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+          RCLONE_S3_ENDPOINT: ${{ secrets.SUPABASE_S3_ENDPOINT }}
+      - name: Verify encrypted repository data
+        env:
+          RESTIC_REPOSITORY: ${{ secrets.RESTIC_REPOSITORY }}
+          RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+        run: |
+          if [ "$(date -u +%u)" = '7' ]; then
+            restic check --read-data
+          else
+            restic check --read-data-subset=5%
+          fi
       # No automatic pruning: retention and legal holds need an approved policy.
       # Never upload database dumps or object exports as GitHub artifacts.

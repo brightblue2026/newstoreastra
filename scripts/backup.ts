@@ -23,7 +23,7 @@ function pgEnv(value: string): NodeJS.ProcessEnv {
 }
 async function run(command: string, args: string[], env = process.env, cwd?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { env, cwd, stdio: ['ignore', 'pipe', 'pipe'], timeout: 30 * 60 * 1000, killSignal: 'SIGKILL' });
     let out = '';
     // Never print raw tool stderr: it may include credentials or customer rows.
     child.stdout.on('data', (b: Buffer) => { out += b.toString(); });
@@ -47,6 +47,8 @@ async function hashes(root: string, prefix = ''): Promise<Record<string, string>
   return result;
 }
 async function main() {
+  // Restrict temporary plaintext dumps and image exports to the backup user.
+  process.umask(0o077);
   required('RESTIC_REPOSITORY');
   if (!process.env.RESTIC_PASSWORD && !process.env.RESTIC_PASSWORD_FILE) throw new Error('Set RESTIC_PASSWORD_FILE or RESTIC_PASSWORD from a secret store');
   const mode = process.argv[2];

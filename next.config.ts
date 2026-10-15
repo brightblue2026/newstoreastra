@@ -105,9 +105,10 @@ const nextConfig: NextConfig = {
           { key: 'Content-Security-Policy', value: CSP },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
-          // Keep same-origin form POSTs compatible with Next's Origin check.
-          // Suppress referrers entirely when navigating to another origin.
-          { key: 'Referrer-Policy', value: 'same-origin' },
+          // Send only the origin: order capability tokens and query strings must
+          // never leak through Referer, even to another page on this site.
+          // Retaining the origin also preserves Next server-action checks.
+          { key: 'Referrer-Policy', value: 'strict-origin' },
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), payment=(self)',
