@@ -136,7 +136,7 @@ function checkQuiet(page: Page, where: string) {
 
 async function signIn(page: Page, role: Role): Promise<boolean> {
   const { email, password } = ACCOUNTS[role];
-  await page.goto(`${BASE}/admin/login`, { waitUntil: 'domcontentloaded' });
+  await open(page, '/admin/login');
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', password);
   await Promise.all([
@@ -1532,7 +1532,7 @@ async function run(name: string, body: () => Promise<void>): Promise<void> {
   try {
     await body();
   } catch (error) {
-    const message = error instanceof Error ? error.message.split(/\r?\n/)[0] : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     check(`${name}: the section ran to the end`, false, message);
   }
 }

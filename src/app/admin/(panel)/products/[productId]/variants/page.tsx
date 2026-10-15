@@ -54,9 +54,9 @@ export default async function VariantsPage({
         </Link>{' '}
         / {product.name}
       </p>
-      <div className="mt-4 flex items-center justify-between gap-4">
+      <div className="mt-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <h1 className="type-display-sm">Variants</h1>
-        <div className="flex flex-wrap items-center justify-end gap-4">
+        <div className="flex max-w-full flex-wrap items-center justify-start gap-4 sm:justify-end">
           {/* Shown only when pressing it would change something. */}
           {drafts > 0 && (
             <form action={setAllVariantsActiveAction.bind(null, product.id, true)}>
