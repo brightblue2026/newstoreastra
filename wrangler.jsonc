@@ -51,8 +51,8 @@
     "AUTH_TRUST_HOST": "true",
     "NEXT_PUBLIC_SITE_URL": "https://brightbluefmcg.com",
     "SUPABASE_URL": "https://mjbebzlknjowvwhmzzzd.supabase.co",
-    // The Razorpay *test* key id. Public by design; the secret is not here.
-    "NEXT_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_TkdJvcsV1WCSON",
+    // The Razorpay live key id. Public by design; the secret is not here.
+    "NEXT_PUBLIC_RAZORPAY_KEY_ID": "rzp_live_TmwzIL8nsNP56q",
     "RESEND_FROM_EMAIL": "orders@brightbluefmcg.com"
   },
   // Cancels unpaid orders past their payment window; see worker.ts.

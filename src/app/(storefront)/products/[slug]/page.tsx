@@ -24,14 +24,19 @@ export async function generateMetadata({
 
   if (!product) return { title: 'Product not found', robots: { index: false, follow: true } };
 
+  const title = product.metaTitle?.trim() || product.name;
+  const description = product.metaDesc?.trim() || product.shortDesc;
+  const images = product.images[0] ? [{ url: product.images[0].url, alt: product.images[0].alt || product.name }] : undefined;
+
   return {
-    title: product.metaTitle ?? product.name,
-    description: product.metaDesc ?? product.shortDesc,
+    title,
+    description,
     alternates: { canonical: `/products/${product.slug}` },
+    twitter: { card: 'summary_large_image', title, description, images },
     openGraph: {
-      title: product.metaTitle ?? product.name,
-      description: product.metaDesc ?? product.shortDesc,
-      images: product.images[0] ? [product.images[0].url] : undefined,
+      title,
+      description,
+      images,
       type: 'website',
       url: absoluteUrl(`/products/${product.slug}`),
     },

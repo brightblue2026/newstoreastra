@@ -13,6 +13,7 @@ export function configurationChecks(env: Record<string, string | undefined>): Re
     { id: 'auth', label: 'Session security', ready: (env.AUTH_SECRET?.length ?? 0) >= 32, detail: 'Use a unique randomly generated session secret of at least 32 characters.' },
     { id: 'rate-limit', label: 'Abuse protection', ready: present('UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'), detail: 'Shared rate limiting is required for checkout and staff sign-in in production.' },
     { id: 'payment', label: 'Online payments', ready: present('NEXT_PUBLIC_RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET'), detail: 'Configure payment keys and the webhook secret, then complete the test-mode acceptance run.' },
+    { id: 'shipping', label: 'Shiprocket shipping', ready: Boolean((env.SHIPROCKET_API_EMAIL || env.SHIPROCKET_EMAIL)?.trim() && (env.SHIPROCKET_API_PASSWORD || env.SHIPROCKET_PASSWORD)?.trim()) && present('SHIPROCKET_WEBHOOK_TOKEN'), detail: 'Configure courier credentials and webhook token; verify the pickup location and shipping settings in admin.' },
     { id: 'cron', label: 'Unpaid order cleanup', ready: (env.CRON_SECRET?.length ?? 0) >= 32, detail: 'Configure a strong scheduler secret and verify the 15-minute cleanup job.' },
     { id: 'storage', label: 'Product photography', ready: present('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'), detail: 'Configure image storage and verify an upload from the product editor.' },
   ];

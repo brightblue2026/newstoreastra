@@ -11,7 +11,9 @@ assert.equal(home.headers.get('x-frame-options'), 'DENY');
 assert.equal(home.headers.get('referrer-policy'), 'strict-origin');
 assert.ok(home.headers.get('content-security-policy')?.includes("object-src 'none'"));
 const html = await home.text();
-assert.ok(html.includes('Find your kind of care.'));
+// The build fixture has no database: empty collections intentionally stay hidden.
+assert.ok(html.includes('<h1'), 'Homepage must retain its primary heading');
+assert.ok(html.includes('The MX-3 collection'), 'Homepage must render its product hero');
 assert.ok(html.includes('application/ld+json'));
 assert.ok(html.includes('rel="canonical"'));
 assert.ok(html.includes('Skip to content'));
