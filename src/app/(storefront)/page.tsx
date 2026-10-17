@@ -100,16 +100,17 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* 04 — hero */}
+      {/* Colour-led storefront hero; admin-managed copy remains editable. */}
+      <section className="colour-hero" aria-label="Discover Bright Blue">
       <div
-        className="store-editorial-hero mx-auto grid max-w-(--container-page) items-center gap-8 px-6 py-12 lg:grid-cols-2 lg:gap-16 lg:py-16"
+        className="store-editorial-hero mx-auto grid max-w-(--container-page) items-center gap-10 px-6 py-12 lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:py-16"
       >
       <Reveal>
         <RevealItem>
           <p className="type-caption text-ink-soft">{hero.eyebrow}</p>
         </RevealItem>
         <RevealItem>
-          <h1 className="mt-6 max-w-4xl type-display-lg [text-wrap:balance]">
+          <h1 className="hero-headline mt-6 max-w-4xl type-display-lg [text-wrap:balance]">
             {hero.before}{' '}
             {/*
               The second type register, for real: Instrument Serif italic
@@ -130,19 +131,23 @@ export default async function HomePage() {
         </RevealItem>
         <RevealItem>
           <div className="mt-10 flex flex-wrap items-center gap-4">
-            <MagneticButton href={hero.ctaHref}>{hero.ctaLabel}</MagneticButton>
+            <MagneticButton href={hero.ctaHref} className="hero-shop-button">{hero.ctaLabel}</MagneticButton>
             <Link href="/shop?brand=mx-3" className="btn btn-secondary">Discover MX-3</Link>
           </div>
           <p className="mt-6 type-caption text-ink-soft">Made in India · Since 2019</p>
         </RevealItem>
       </Reveal>
         {/* Decorative: a Kerala counter with 24 bubbles, one per fragrance. */}
-        <div className="store-hero-stage relative overflow-hidden rounded-card border border-line bg-sky p-6 lg:p-8">
+        <div className="store-hero-stage relative overflow-hidden rounded-card p-6 lg:p-8">
           <div className="flex items-center justify-between gap-4"><span className="type-caption">The MX-3 collection</span><span className="rounded-full border border-ink/20 px-3 py-1 text-xs">Dish care</span></div>
           <Image src="/collection/dishwash-cutout.webp" alt="Original MX-3 dishwashing liquid bottles from the Bright Blue collection" width={800} height={800} priority sizes="(max-width: 1024px) 90vw, 500px" className="relative mx-auto aspect-square w-full object-contain" />
           <div className="flex items-end justify-between border-t border-ink/15 pt-6"><div><span className="type-display-sm">24</span><p className="mt-1 type-body text-ink-soft">Signature fragrances</p></div><Link href="/shop?brand=mx-3" aria-label="Explore MX-3 dish care" className="flex size-12 items-center justify-center rounded-full bg-ink text-paper">↗</Link></div>
         </div>
       </div>
+
+      </section>
+
+      <div className="care-ribbon" aria-label="Bright Blue product range"><span>Made for everyday living</span><span aria-hidden="true">✦</span><span>From our brands to your home</span><span aria-hidden="true">✦</span><span>Discover your kind of care</span></div>
 
       {/* 01 — brand pills. One swipeable row on a phone: nine pills wrapped
           into five rows pushed the headline half a screen down, and a wrapped
@@ -175,7 +180,7 @@ export default async function HomePage() {
 
       {/* 09 — best sellers */}
       {products.length > 0 && (
-        <section className="border-t border-line">
+        <section className="featured-colour-band border-t border-line">
           <Reveal className="mx-auto max-w-(--container-page) px-6 py-24">
             <RevealItem>
               <div className="flex flex-wrap items-end justify-between gap-6"><div><p className="mb-4 type-caption text-ink-soft">The Bright Blue edit</p><h2 className="type-display-sm">Everyday favourites</h2></div><Link href="/shop" className="btn btn-secondary">Shop all products <span aria-hidden="true">↗</span></Link></div>
@@ -196,7 +201,7 @@ export default async function HomePage() {
       )}
 
       {/* 05 — the record */}
-      <section className="bg-sky">
+      <section className="record-colour-band">
         <div className="mx-auto grid max-w-(--container-page) items-center gap-12 px-6 py-24 md:grid-cols-[minmax(0,1fr)_auto]">
         <Reveal>
           <RevealItem>
@@ -296,7 +301,7 @@ export default async function HomePage() {
       )}
 
       {/* 11 — our story */}
-      <section className="border-t border-line bg-sky">
+      <section className="story-colour-band border-t border-line">
         <div className="mx-auto grid max-w-(--container-page) items-end gap-12 px-6 py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Reveal>
           <RevealItem>

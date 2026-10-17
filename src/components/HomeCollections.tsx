@@ -13,7 +13,7 @@ export default function HomeCollections({ brands }: { brands: Array<{ slug: stri
   const available = collections.filter((item) => brands.some((brand) => brand.slug === item.slug && brand.productCount > 0));
   if (available.length === 0) return null;
   return (
-    <section aria-labelledby="collection-title" className="border-y border-line bg-white">
+    <section aria-labelledby="collection-title" className="collections-colour-band border-y border-line">
       <div className="mx-auto max-w-(--container-page) px-6 py-16 lg:py-24">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
@@ -24,7 +24,7 @@ export default function HomeCollections({ brands }: { brands: Array<{ slug: stri
         </div>
         <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2">
           {available.map((item, index) => (
-            <Link href={`/shop?brand=${item.slug}`} key={item.slug} className={`group collection-editorial relative overflow-hidden rounded-card border border-line bg-paper transition-shadow hover:shadow-bb ${available.length === 1 ? 'md:col-span-2 md:grid md:grid-cols-2 md:items-center' : ''}`}>
+            <Link href={`/shop?brand=${item.slug}`} key={item.slug} data-collection={item.slug} className={`group collection-editorial relative overflow-hidden rounded-card border border-line transition-shadow hover:shadow-bb ${available.length === 1 ? 'md:col-span-2 md:grid md:grid-cols-2 md:items-center' : ''}`}>
               <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-sky/40 p-8">
                 <span className="absolute left-4 top-4 font-mono text-xs text-ink-soft">0{index + 1} / {item.category}</span>
                 <Image src={`/collection/${item.image}`} alt={`${item.brand} ${item.category} product`} width={480} height={480} sizes="(max-width: 768px) 90vw, 560px" className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />

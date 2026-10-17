@@ -52,7 +52,7 @@ export default async function StorefrontLayout({
 
       <main id="main-content" tabIndex={-1}>{children}</main>
 
-      <footer className="border-t border-line">
+      <footer className="storefront-colour-footer border-t border-line">
         <div className="mx-auto max-w-(--container-page) px-6 py-16">
           {brands.length > 0 && (
             <ul className="flex flex-wrap gap-x-8 gap-y-3">

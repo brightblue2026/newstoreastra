@@ -80,7 +80,7 @@ export default function ProductCard({
       }}
       animate={{ y: hover && !reduced ? -2 : 0 }}
       transition={{ duration: dur.lift, ease }}
-      className="group relative flex h-full flex-col rounded-card border bg-paper p-3 sm:p-4 transition-[border-color,box-shadow] duration-(--bb-duration-accent) ease-(--bb-ease-out) hover:shadow-bb focus-within:shadow-bb"
+      className="colour-product-card group relative flex h-full flex-col rounded-card border bg-paper p-3 sm:p-4 transition-[border-color,box-shadow] duration-(--bb-duration-accent) ease-(--bb-ease-out) hover:shadow-bb focus-within:shadow-bb"
       style={{ borderColor: hover ? accentHex : 'var(--color-line)' }}
     >
       <div

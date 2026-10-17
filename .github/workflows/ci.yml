@@ -185,6 +185,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:next
+      - run: pnpm exec playwright install --with-deps chromium
       - name: Production HTTP smoke
         run: |
           pnpm exec next start -H 127.0.0.1 > /tmp/native-server.log 2>&1 &
@@ -195,6 +196,13 @@ jobs:
             sleep 1
           done
           QA_BASE_URL=http://127.0.0.1:3000 pnpm test:http
+          QA_BASE_URL=http://127.0.0.1:3000 node --import tsx scripts/visual-storefront.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: storefront-colour-preview
+          path: qa/screenshots/storefront
+          retention-days: 7
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:

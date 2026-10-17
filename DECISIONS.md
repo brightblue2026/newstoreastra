@@ -1914,3 +1914,5 @@ Reverses "Hosting on Vercel + Supabase" of 28 September. Supabase stays for Post
 - 2026-10-15: Referrer-Policy strict-origin strips order capability tokens and other URL paths/queries from same-origin and cross-origin referrers while retaining origin for server-action validation.
 
 - 2026-10-16: Read source origin/main 90ded85 only; copied its publishable live Razorpay key configuration to newstoreastra, preserving matching Supabase project and all three provider integrations. Added Shiprocket readiness diagnostics, product-specific Twitter metadata and optional Search Console verification. Fixed DB-free smoke assertion for intentionally hidden empty collections. No source repository writes.
+
+- 2026-10-17: User rejected the neutral storefront and requested colourful backgrounds; supersedes earlier single-accent background guidance. Added a cobalt hero with mint/lemon product stage, cream catalogue, pastel collection panels and navy footer, preserving original assets and admin/payment behavior.

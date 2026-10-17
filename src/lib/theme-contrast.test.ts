@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
-function token(name: string): string {
-  const value = css.match(new RegExp(`--color-${name}:\\s*(#[a-f\\d]{6})`, 'i'))?.[1];
+function token(name: string, prefix = 'color'): string {
+  const value = css.match(new RegExp(`--${prefix}-${name}:\\s*(#[a-f\\d]{6})`, 'i'))?.[1];
   if (!value) throw new Error(`Missing colour token: ${name}`);
   return value;
 }
@@ -22,5 +22,15 @@ describe('action and link text contrast', () => {
   });
   it('keeps white admin-button text readable on the action colour', () => {
     expect(contrast(token('signal'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('colourful storefront readability', () => {
+  it.each(['cream', 'mint', 'peach', 'lilac', 'lemon'])('keeps body copy readable on %s', (background) => {
+    expect(contrast(token('ink-soft'), token(background, 'store'))).toBeGreaterThanOrEqual(4.5);
+  });
+  it('keeps the hero text and lemon action readable', () => {
+    expect(contrast('#e2eaff', token('blue', 'store'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(token('blue-deep', 'store'), token('lemon', 'store'))).toBeGreaterThanOrEqual(4.5);
   });
 });

@@ -65,7 +65,7 @@ export default async function ShopPage({
   const filtered = knownBrand !== undefined || knownCategory !== undefined;
 
   return (
-    <div className="mx-auto max-w-(--container-page) px-6 py-12 lg:py-16">
+    <div className="colour-shop"><div className="mx-auto max-w-(--container-page) px-6 py-12 lg:py-16">
       <Reveal>
         <RevealItem>
           <p className="type-caption text-ink-soft">Catalogue</p>
@@ -133,6 +133,6 @@ export default async function ShopPage({
           </EmptyListing>
         )}
       </div>
-    </div>
+    </div></div>
   );
 }
