@@ -612,3 +612,12 @@
 .store-question[open] { background: var(--store-cream); border-color: var(--store-blue-deep); }
 .store-question summary::-webkit-details-marker { display: none; }
 .discovery-pill:focus-visible, .collection-editorial:focus-visible, .store-question summary:focus-visible { outline: 3px solid var(--store-blue); outline-offset: 4px; }
+
+.announcement-track { animation: announcement-scroll 28s linear infinite; }
+.announcement-track > li { padding-inline-end: 3rem; }
+@keyframes announcement-scroll { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .announcement-track { animation: none; width: auto; max-width: var(--container-page); margin-inline: auto; padding-inline: 1.5rem; flex-wrap: wrap; justify-content: center; column-gap: 3rem; row-gap: .25rem; }
+  .announcement-track > [aria-hidden="true"] { display: none; }
+  .announcement-track > li { padding-inline-end: 0; white-space: normal; text-align: center; }
+}
