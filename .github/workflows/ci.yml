@@ -153,13 +153,13 @@ jobs:
       - name: Admin browser journeys and role enforcement
         if: ${{ !cancelled() && steps.server.outcome == 'success' }}
         run: node --conditions=react-server --import tsx scripts/e2e-admin.ts
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: admin-browser-screenshots
           path: qa/screenshots
           retention-days: 7
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: integration-server-log
@@ -197,13 +197,13 @@ jobs:
           done
           QA_BASE_URL=http://127.0.0.1:3000 pnpm test:http
           QA_BASE_URL=http://127.0.0.1:3000 node --import tsx scripts/visual-storefront.ts
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: storefront-colour-preview
           path: qa/screenshots/storefront
           retention-days: 7
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: native-server-log
