@@ -17,8 +17,8 @@ export default function StoreQuestions() {
         mainEntity: questions.map(({ question, answer }) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })),
       }) }} />
       <div><p className="type-caption text-ink-soft">A little help</p><h2 id="questions-title" className="mt-4 type-display-sm">Before you shop.</h2><Link href="/order" className="mt-6 inline-flex min-h-11 items-center underline underline-offset-4">Track your order ↗</Link></div>
-      <div>{questions.map(({ question, answer }) => (
-        <details key={question} className="group border-b border-line py-6 first:border-t">
+      <div className="space-y-3">{questions.map(({ question, answer }) => (
+        <details key={question} className="store-question group rounded-2xl border border-line p-5 sm:p-6">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-6 type-subhead">{question}<span aria-hidden="true" className="group-open:rotate-45">+</span></summary>
           <p className="mt-4 max-w-2xl type-body text-ink-soft">{answer}</p>
         </details>

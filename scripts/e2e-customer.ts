@@ -31,6 +31,15 @@ async function main() {
         await page.screenshot({ path: `qa/screenshots/customer/${width}-${route === '/' ? 'home' : 'shop'}.png`, fullPage: true });
       }
     }
+    // The discovery shortcut must apply the live brand filter, not just look clickable.
+    await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+    const discovery = page.getByRole('navigation', { name: 'Shop by brand', exact: true });
+    await expect(discovery).toBeVisible();
+    await discovery.getByRole('link', { name: /Integration fixture/ }).click();
+    await expect(page).toHaveURL(/\/shop\?brand=integration-test/);
+    await expect(page.getByRole('link', { name: 'Synthetic test product', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Synthetic test product', exact: true }).click();
+    await expect(page).toHaveURL(/\/products\/integration-test$/);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('http://localhost:3000/products/integration-test', { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.getByRole('button', { name: 'Add to cart', exact: true }).filter({ visible: true }).first().click();

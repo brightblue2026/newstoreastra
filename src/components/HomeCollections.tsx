@@ -25,7 +25,7 @@ export default function HomeCollections({ brands }: { brands: Array<{ slug: stri
         <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2">
           {available.map((item, index) => (
             <Link href={`/shop?brand=${item.slug}`} key={item.slug} data-collection={item.slug} className={`group collection-editorial relative overflow-hidden rounded-card border border-line transition-shadow hover:shadow-bb ${available.length === 1 ? 'md:col-span-2 md:grid md:grid-cols-2 md:items-center' : ''}`}>
-              <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-sky/40 p-8">
+              <div className="collection-image-field relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-sky/40 p-8">
                 <span className="absolute left-4 top-4 font-mono text-xs text-ink-soft">0{index + 1} / {item.category}</span>
                 <Image src={`/collection/${item.image}`} alt={`${item.brand} ${item.category} product`} width={480} height={480} sizes="(max-width: 768px) 90vw, 560px" className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
               </div>

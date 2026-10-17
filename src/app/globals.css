@@ -594,3 +594,21 @@
   .care-ribbon > :nth-child(n+4) { display: none; }
   .store-hero-stage { border-radius: 40% 40% 20px 20px; }
 }
+
+/* Product-led discovery adapted to Bright Blue's own catalogue and assets. */
+.shop-discovery { background: var(--store-cream); }
+.discovery-pill { display: flex; min-height: 48px; align-items: center; gap: .75rem; border: 1px solid var(--color-line); border-radius: 999px; padding: .625rem 1rem; font-size: .875rem; font-weight: 600; background: white; }
+.discovery-pill:hover { border-color: var(--store-blue); color: var(--store-blue); }
+.discovery-pill-all { background: var(--store-blue-deep); color: white; border-color: var(--store-blue-deep); }
+.discovery-pill-all:hover { background: var(--store-blue); color: white; }
+.discovery-count { display: inline-flex; min-width: 1.75rem; height: 1.75rem; align-items: center; justify-content: center; padding-inline: .375rem; border-radius: 999px; background: var(--store-cream); color: var(--color-ink); font-size: .75rem; }
+.collection-editorial { border-radius: 28px; }
+.collection-image-field::before { content: ''; position: absolute; width: 70%; aspect-ratio: 1; border-radius: 50%; background: #ffffff55; pointer-events: none; }
+.collection-image-field img { position: relative; }
+.colour-hero .btn { border-radius: 999px; }
+.product-view-link { background: var(--store-blue-deep); color: white; }
+.colour-product-card:hover .product-view-link, .colour-product-card:focus-within .product-view-link { background: var(--store-blue); }
+.store-question { background: white; }
+.store-question[open] { background: var(--store-cream); border-color: var(--store-blue-deep); }
+.store-question summary::-webkit-details-marker { display: none; }
+.discovery-pill:focus-visible, .collection-editorial:focus-visible, .store-question summary:focus-visible { outline: 3px solid var(--store-blue); outline-offset: 4px; }

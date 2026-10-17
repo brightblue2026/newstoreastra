@@ -166,7 +166,7 @@ export default function ProductCard({
 
       {size && <p className="mt-1 type-body text-ink-soft">{size}</p>}
 
-      <p className="mt-auto flex flex-wrap items-baseline gap-x-2 pt-2 type-body" data-price>
+      <p className="mt-auto flex flex-wrap items-baseline gap-x-2 pt-2 text-base sm:text-lg" data-price>
         {purchasable ? (
           <>
             <span className="font-medium">{formatPrice(pricePaise)}</span>
@@ -178,7 +178,7 @@ export default function ProductCard({
           <span className="text-ink-soft">{formatPrice(null)}</span>
         )}
       </p>
-      <div aria-hidden="true" className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-3 text-xs font-medium text-signal">
+      <div aria-hidden="true" className="product-view-link mt-4 flex min-h-11 items-center justify-between gap-2 rounded-full px-4 py-2 text-xs font-medium">
         <span>View product</span><span className="arrow-nudge">↗</span>
       </div>
     </m.article>

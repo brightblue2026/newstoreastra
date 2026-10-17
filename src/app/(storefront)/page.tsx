@@ -137,7 +137,7 @@ export default async function HomePage() {
           <p className="mt-6 type-caption text-ink-soft">Made in India · Since 2019</p>
         </RevealItem>
       </Reveal>
-        {/* Decorative: a Kerala counter with 24 bubbles, one per fragrance. */}
+        {/* Original product photography on a contrasting colour field. */}
         <div className="store-hero-stage relative overflow-hidden rounded-card p-6 lg:p-8">
           <div className="flex items-center justify-between gap-4"><span className="type-caption">The MX-3 collection</span><span className="rounded-full border border-ink/20 px-3 py-1 text-xs">Dish care</span></div>
           <Image src="/collection/dishwash-cutout.webp" alt="Original MX-3 dishwashing liquid bottles from the Bright Blue collection" width={800} height={800} priority sizes="(max-width: 1024px) 90vw, 500px" className="relative mx-auto aspect-square w-full object-contain" />
@@ -149,31 +149,24 @@ export default async function HomePage() {
 
       <div className="care-ribbon" aria-label="Bright Blue product range"><span>Made for everyday living</span><span aria-hidden="true">✦</span><span>From our brands to your home</span><span aria-hidden="true">✦</span><span>Discover your kind of care</span></div>
 
-      {/* 01 — brand pills. One swipeable row on a phone: nine pills wrapped
-          into five rows pushed the headline half a screen down, and a wrapped
-          row re-flowed — jolting everything below it — when the brand font
-          arrived a second or two after first paint. */}
-      {brands.length > 0 && (
-        <Reveal
-          className="mx-auto flex max-w-(--container-page) gap-3 overflow-x-auto px-6 py-8 [scrollbar-width:none] *:shrink-0 sm:flex-wrap sm:overflow-visible"
-          gap={0.04}
-        >
-          {brands.map((brand) => (
-            <RevealItem key={brand.slug}>
-              <Link
-                href={`/brands/${brand.slug}`}
-                className="group flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-line px-4 py-2 type-caption motion-accent hover:border-ink hover:bg-ink hover:text-paper"
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-2 rounded-full transition-transform duration-(--bb-duration-accent) ease-(--bb-ease-out) group-hover:scale-150"
-                  style={{ backgroundColor: brand.accentHex }}
-                />
-                {brand.name}
-              </Link>
-            </RevealItem>
-          ))}
-        </Reveal>
+      {brands.some((brand) => brand.productCount > 0) && (
+        <nav aria-label="Shop by brand" className="shop-discovery">
+          <div className="mx-auto max-w-(--container-page) px-6 py-8">
+            <p className="type-caption text-ink-soft">Your everyday, made brighter</p>
+            <ul className="mt-4 flex flex-wrap gap-3">
+              <li><Link href="/shop" className="discovery-pill discovery-pill-all">Shop everything <span aria-hidden="true">↗</span></Link></li>
+              {brands.filter((brand) => brand.productCount > 0).map((brand) => (
+                <li key={brand.slug}>
+                  <Link href={`/shop?brand=${brand.slug}`} className="discovery-pill">
+                    <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ backgroundColor: brand.accentHex }} />
+                    {brand.name}
+                    <span className="discovery-count">{brand.productCount}<span className="sr-only"> products</span></span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </nav>
       )}
 
       <HomeCollections brands={brands} />

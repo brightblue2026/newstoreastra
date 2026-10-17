@@ -1916,3 +1916,5 @@ Reverses "Hosting on Vercel + Supabase" of 28 September. Supabase stays for Post
 - 2026-10-16: Read source origin/main 90ded85 only; copied its publishable live Razorpay key configuration to newstoreastra, preserving matching Supabase project and all three provider integrations. Added Shiprocket readiness diagnostics, product-specific Twitter metadata and optional Search Console verification. Fixed DB-free smoke assertion for intentionally hidden empty collections. No source repository writes.
 
 - 2026-10-17: User rejected the neutral storefront and requested colourful backgrounds; supersedes earlier single-accent background guidance. Added a cobalt hero with mint/lemon product stage, cream catalogue, pastel collection panels and navy footer, preserving original assets and admin/payment behavior.
+
+- 2026-10-17: Adapt product-first browsing from the accessible Mr. Pops Awwwards reference: live-count brand shortcuts, circular collection image fields, visible product links and keyboard-friendly FAQ cards. Keep original BBTC assets; no external code, new dependencies or provider changes. Verify four widths and real filter navigation in isolated browser CI.
